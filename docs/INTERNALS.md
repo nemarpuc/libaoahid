@@ -6,7 +6,7 @@ changing the library. The public model is in [ARCHITECTURE.md](ARCHITECTURE.md),
 the wire protocol in [PROTOCOL.md](PROTOCOL.md), and every limit in
 [LIMITS.md](LIMITS.md); this page does not repeat them.
 
-Source references are `path#Lnnn` and are valid at v4.0.4. They name the line
+Source references are `path#Lnnn` and are valid at v4.0.5. They name the line
 where the symbol starts.
 
 ## Handles
@@ -14,9 +14,9 @@ where the symbol starts.
 | Handle | Definition | Holds |
 | --- | --- | --- |
 | `aoahid_context` | `src/api/internal.hpp#L269` | The `Runtime` (libusb context), the event thread, `devices`, `graveyard`, the HID ID domains, and the deferred error latch. |
-| `aoahid_device` | `src/api/internal.hpp#L304` | A `transport::Device` (transfer pool and one `Port` reference), its policy values, `nodes`, `channels`, and the pool-slot signal. |
-| `aoahid_node` | `src/api/internal.hpp#L343` | A retained Spec, the `NodeState` variant, the HID ID, the pool reservation, and the completion fields the callback publishes. |
-| `aoahid_channel` | `src/api/internal.hpp#L338` | A `transport::Channel` (its own transfers and one `Port` reference). |
+| `aoahid_device` | `src/api/internal.hpp#L301` | A `transport::Device` (transfer pool and one `Port` reference), its policy values, `nodes`, `channels`, and the pool-slot signal. |
+| `aoahid_node` | `src/api/internal.hpp#L340` | A retained Spec, the `NodeState` variant, the HID ID, the pool reservation, and the completion fields the callback publishes. |
+| `aoahid_channel` | `src/api/internal.hpp#L335` | A `transport::Channel` (its own transfers and one `Port` reference). |
 | `aoahid_spec` | `src/api/internal.hpp#L258` | An atomic reference count, the descriptor bytes, the `ReportLayout`, the `DescriptorRequirements`, and the copied options. |
 
 A `Port` (`src/transport/transport.hpp#L124`) is the only owner
@@ -40,7 +40,7 @@ No libusb type appears above `src/transport/transport.hpp`.
 | `Runtime::ports_mutex_`, `Port::claims_mutex_` | The open-Port list; the per-interface claim counts | Leaf locks, open and close paths only. |
 
 Order: the Context mutex is taken before the transport spinlock
-(`src/api/c_api.cpp#L921` calls `graph_drained` under it).
+(`src/api/c_api.cpp#L908` calls `graph_drained` under it).
 Nothing takes them the other way round.
 
 Profile calls need no lock: a mutator returns `AOAHID_ERR_BUSY` while
@@ -51,7 +51,7 @@ time.
 ## Event thread
 
 Internal-thread mode starts one thread in
-`src/api/c_api.cpp#L1070`. Its loop is
+`src/api/c_api.cpp#L1057`. Its loop is
 `Runtime::poll(60 s)` followed by `reap_graveyard`
 (`src/api/c_api.cpp#L26`).
 A failed poll latches a Context error and backs off 10 ms on `graveyard_cv`.
@@ -62,7 +62,7 @@ success.
 
 Stopping sets `stop_event_thread`, then calls
 `src/transport/discovery.cpp#L172`, then
-joins (`src/api/c_api.cpp#L240`). The 60-second
+joins (`src/api/c_api.cpp#L234`). The 60-second
 timeout only bounds a backend that ignores the interrupt.
 
 The log sink can run on the event thread. Exceptions from it are swallowed.
@@ -74,10 +74,10 @@ Per report, in internal-thread mode:
 1. A profile call changes `NodeState` and marks the Node dirty. Press and
    release of one control cannot share a report: the second edge returns
    `AOAHID_ERR_BUSY` until a report carrying the first has completed.
-2. `src/api/c_api.cpp#L1612` runs
-   `preflight_context`, which reads two atomics (`event_thread_failed`,
-   `deferred_error_pending`) and takes the Context mutex only when an error is
-   latched (`src/api/c_api.cpp#L210`).
+2. `src/api/c_api.cpp#L1599` runs
+   `preflight_context`, which reads the `event_thread_failed` atomic and then
+   checks the deferred error latch under the Context mutex
+   (`src/api/c_api.cpp#L209`).
 3. `src/transport/transport.cpp#L652` pops a slot
    from `free_stack` (last in, first out). A slot is handed out only while
    more are free than other Nodes have reserved, unless the caller is filling
@@ -99,7 +99,7 @@ cancellation) may have reached the device, so a mouse report consumes the
 motion it carried and motion is never sent twice.
 
 `aoahid_node_submit_blocking` waits in
-`src/api/c_api.cpp#L614`: on the Node's
+`src/api/c_api.cpp#L601`: on the Node's
 `completion_cv`, or on the Device's `slot_cv` when every pool slot is taken.
 Both waits wake every 10 ms to check for a Context error.
 
@@ -112,8 +112,6 @@ Both waits wake every 10 ms to check for a Context error.
   `completion_*` atomics (reported by the next submit or close), the Device
   latch (`aoahid_device_latched_error`), and the Context `deferred_error`.
 - The Context latch keeps the first error only.
-  `deferred_error_pending` mirrors `deferred_error.pending`; code or tests
-  that write `deferred_error` directly must set it too.
 - An event-thread termination is stored separately in `event_thread_error`
   and is returned by every later call.
 - `DeferredError` holds only string literals, so it never allocates and can
@@ -121,7 +119,7 @@ Both waits wake every 10 ms to check for a Context error.
 
 ## Close and the graveyard
 
-`src/api/c_api.cpp#L1893` marks the
+`src/api/c_api.cpp#L1880` marks the
 Device closing, closes every Node (neutral report, request 55, reservation)
 inside one `close_drain_timeout_ms` budget, loses every Channel, cancels all
 transfers, and waits for them to drain.
@@ -130,13 +128,14 @@ transfers, and waits for them to drain.
   (`src/transport/transport.cpp#L819`). `callbacks_active`
   is decremented only after the completion callback returns.
 - A drained Device is destroyed at once
-  (`src/api/c_api.cpp#L870`).
+  (`src/api/c_api.cpp#L857`).
 - Otherwise the whole graph moves to `graveyard`
-  (`src/api/c_api.cpp#L915`) and the call returns
+  (`src/api/c_api.cpp#L902`) and the call returns
   `AOAHID_CLOSE_PENDING`. The event thread reaps it after a poll returns;
-  in caller-poll mode `aoahid_context_poll` and context destroy do. Since
-  4.0.4 the event thread is woken right after the hand-over
-  (`src/api/c_api.cpp#L252`).
+  in caller-poll mode `aoahid_context_poll` and context destroy do. Nothing
+  wakes the event thread for the hand-over itself: a graph whose last callback
+  finished just before it is reaped at the next USB event, or when the
+  60-second wait ends.
 - `aoahid_device_open` reserves room in both `devices` and `graveyard`, so
   the hand-over cannot allocate.
 - A `transport::Device` or `Channel` destroyed while not drained leaks its
@@ -147,7 +146,7 @@ between polls.
 
 ## Registration
 
-`src/api/c_api.cpp#L983` takes the next ID of the
+`src/api/c_api.cpp#L970` takes the next ID of the
 Device's domain (USB bus plus port path). IDs start at 1 and are never reused
 while the Context lives; passing 65535 returns `AOAHID_ERR_OVERFLOW`.
 

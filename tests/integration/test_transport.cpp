@@ -2393,7 +2393,6 @@ void test_context_destroy_never_returns_terminal_pending() {
     {
         const aoa::detail::ModeMutexGuard guard(context->active_state_mutex);
         context->deferred_error = invalid_terminal;
-        context->deferred_error_pending.store(true, std::memory_order_release);
     }
     // Context is consumed, but the consuming result can never be the one value
     // that authorizes the blocking wrapper to inspect it again.

@@ -5,6 +5,23 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+## [4.0.5] - 2026-10-04
+
+No public API or ABI change. It was not hardware-verified again: it was checked
+with the host test suite only, so the `Verified` rows in
+`docs/TARGET_MATRIX.md` are still the 4.0.2 results.
+
+### Changed
+
+- Two changes from 4.0.4 are taken out again, and the code they touched is
+  that of 4.0.3. The atomic flag that let `aoahid_node_submit` skip the
+  Context mutex saved one uncontended lock per report, which was never
+  measured, and had to be kept in step with the error latch by hand. The
+  wake-up after a Device is handed to the Context graveyard covered a window
+  of microseconds whose only cost is a later reclaim.
+- The field-width fix from 4.0.4 stays: every combination of widths from 1 to
+  32 bits is accepted.
+
 ## [4.0.4] - 2026-10-04
 
 No public API or ABI change. It was not hardware-verified again: it was checked

@@ -59,10 +59,8 @@ bool inject_terminal_event_thread_failure(aoahid_context* context) noexcept {
     {
         const std::lock_guard<std::mutex> guard(context->mutex);
         context->event_thread_error = failure;
-        if (!context->deferred_error.pending) {
+        if (!context->deferred_error.pending)
             context->deferred_error = failure;
-            context->deferred_error_pending.store(true, std::memory_order_release);
-        }
     }
     context->event_thread_failed.store(true, std::memory_order_release);
     context->stop_event_thread.store(true, std::memory_order_release);

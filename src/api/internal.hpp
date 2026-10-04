@@ -283,9 +283,6 @@ struct aoahid_context {
     std::condition_variable graveyard_cv;
     std::vector<aoa::detail::HidIdDomain> hid_id_domains;
     aoa::detail::DeferredError deferred_error;
-    // Mirrors deferred_error.pending so the per-report preflight reads one
-    // atomic instead of locking the Context mutex to find nothing latched.
-    std::atomic<bool> deferred_error_pending{false};
     // Unlike ordinary first-error delivery, an event-thread termination is a
     // persistent fatal state: accepting more asynchronous work would leave it
     // without an event pump.

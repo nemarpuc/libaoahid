@@ -191,7 +191,6 @@ void latch_context_error(aoahid_context* context,
         const aoa::detail::ModeMutexGuard guard(context->active_state_mutex);
         if (!context->deferred_error.pending) {
             context->deferred_error = error;
-            context->deferred_error_pending.store(true, std::memory_order_release);
         }
     }
     context->graveyard_cv.notify_all();
@@ -208,16 +207,13 @@ bool peek_context_error(aoahid_context* context, aoa::detail::DeferredError* out
 }
 
 bool take_context_error(aoahid_context* context, aoa::detail::DeferredError* output) noexcept {
-    if (context == nullptr || output == nullptr ||
-        !context->deferred_error_pending.load(std::memory_order_acquire)) {
+    if (context == nullptr || output == nullptr)
         return false;
-    }
     const aoa::detail::ModeMutexGuard guard(context->active_state_mutex);
     if (!context->deferred_error.pending)
         return false;
     *output = context->deferred_error;
     context->deferred_error = aoa::detail::DeferredError{};
-    context->deferred_error_pending.store(false, std::memory_order_release);
     return true;
 }
 
@@ -228,10 +224,8 @@ void latch_terminal_event_error(aoahid_context* context,
     {
         const aoa::detail::ModeMutexGuard guard(context->active_state_mutex);
         context->event_thread_error = error;
-        if (!context->deferred_error.pending) {
+        if (!context->deferred_error.pending)
             context->deferred_error = error;
-            context->deferred_error_pending.store(true, std::memory_order_release);
-        }
     }
     context->event_thread_failed.store(true, std::memory_order_release);
     context->graveyard_cv.notify_all();
@@ -247,13 +241,6 @@ void request_event_thread_stop(aoahid_context* context) noexcept {
         context->runtime->interrupt_event_handler();
     }
     context->graveyard_cv.notify_all();
-}
-
-void request_graveyard_reap(aoahid_context* context) noexcept {
-    if (context->runtime != nullptr &&
-        !context->event_thread_exited.load(std::memory_order_acquire)) {
-        context->runtime->interrupt_event_handler();
-    }
 }
 
 bool peek_terminal_event_error(aoahid_context* context,
@@ -2013,12 +2000,6 @@ static aoahid_result device_close_impl(aoahid_device* device, bool* consumed) tr
     // Publication is the last operation that may touch the Device. In
     // internal-thread mode the event thread may reap it immediately.
     park_in_graveyard(context, device);
-    // The event thread may have checked the graveyard just before this and
-    // gone back to its long wait; wake it so a graph that drained in between
-    // is reclaimed now instead of at the next USB event.
-    if (context->options.event_mode == AOAHID_EVENT_INTERNAL_THREAD) {
-        request_graveyard_reap(context);
-    }
     return AOAHID_CLOSE_PENDING;
 }
 AOAHID_C_RESULT_CATCH("device.close")
