@@ -36,7 +36,7 @@ pub type aoahid_usage_semantic = i32;
 
 pub const AOAHID_VERSION_MAJOR: u32 = 4;
 pub const AOAHID_VERSION_MINOR: u32 = 0;
-pub const AOAHID_VERSION_PATCH: u32 = 3;
+pub const AOAHID_VERSION_PATCH: u32 = 4;
 pub const AOAHID_OK: i32 = 0;
 pub const AOAHID_ERR_PARAM: i32 = 1;
 pub const AOAHID_ERR_UNSET_FIELD: i32 = 2;

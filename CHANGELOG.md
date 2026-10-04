@@ -5,6 +5,43 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+## [4.0.4] - 2026-10-04
+
+No public API or ABI change. It was not hardware-verified again: it was checked
+with the host test suite only (including the ThreadSanitizer build), so the
+`Verified` rows in `docs/TARGET_MATRIX.md` are still the 4.0.2 results.
+
+### Fixed
+
+- Mouse, Pen, Touchscreen, and Touchpad Specs no longer reject width
+  combinations that put a field across a fifth byte: a 32-bit Y behind a
+  31-bit X, or an X of 29 bits or more behind a 4-bit Contact Identifier. They
+  returned `AOAHID_ERR_PARAM` ("spec.field"). The generator now pads to the next
+  byte boundary in exactly that case. Every descriptor that was accepted
+  before is byte-identical; the golden descriptors are unchanged.
+- In internal-thread mode, a Device that `aoahid_device_close` hands to the
+  Context graveyard is reclaimed at once. If its last callback finished
+  between the close's final check and the hand-over, nothing woke the event
+  thread, and the USB handle stayed open until the next USB event or the
+  60-second idle bound.
+
+### Changed
+
+- `aoahid_node_submit` and `aoahid_raw_submit` in internal-thread mode read
+  one atomic flag instead of locking the Context mutex to find that no
+  deferred error is latched.
+
+### Documentation
+
+- `aoahid_spec_create_toggle` in `aoahid.h`: a Camera Control Usage outside
+  Auto-focus/Shutter returns `AOAHID_ERR_PARAM`, as the code always did. The
+  comment said `AOAHID_ERR_UNSUPPORTED`.
+- `docs/LIMITS.md`: a Logical or Physical Maximum is written unsigned when
+  both extents are non-negative, and the conditional padding above.
+- Added `docs/INTERNALS.md`: lifetimes, locks, the send and completion paths,
+  the Channel, the descriptor generator, and the test and release tooling,
+  with source references.
+
 ## [4.0.3] - 2026-10-03
 
 No public API, ABI, or behavior change. A maintenance release. It was not

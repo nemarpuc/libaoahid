@@ -781,6 +781,52 @@ aoahid_touchpad_options touchpad_options() {
     return options;
 }
 
+void test_field_span_padding() {
+    // X ends mid-byte, so a 32-bit Y right behind it would touch five bytes.
+    aoahid_mouse_options mouse{};
+    mouse.struct_size = static_cast<std::uint32_t>(sizeof(mouse));
+    mouse.button_count = 1U;
+    mouse.x = {-1073741823, 1073741823, 31U, {}};
+    mouse.y = {-2147483647, 2147483647, 32U, {}};
+    aoahid_spec* spec = nullptr;
+    AOAHID_CHECK(aoahid_spec_create_mouse(&mouse, &spec) == AOAHID_OK);
+    if (spec != nullptr) {
+        const auto* x = field(spec, aoa::hid::FieldSemantic::x);
+        const auto* y = field(spec, aoa::hid::FieldSemantic::y);
+        AOAHID_CHECK(x != nullptr && x->bit_offset == 8U);
+        AOAHID_CHECK(y != nullptr && y->bit_offset == 40U);
+    }
+    aoahid_spec_release(spec);
+    spec = nullptr;
+
+    // Fields that already fit keep their packed positions.
+    mouse.x = {-127, 127, 8U, {}};
+    mouse.y = {-2047, 2047, 12U, {}};
+    AOAHID_CHECK(aoahid_spec_create_mouse(&mouse, &spec) == AOAHID_OK);
+    if (spec != nullptr) {
+        const auto* y = field(spec, aoa::hid::FieldSemantic::y);
+        AOAHID_CHECK(y != nullptr && y->bit_offset == 16U);
+    }
+    aoahid_spec_release(spec);
+    spec = nullptr;
+
+    // A 4-bit Contact Identifier followed by a 31-bit X.
+    aoahid_touchscreen_options touch{};
+    touch.struct_size = static_cast<std::uint32_t>(sizeof(touch));
+    touch.maximum_contacts = 1U;
+    touch.contacts_per_report = 1U;
+    touch.contact_identifier = {0, 15, 4U, {}};
+    touch.x = {0, 2147483646, 31U, {}};
+    touch.y = {0, 2559, 12U, {}};
+    touch.contact_count = {0, 1, 1U, {}};
+    AOAHID_CHECK(aoahid_spec_create_touchscreen(&touch, &spec) == AOAHID_OK);
+    if (spec != nullptr) {
+        const auto* x = field(spec, aoa::hid::FieldSemantic::x);
+        AOAHID_CHECK(x != nullptr && x->bit_offset % 8U == 0U);
+    }
+    aoahid_spec_release(spec);
+}
+
 void test_touch_units_feature_and_manifest_status() {
     aoahid_touchscreen_options options = touchscreen_options();
     options.enable_contact_count_maximum_feature_declaration = 1U;
@@ -1337,6 +1383,7 @@ void test_profiles() {
     test_hat_domain();
     test_controller_dpad_and_extended_axes();
     test_physical_properties_and_reset();
+    test_field_span_padding();
     test_touch_units_feature_and_manifest_status();
     test_touch_azimuth();
     test_touch_packets();

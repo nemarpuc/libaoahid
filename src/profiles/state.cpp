@@ -94,7 +94,7 @@ bool store_bits(std::uint8_t* report, const std::size_t capacity, const FieldLay
         static_cast<std::uint64_t>(value) & ((std::uint64_t{1} << field.bit_width) - 1U);
     std::size_t position = field.bit_offset;
     std::uint32_t remaining = field.bit_width;
-    // A field spans at most five bytes, so it is written a byte at a time.
+    // A field spans at most four bytes, so it is written a byte at a time.
     while (remaining != 0U) {
         const auto shift = static_cast<std::uint32_t>(position & 7U);
         const std::uint32_t taken = std::min(remaining, 8U - shift);

@@ -31,7 +31,7 @@ extern "C" {
 
 #define AOAHID_VERSION_MAJOR 4
 #define AOAHID_VERSION_MINOR 0
-#define AOAHID_VERSION_PATCH 3
+#define AOAHID_VERSION_PATCH 4
 
 typedef struct aoahid_context aoahid_context;
 typedef struct aoahid_discovery aoahid_discovery;
@@ -947,11 +947,12 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_spec_create_mouse(const aoahid_mouse
  * Blocking: Performs validation and allocation but no I/O or waiting.
  * Synchronization: Has no Context domain and may run concurrently; caller-owned
  * input/output storage must not be concurrently mutated.
- * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid pointers/ABI fields/usages;
+ * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid pointers/ABI fields/usages,
+ * including a Camera Control field Usage outside Auto-focus/Shutter;
  * AOAHID_ERR_UNSET_FIELD for a missing Application Collection, field Usage
  * Page, allow-list, semantic, or evidence array; AOAHID_ERR_UNSUPPORTED for a
  * semantic press/release cannot represent, or for a Camera Control field
- * Usage outside Auto-focus/Shutter or not declared One Shot;
+ * Usage not declared One Shot;
  * AOAHID_ERR_OVERFLOW for count/descriptor/layout overflow; AOAHID_ERR_INTERNAL
  * for allocation, generation inconsistency, or unexpected exception. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_spec_create_toggle(const aoahid_toggle_options* options,

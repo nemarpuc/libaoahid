@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "libaoahid",
-  "version-semver": "4.0.3",
+  "version-semver": "4.0.4",
   "description": "Explicit, allocation-bounded Android Open Accessory HID library",
   "homepage": "https://github.com/nemarpuc/libaoahid",
   "license": "MIT",

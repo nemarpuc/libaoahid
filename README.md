@@ -272,6 +272,7 @@ the GitHub Release and its assets.
 | [PROFILES.md](docs/PROFILES.md) | Descriptor and state-machine contract of each profile |
 | [EXAMPLES.md](docs/EXAMPLES.md) | Walkthrough of the example programs in C, C++, Python, C#, and Rust |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Object model, threading, send path, source layout |
+| [INTERNALS.md](docs/INTERNALS.md) | Implementation notes for contributors: ownership, locks, teardown, descriptor generation, release tooling |
 | [PROTOCOL.md](docs/PROTOCOL.md) | How AOA 2.0 HID works and how Android handles the device |
 | [LIMITS.md](docs/LIMITS.md) | Numeric limits and validation rules |
 | [LATENCY.md](docs/LATENCY.md) | Latency behavior, tuning, and what the tests measure |

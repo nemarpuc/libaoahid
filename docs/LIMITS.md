@@ -19,7 +19,7 @@ and [HID Usage Tables 1.7](https://usb.org/sites/default/files/hut1_7.pdf).
 | Report ID placement | Before the first Main item of the report it identifies | §6.2.2.7 | An Application Collection may come first. |
 | Field span | One field touches at most 4 bytes; a 32-bit field starts on a byte boundary | §8.4 | Checked per field, not per report. |
 | Report length | No 4-byte limit on the whole report | §8.4 | Report size is limited only by the transport and target policies below. |
-| Signed items | Minimum/Maximum items are read as signed two's-complement values | §6.2.2.7 | A positive minimum or a maximum is encoded so it still reads correctly as signed. |
+| Signed items | A field is signed when either extent is negative, unsigned otherwise | §§5.8, 6.2.2.7 | Minimum items are written as the shortest signed value. A Maximum is written as the shortest unsigned value when both extents are non-negative (65535 with minimum 0 is `26 FF FF`), and as the shortest signed value otherwise. |
 | Unit Exponent | 4-bit signed, -8..7 | §6.2.2.7 | Emitted as a low nibble. |
 | Global tags | 0-11 defined, 12-15 reserved | §6.2.2.7 | Raw validation rejects reserved tags. |
 | Extended Usages | A 4-byte Usage carries its own page; an extended Usage Minimum needs an extended Maximum | §6.2.2.8 | Raw validation rejects mixed pairs. |
@@ -59,6 +59,12 @@ fields:
 - Touchscreen and Touchpad: in every contact after Tip Switch, after the
   Contact Identifier/X/Y group, and after each of Pressure, Width, and Height;
   then before Scan Time and before Contact Count.
+
+Two caller-sized fields can also follow each other with no boundary between
+them (Mouse X then Y, Pen X then Y, a contact's Contact Identifier, X, and Y).
+There the generator pads to the next byte boundary only when the second field
+would otherwise touch a fifth byte, for example a 32-bit Y behind a 31-bit X;
+narrower fields stay packed.
 
 This costs at most a few padding bits per boundary and keeps every
 combination of widths within the HID field-span rule.

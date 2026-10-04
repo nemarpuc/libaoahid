@@ -3,7 +3,8 @@
 This document describes how libaoahid is put together. It is for contributors
 and for users who need to reason about threading, lifetimes, or failure
 handling. For the wire protocol see [PROTOCOL.md](PROTOCOL.md); for the full
-function reference see [API.md](API.md).
+function reference see [API.md](API.md); for the implementation behind it
+(locks, the send path, teardown) see [INTERNALS.md](INTERNALS.md).
 
 ## Layers
 

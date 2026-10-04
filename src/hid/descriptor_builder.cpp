@@ -197,6 +197,13 @@ bool DescriptorBuilder::variable(const std::uint16_t usage_page, const std::uint
     if (!prepare_data_main()) {
         return false;
     }
+    // HID 1.11 section 8.4 lets a field touch at most four bytes. A field that
+    // would reach a fifth starts on the next byte boundary instead.
+    const std::size_t lead_bits = input_bits_ & 7U;
+    if (lead_bits != 0U && lead_bits + bit_width > 32U &&
+        !constant_padding(static_cast<std::uint16_t>(8U - lead_bits))) {
+        return false;
+    }
     std::uint32_t flags = kInputVariable;
     if (relative) {
         flags |= kInputRelative;
