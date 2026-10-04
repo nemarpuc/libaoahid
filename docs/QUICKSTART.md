@@ -68,9 +68,11 @@ libusb0). Two things commonly get in the way:
   and close any app that might restart it (Android Studio, scrcpy, Vysor).
 - The manufacturer installed its own driver instead of WinUSB. Samsung
   devices are one example: HID can work while a Channel on the ADB interface
-  fails with libusb status `-12` (`LIBUSB_ERROR_NOT_SUPPORTED`). Replace the
-  whole device's driver with WinUSB using [Zadig](https://zadig.akeo.ie/); see
-  the Windows section of [PORTING.md](PORTING.md#windows).
+  fails with libusb status `-12` (`LIBUSB_ERROR_NOT_SUPPORTED`). Replacing the
+  whole device's driver with WinUSB using [Zadig](https://zadig.akeo.ie/) may
+  fix it, but it is not guaranteed on every phone; see the Windows section of
+  [PORTING.md](PORTING.md#windows). If only HID is needed and the device opens,
+  no driver change is required.
 
 ## 5. Build against the real libusb backend
 

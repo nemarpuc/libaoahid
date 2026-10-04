@@ -42,6 +42,18 @@ Arch Linux:
 
 Details per device and OS are in [TARGET_MATRIX.md](docs/TARGET_MATRIX.md).
 
+## Windows drivers
+
+On Windows, libusb can use a phone only through WinUSB (or libusbK / libusb0).
+Input alone (HID, sent as USB control transfers) worked on the Samsung Galaxy
+Tab S11 with Samsung's own driver. The ADB interface, a bulk interface, did
+not, until the whole device was switched to WinUSB; the POCO F6 Pro had WinUSB
+from the start. So if a phone cannot be opened, or you open a bulk interface
+such as ADB, replacing the whole device's driver with WinUSB in
+[Zadig](https://zadig.akeo.ie/) may fix it. That is not guaranteed on every
+phone. Some manufacturers install their own driver; Samsung is one example.
+See [PORTING.md](docs/PORTING.md#windows).
+
 ## Profiles
 
 <!-- profile-table:start -->
