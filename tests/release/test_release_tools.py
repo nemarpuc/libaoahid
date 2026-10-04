@@ -349,25 +349,25 @@ class ReleaseIdentityTests(unittest.TestCase):
             "libaoahid-0.1.0-source.tar.gz",
         )
 
-    def test_exact_23_asset_contract(self) -> None:
+    def test_exact_33_asset_contract(self) -> None:
         assets = collect_release.expected_release_asset_names("0.1.0")
-        self.assertEqual(len(assets), 23)
+        self.assertEqual(len(assets), 33)
         self.assertEqual(
             sum(name.endswith((".tar.gz", ".zip")) for name in assets),
-            13,
+            19,
         )
-        self.assertEqual(sum(name.endswith(".spdx.json") for name in assets), 8)
+        self.assertEqual(sum(name.endswith(".spdx.json") for name in assets), 12)
         self.assertEqual(
             sum(name.endswith(("-runtime.tar.gz", "-runtime.zip")) for name in assets),
-            4,
+            6,
         )
         # A bare shared library cannot carry libusb's license or corresponding
         # source, so no asset may be one.
-        self.assertEqual(sum(name.endswith((".so", ".dll")) for name in assets), 0)
+        self.assertEqual(sum(name.endswith((".so", ".dylib", ".dll")) for name in assets), 0)
         self.assertIn("release-manifest.json", assets)
         self.assertIn("SHA256SUMS", assets)
         readme = (REPOSITORY / "README.md").read_text(encoding="utf-8")
-        self.assertIn("exactly 23 uploaded assets", readme)
+        self.assertIn("exactly 33 uploaded assets", readme)
 
     def test_runtime_bundle_carries_every_license_obligation(self) -> None:
         elf = bytearray(64)
@@ -456,6 +456,37 @@ class ReleaseIdentityTests(unittest.TestCase):
                     first, hashlib.sha256(again.read_bytes()).hexdigest()
                 )
 
+    def test_macos_runtime_is_checked_as_a_thin_mach_o_dylib(self) -> None:
+        def dylib(cpu_type: int, file_type: int = 6) -> bytes:
+            header = bytearray(32)
+            header[0:4] = b"\xcf\xfa\xed\xfe"
+            struct.pack_into("<iiI", header, 4, cpu_type, 0, file_type)
+            return bytes(header)
+
+        collect_release.validate_runtime_architecture(
+            dylib(0x0100000C), "macos", "arm64"
+        )
+        collect_release.validate_runtime_architecture(
+            dylib(0x01000007), "macos", "x86_64"
+        )
+        for data, arch in (
+            (dylib(0x01000007), "arm64"),
+            (dylib(0x0100000C), "x86_64"),
+            (dylib(0x0100000C, 2), "arm64"),
+            (b"\xca\xfe\xba\xbe" + bytes(28), "arm64"),
+        ):
+            with self.subTest(arch=arch, magic=data[:4]):
+                with self.assertRaises(collect_release.CollectionError):
+                    collect_release.validate_runtime_architecture(
+                        data, "macos", arch
+                    )
+        self.assertTrue(collect_release.is_runtime_binary("lib/libusb-1.0.0.dylib", "macos"))
+        self.assertFalse(collect_release.is_runtime_binary("lib/libaoahid.a", "macos"))
+        self.assertEqual(
+            collect_release.runtime_bundle_name("0.1.0", "macos", "arm64", ""),
+            "libaoahid-0.1.0-macos-arm64-runtime.tar.gz",
+        )
+
     def test_spdx_files_are_licensed_individually(self) -> None:
         self.assertEqual(
             generate_spdx.file_license("lib/libaoahid.so.0.1.0"),
@@ -463,6 +494,7 @@ class ReleaseIdentityTests(unittest.TestCase):
         )
         for dependency in (
             "lib/libusb-1.0.so.0.6.0",
+            "lib/libusb-1.0.0.dylib",
             "bin/libusb-1.0.dll",
             "include/libusb-1.0/libusb.h",
             "lib/pkgconfig/libusb-1.0.pc",
@@ -612,14 +644,18 @@ Cflags: -I${includedir}
             "Linux AArch64 (Ubuntu 22.04 glibc)",
             "Windows x64",
             "Windows ARM64",
+            "macOS ARM64",
+            "macOS x86-64",
         ):
             self.assertIn(label, workflow)
+        self.assertIn("os: macos-15\n", workflow)
+        self.assertIn("os: macos-15-intel", workflow)
         self.assertIn("os: windows-2025-vs2026", workflow)
         self.assertIn("os: windows-11-vs2026-arm", workflow)
         self.assertIn("generator: Visual Studio 18 2026", workflow)
         self.assertIn("tools/release/package_source.py", workflow)
         self.assertIn("--source-root .", workflow)
-        self.assertIn('test "${#assets[@]}" -eq 23', workflow)
+        self.assertIn('test "${#assets[@]}" -eq 33', workflow)
         self.assertIn(
             "AOAHID_RELEASE_VERSION: ${{ needs.validate.outputs.version }}", workflow
         )
@@ -698,7 +734,7 @@ Cflags: -I${includedir}
         self.assertIn("if(_AOAHID_BUILT_SHARED AND", config)
         self.assertIn("if(_AOAHID_BUILT_STATIC AND", config)
         self.assertEqual(
-            release.count("-DAOAHID_CONSUMER_TARGET=aoahid::aoahid_static"), 2
+            release.count("-DAOAHID_CONSUMER_TARGET=aoahid::aoahid_static"), 3
         )
         for expected in (
             '"build/$variant"',

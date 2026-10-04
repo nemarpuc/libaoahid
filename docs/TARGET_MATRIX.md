@@ -81,11 +81,16 @@ Release archives are built by `.github/workflows/release.yml` for:
 | Linux aarch64, glibc | `ubuntu-22.04-arm` | `libaoahid.so`, `libaoahid.a` |
 | Windows x86_64 | `windows-2025-vs2026` | `aoahid.dll` + import library, `aoahid_static.lib` |
 | Windows ARM64 | `windows-11-vs2026-arm` | `aoahid.dll` + import library, `aoahid_static.lib` |
+| macOS arm64 | `macos-15` | `libaoahid.dylib`, `libaoahid.a` |
+| macOS x86_64 | `macos-15-intel` | `libaoahid.dylib`, `libaoahid.a` |
+
+The macOS archives are built with the fake libusb backend's tests and an
+installed-package consumer, and have not been tested with a real device or
+libusb's macOS backend.
 
 `.github/workflows/ci.yml` also builds and tests Linux musl (x86_64 and
-aarch64) and macOS (`macos-15`, `macos-15-intel`). These are portability
-checks only; no release archive is published for them, and they have not been
-tested with a real device.
+aarch64). That is a portability check only; no release archive is published
+for it, and it has not been tested with a real device.
 
 ## Checking a new device
 

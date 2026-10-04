@@ -11,7 +11,8 @@ and is licensed under the MIT License. The complete license text is in LICENSE.
 libaoahid uses libusb 1.0, which is a separate work distributed under the GNU
 Lesser General Public License, version 2.1 or (at your option) any later version.
 Windows packages include the dynamically linked libusb runtime and import
-library; the corresponding libusb license and copyright file is included.
+library, and macOS packages include `libusb-1.0.0.dylib`; the corresponding
+libusb license and copyright file is included.
 Static libaoahid archives do not incorporate libusb object code, but programs
 linking those archives must provide a compatible libusb implementation.
 

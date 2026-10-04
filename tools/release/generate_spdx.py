@@ -93,6 +93,7 @@ def release_archive_name(
 ) -> str:
     allowed = {
         "linux": {"x86_64", "aarch64"},
+        "macos": {"x86_64", "arm64"},
         "windows": {"x86_64", "arm64"},
     }
     if platform not in allowed or arch not in allowed[platform]:
@@ -103,6 +104,8 @@ def release_archive_name(
         return (
             f"libaoahid-{version}-linux-{arch}-ubuntu22.04-{variant}.tar.gz"
         )
+    if platform == "macos":
+        return f"libaoahid-{version}-macos-{arch}-{variant}.tar.gz"
     return f"libaoahid-{version}-windows-{arch}-{variant}.zip"
 
 
@@ -328,7 +331,7 @@ def validate_document(root: Path, document: dict[str, object]) -> None:
     if not isinstance(name, str):
         raise SpdxError("document name is missing")
     match = re.fullmatch(
-        r"libaoahid-([0-9]+\.[0-9]+\.[0-9]+)-(linux|windows)-"
+        r"libaoahid-([0-9]+\.[0-9]+\.[0-9]+)-(linux|macos|windows)-"
         r"(x86_64|aarch64|arm64)-(shared|static)",
         name,
     )

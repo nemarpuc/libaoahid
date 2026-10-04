@@ -446,8 +446,8 @@ public static class Native
     private const string Library = "aoahid";
     private const CallingConvention Call = CallingConvention.Cdecl;
     public const uint AOAHID_VERSION_MAJOR = 4;
-    public const uint AOAHID_VERSION_MINOR = 0;
-    public const uint AOAHID_VERSION_PATCH = 5;
+    public const uint AOAHID_VERSION_MINOR = 1;
+    public const uint AOAHID_VERSION_PATCH = 0;
 
     public static readonly IReadOnlyDictionary<string, int> AbiConstants =
         new Dictionary<string, int>

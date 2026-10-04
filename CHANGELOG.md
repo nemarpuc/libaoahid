@@ -5,6 +5,21 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-10-04
+
+No public API or ABI change. It was not hardware-verified again: the macOS
+archives were not run against a phone, and the `Verified` rows in
+`docs/TARGET_MATRIX.md` are still the 4.0.2 results.
+
+### Added
+
+- Release archives for macOS arm64 and x86_64: `libaoahid-X.Y.Z-macos-{arm64,x86_64}-{shared,static}.tar.gz`,
+  their SPDX sidecars, and `-runtime.tar.gz` bundles. They bundle libusb 1.0.30
+  built from its unmodified source, target macOS 11, load libusb through
+  `@rpath`, and are signed ad hoc, not notarized. The release now has 33
+  assets instead of 23. They are checked with the fake libusb backend and
+  installed-package consumers only.
+
 ## [4.0.5] - 2026-10-04
 
 No public API or ABI change. It was not hardware-verified again: it was checked

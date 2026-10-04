@@ -1,6 +1,6 @@
 [package]
 name = "aoahid-sys"
-version = "4.0.5"
+version = "4.1.0"
 edition = "2021"
 description = "Literal Rust FFI declarations for the libaoahid C ABI"
 license = "MIT"

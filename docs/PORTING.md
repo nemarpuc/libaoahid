@@ -89,10 +89,23 @@ driver and reconnect.
 Release archives for Windows x64 and ARM64 are built on native GitHub-hosted
 runners and include the import library and the libusb DLL with its license.
 
+## macOS
+
+Release archives for arm64 and x86_64 are built with libusb 1.0.30 from its
+unmodified source, a deployment target of macOS 11, and `@loader_path` as the
+run path, so `libaoahid.dylib` finds `libusb-1.0.0.dylib` in its own directory.
+Both libraries are signed ad hoc and not notarized.
+
+The macOS build is checked only with the fake libusb backend and installed-package
+consumers on GitHub-hosted runners. It has not been run against a phone, so
+whether libusb's macOS backend can open an Android device, claim the ADB
+interface, or take it from another process is unknown here. Record a first
+result as its own row in [TARGET_MATRIX.md](TARGET_MATRIX.md#checking-a-new-device).
+
 ## Other libusb platforms
 
 The transport uses only public libusb 1.0.30 APIs, and CI builds and tests on
-macOS and Linux musl. Release archives cover only the targets in
+Linux musl. Release archives cover only the targets in
 [TARGET_MATRIX.md](TARGET_MATRIX.md#build-targets). A new backend needs a check
 of its control-transfer length, claim, cancel, event, and device-matching
 behavior against the libusb documentation and source, plus integration tests.

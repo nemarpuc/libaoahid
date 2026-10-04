@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 libaoahid contributors
-"""Validate the complete four-platform release set and write checksums."""
+"""Validate the complete six-target release set and write checksums."""
 
 from __future__ import annotations
 
@@ -30,7 +30,11 @@ TARGETS = (
     ("linux", "aarch64", "ubuntu22.04", ".tar.gz"),
     ("windows", "x86_64", "", ".zip"),
     ("windows", "arm64", "", ".zip"),
+    ("macos", "arm64", "", ".tar.gz"),
+    ("macos", "x86_64", "", ".tar.gz"),
 )
+# Platforms whose archives are .tar.gz; Windows alone ships .zip.
+TAR_PLATFORMS = ("linux", "macos")
 VARIANTS = ("shared", "static")
 LIBUSB_SOURCE_NAME = "share/doc/libaoahid/third-party/source/libusb-1.0.30.tar.bz2"
 LIBUSB_SOURCE_SHA256 = "fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf"
@@ -106,7 +110,7 @@ def runtime_bundle_name(
     version: str, platform: str, arch: str, qualifier: str
 ) -> str:
     """Return the license-complete runtime asset name for one target."""
-    extension = ".tar.gz" if platform == "linux" else ".zip"
+    extension = ".tar.gz" if platform in TAR_PLATFORMS else ".zip"
     return (
         f"libaoahid-{version}-{platform_part(platform, arch, qualifier)}"
         f"-runtime{extension}"
@@ -193,20 +197,25 @@ def archive_bytes(path: Path, relative: str) -> bytes:
 
 def shared_runtime(path: Path, platform: str) -> tuple[str, bytes]:
     root = path.name.removesuffix(".tar.gz").removesuffix(".zip")
-    if platform == "linux":
+    if platform in TAR_PLATFORMS:
+        runtime_pattern = (
+            r"libaoahid\.so\.[0-9]+\.[0-9]+\.[0-9]+"
+            if platform == "linux"
+            else r"libaoahid\.[0-9]+\.[0-9]+\.[0-9]+\.dylib"
+        )
         with tarfile.open(path, "r:gz") as archive:
             matches = [
                 member
                 for member in archive.getmembers()
                 if member.isfile()
                 and re.fullmatch(
-                    rf"{re.escape(root)}/lib/libaoahid\.so\.[0-9]+\.[0-9]+\.[0-9]+",
+                    rf"{re.escape(root)}/lib/{runtime_pattern}",
                     member.name,
                 )
             ]
             if len(matches) != 1:
                 raise CollectionError(
-                    f"{path.name}: expected exactly one regular versioned libaoahid shared object"
+                    f"{path.name}: expected exactly one regular versioned libaoahid shared library"
                 )
             stream = archive.extractfile(matches[0])
             if stream is None:
@@ -238,6 +247,19 @@ def validate_runtime_architecture(data: bytes, platform: str, arch: str) -> None
             )
         return
 
+    if platform == "macos":
+        # Thin little-endian Mach-O 64 dynamic library (MH_MAGIC_64, MH_DYLIB).
+        if len(data) < 16 or data[:4] != b"\xcf\xfa\xed\xfe":
+            raise CollectionError("direct macOS runtime is not a thin 64-bit Mach-O object")
+        cpu_type, _, file_type = struct.unpack_from("<iiI", data, 4)
+        expected_cpu = {"x86_64": 0x01000007, "arm64": 0x0100000C}[arch]
+        if cpu_type != expected_cpu or file_type != 6:
+            raise CollectionError(
+                f"direct macOS runtime has Mach-O cpu/file type {cpu_type:#x}/{file_type}, "
+                f"expected {expected_cpu:#x}/6 (MH_DYLIB)"
+            )
+        return
+
     if len(data) < 0x40 or data[:2] != b"MZ":
         raise CollectionError("direct Windows runtime has no DOS/PE header")
     pe_offset = struct.unpack_from("<I", data, 0x3C)[0]
@@ -266,6 +288,8 @@ def is_runtime_binary(relative: str, platform: str) -> bool:
         return False
     if platform == "linux":
         return parts[0] == "lib" and ".so" in parts[1]
+    if platform == "macos":
+        return parts[0] == "lib" and parts[1].endswith(".dylib")
     return parts[0] == "bin" and parts[1].lower().endswith(".dll")
 
 
@@ -305,7 +329,7 @@ def build_runtime_bundle(
     if not binaries:
         raise CollectionError(f"{archive.name}: no runtime binary to bundle")
 
-    if platform == "linux":
+    if platform in TAR_PLATFORMS:
         with tarfile.open(archive, "r:gz") as source:
             with bundle.open("wb") as raw:
                 with gzip.GzipFile(
@@ -527,7 +551,7 @@ def require_layout(
             ),
             expected_private_libraries=(
                 ("-lstdc++", "-lc++")
-                if variant == "static" and platform == "linux"
+                if variant == "static" and platform in ("linux", "macos")
                 else None
             ),
         )
@@ -537,7 +561,7 @@ def require_layout(
                 label=f"{path.name}: libusb-1.0.pc",
                 expected_name="libusb-1.0",
                 expected_version="1.0.30",
-                expected_library=("usb-1.0" if platform == "linux" else "libusb-1.0"),
+                expected_library=("libusb-1.0" if platform == "windows" else "usb-1.0"),
             )
     except (KeyError, pkg_config_metadata.PkgConfigError) as error:
         raise CollectionError(f"{path.name}: invalid pkg-config metadata: {error}") from error
@@ -562,6 +586,23 @@ def require_layout(
                 for name in members
             )
             == 1
+        )
+    elif platform == "macos" and variant == "shared":
+        okay = (
+            any(
+                re.fullmatch(r"lib/libaoahid\.[0-9]+\.[0-9]+\.[0-9]+\.dylib", name)
+                for name in members
+            )
+            and "lib/libusb-1.0.0.dylib" in members
+            and not any(name.endswith(".a") for name in members)
+        )
+    elif platform == "macos":
+        okay = (
+            "lib/libaoahid.a" in members
+            and "lib/libusb-1.0.dylib" in members
+            and "lib/libusb-1.0.0.dylib" in members
+            and "include/libusb-1.0/libusb.h" in members
+            and not any(name.startswith("lib/libaoahid") and name.endswith(".dylib") for name in members)
         )
     elif variant == "shared":
         dependency_dlls = {
@@ -615,6 +656,10 @@ def require_layout(
         )
     if not okay:
         raise CollectionError(f"{path.name}: expected {platform}/{variant} library files are missing")
+    if platform == "macos":
+        validate_runtime_architecture(
+            archive_bytes(path, "lib/libusb-1.0.0.dylib"), platform, arch
+        )
 
     try:
         metadata = json.loads(archive_bytes(path, "share/doc/libaoahid/build-metadata.json"))
@@ -775,7 +820,7 @@ def validate_sidecar(
             raise CollectionError(f"{path.name}: SPDX vcpkg verification code is inconsistent")
     elif vcpkg is not None or len(packages) != 2:
         raise CollectionError(
-            f"{path.name}: Linux SPDX must contain only libaoahid and libusb"
+            f"{path.name}: a non-Windows SPDX must contain only libaoahid and libusb"
         )
     created = datetime.fromtimestamp(created_epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     creation_info = document.get("creationInfo")
@@ -1045,7 +1090,8 @@ def main() -> int:
         print(f"collect-release: error: {error}", file=sys.stderr)
         return 1
     print(
-        "collect-release: validated 8 packages, 1 source archive, and 4 runtime bundles; "
+        f"collect-release: validated {len(TARGETS) * len(VARIANTS)} packages, 1 source archive, "
+        f"and {len(TARGETS)} runtime bundles; "
         "wrote release-manifest.json and SHA256SUMS"
     )
     return 0

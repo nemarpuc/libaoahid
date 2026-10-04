@@ -76,6 +76,14 @@ jobs:
             qualifier: ubuntu22.04
             generator: Ninja
             elf_machine: AArch64
+          - name: macOS ARM64
+            os: macos-15
+            platform: macos
+            arch: arm64
+          - name: macOS x86-64
+            os: macos-15-intel
+            platform: macos
+            arch: x86_64
           - name: Windows x64
             os: windows-2025-vs2026
             platform: windows
@@ -108,8 +116,8 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Configure deterministic transport gate (Linux)
-        if: matrix.platform == 'linux'
+      - name: Configure deterministic transport gate (Unix)
+        if: matrix.platform != 'windows'
         run: >-
           cmake -S . -B build/gate -G Ninja
           -DCMAKE_BUILD_TYPE=Release
@@ -133,8 +141,8 @@ jobs:
             -DCMAKE_INSTALL_LIBDIR=lib
           if ($LASTEXITCODE -ne 0) { throw "deterministic transport configure failed" }
 
-      - name: Run deterministic transport gate (Linux)
-        if: matrix.platform == 'linux'
+      - name: Run deterministic transport gate (Unix)
+        if: matrix.platform != 'windows'
         run: |
           cmake --build build/gate --config Release --parallel
           ctest --test-dir build/gate -C Release --output-on-failure
@@ -384,6 +392,228 @@ jobs:
               --build-metadata 'libusb_source_commit=87a55632db62c9bdc58cd31d3ccfa673f1bb017f' \
               --build-metadata 'libusb_source_archive_sha256=fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf' \
               --build-metadata "libusb_build=unmodified source; ./configure $AOAHID_LIBUSB_CONFIGURE; make; make install"
+          done
+
+      - name: Prepare macOS build tools
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v ninja >/dev/null || brew install ninja
+          command -v pkg-config >/dev/null || brew install pkgconf
+
+      - name: Build pinned libusb for macOS
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export MACOSX_DEPLOYMENT_TARGET=11.0
+          archive="$PWD/build/dependencies/libusb-1.0.30.tar.bz2"
+          source_dir="$PWD/build/dependencies/libusb-1.0.30"
+          prefix="$PWD/build/libusb-prefix"
+          mkdir -p "${archive%/*}"
+          curl --proto '=https' --tlsv1.2 --fail --location \
+            --retry 5 --retry-all-errors \
+            --output "$archive" \
+            https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2
+          printf '%s  %s\n' \
+            fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf \
+            "$archive" | shasum -a 256 -c -
+          tar -xjf "$archive" -C "${archive%/*}"
+          test -x "$source_dir/configure"
+          cd "$source_dir"
+          # Recorded in build-metadata.json, as for the Linux archives.
+          configure_flags='--disable-static --enable-shared'
+          # shellcheck disable=SC2086
+          ./configure --prefix="$prefix" $configure_flags
+          printf 'AOAHID_LIBUSB_CONFIGURE=%s\n' "$configure_flags" >> "$GITHUB_ENV"
+          make --jobs="$(sysctl -n hw.ncpu)"
+          make install
+
+          # Load libusb through @rpath so the archive works wherever it is
+          # unpacked. Changing the install name invalidates the signature.
+          install_name_tool -id @rpath/libusb-1.0.0.dylib "$prefix/lib/libusb-1.0.0.dylib"
+          codesign --force --sign - "$prefix/lib/libusb-1.0.0.dylib"
+
+          pc_file="$prefix/lib/pkgconfig/libusb-1.0.pc"
+          test -f "$pc_file"
+          pc_dir="${pc_file%/*}"
+          libusb_version="$(PKG_CONFIG_PATH="$pc_dir" pkg-config --modversion libusb-1.0)"
+          libusb_libdir="$(PKG_CONFIG_PATH="$pc_dir" pkg-config --variable=libdir libusb-1.0)"
+          libusb_includedir="$(PKG_CONFIG_PATH="$pc_dir" pkg-config --variable=includedir libusb-1.0)"
+          test "$libusb_version" = 1.0.30
+          test -f "$libusb_includedir/libusb-1.0/libusb.h"
+          test -f "$libusb_libdir/libusb-1.0.0.dylib"
+          test -L "$libusb_libdir/libusb-1.0.dylib"
+          printf 'PKG_CONFIG_PATH=%s\n' "$pc_dir" >> "$GITHUB_ENV"
+          printf 'AOAHID_LIBUSB_PREFIX=%s\n' "$prefix" >> "$GITHUB_ENV"
+          printf 'AOAHID_LIBUSB_LIBDIR=%s\n' "$libusb_libdir" >> "$GITHUB_ENV"
+          printf 'AOAHID_LIBUSB_INCLUDEDIR=%s\n' "$libusb_includedir" >> "$GITHUB_ENV"
+          printf 'AOAHID_LIBUSB_PC=%s\n' "$pc_file" >> "$GITHUB_ENV"
+
+      - name: Build and install real macOS libraries
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for variant in shared static; do
+            shared=OFF
+            static=OFF
+            if test "$variant" = shared; then shared=ON; else static=ON; fi
+            cmake -S . -B "build/$variant" -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+              -DCMAKE_OSX_ARCHITECTURES='${{ matrix.arch }}' \
+              -DAOAHID_USE_FAKE_LIBUSB=OFF \
+              -DAOAHID_BUILD_SHARED:BOOL="$shared" \
+              -DAOAHID_BUILD_STATIC:BOOL="$static" \
+              -DAOAHID_BUILD_TESTS:BOOL=OFF \
+              -DAOAHID_BUILD_EXAMPLES:BOOL=OFF \
+              -DCMAKE_PREFIX_PATH="$AOAHID_LIBUSB_PREFIX" \
+              -DCMAKE_INSTALL_RPATH='@loader_path' \
+              -DCMAKE_INSTALL_LIBDIR=lib
+            cmake --build "build/$variant" --parallel
+            cmake --install "build/$variant" --prefix "build/stage-$variant"
+            cp -a "$AOAHID_LIBUSB_LIBDIR/libusb-1.0.0.dylib" "$AOAHID_LIBUSB_LIBDIR/libusb-1.0.dylib" \
+              "build/stage-$variant/lib/"
+            mkdir -p "build/stage-$variant/share/doc/libaoahid/third-party/source"
+            install -m 0644 build/dependencies/libusb-1.0.30/COPYING \
+              "build/stage-$variant/share/doc/libaoahid/third-party/libusb-copyright"
+            install -m 0644 build/dependencies/libusb-1.0.30.tar.bz2 \
+              "build/stage-$variant/share/doc/libaoahid/third-party/source/libusb-1.0.30.tar.bz2"
+          done
+          mkdir -p build/stage-static/include build/stage-static/lib/pkgconfig
+          cp -a "$AOAHID_LIBUSB_INCLUDEDIR/libusb-1.0" build/stage-static/include/
+          install -m 0644 "$AOAHID_LIBUSB_PC" build/stage-static/lib/pkgconfig/libusb-1.0.pc
+          python tools/release/pkg_config_metadata.py \
+            --relocate build/stage-static/lib/pkgconfig/libusb-1.0.pc
+
+      - name: Verify real macOS libraries, ABI, and installed consumers
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          arch='${{ matrix.arch }}'
+          library=""
+          for variant in shared static; do
+            for file in build/stage-$variant/lib/*.dylib build/stage-$variant/lib/*.a; do
+              test -e "$file" || continue
+              test -L "$file" && continue
+              test "$(lipo -archs "$file")" = "$arch"
+              case "$file" in
+                *.dylib)
+                  # Ad-hoc signed, as Apple Silicon requires; not notarized.
+                  codesign --force --sign - "$file"
+                  codesign --verify --strict "$file"
+                  test "$(vtool -show-build "$file" | awk '/minos/ { print $2; exit }')" = 11.0
+                  # Every dependency is another library of this package (by
+                  # @rpath) or an OS library; no build-machine path remains.
+                  otool -L "$file" | tail -n +2 | awk '{ print $1 }' | while read -r dependency; do
+                    case "$dependency" in
+                      @rpath/libaoahid.4.dylib|@rpath/libusb-1.0.0.dylib|/usr/lib/*|/System/Library/*) ;;
+                      *) echo "$file depends on $dependency" >&2; exit 1 ;;
+                    esac
+                  done
+                  ;;
+              esac
+            done
+          done
+          for file in build/stage-shared/lib/libaoahid.*.*.*.dylib; do
+            library="$file"
+          done
+          test -f "$library"
+          otool -L "$library" | grep -F '@rpath/libusb-1.0.0.dylib'
+          otool -l "$library" | grep -A2 LC_RPATH | grep -F 'path @loader_path '
+          python tools/symbol-lint/symbol_lint.py --header include/aoahid.h --binary "$library"
+          cmake -S tools/release/consumer -B build/consumer-shared -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$PWD/build/stage-shared" \
+            -DAOAHID_FIND_COMPONENTS=shared
+          cmake --build build/consumer-shared --parallel
+          DYLD_LIBRARY_PATH="$PWD/build/stage-shared/lib" ./build/consumer-shared/aoahid_consumer
+          cmake -S tools/release/consumer -B build/consumer-static -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=TRUE \
+            -DCMAKE_PREFIX_PATH="$PWD/build/stage-static" \
+            -DAOAHID_FIND_COMPONENTS=static \
+            -DAOAHID_CONSUMER_TARGET=aoahid::aoahid_static
+          cmake --build build/consumer-static --parallel
+          DYLD_LIBRARY_PATH="$PWD/build/stage-static/lib" ./build/consumer-static/aoahid_consumer
+          if cmake -S tools/release/consumer -B build/consumer-wrong-static -G Ninja \
+              -DCMAKE_PREFIX_PATH="$PWD/build/stage-shared" \
+              -DAOAHID_FIND_COMPONENTS=static; then
+            echo 'shared-only package accepted the unavailable static component' >&2
+            exit 1
+          fi
+          if cmake -S tools/release/consumer -B build/consumer-wrong-shared -G Ninja \
+              -DCMAKE_PREFIX_PATH="$PWD/build/stage-static" \
+              -DAOAHID_FIND_COMPONENTS=shared; then
+            echo 'static-only package accepted the unavailable shared component' >&2
+            exit 1
+          fi
+
+          real_path() { python -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
+          relocated_parent="$(mktemp -d "$PWD/build/pkgconfig-relocated.XXXXXX")"
+          for variant in shared static; do
+            relocated="$relocated_parent/$variant"
+            mkdir -p "$relocated"
+            cp -a "build/stage-$variant/." "$relocated/"
+            pc_dir="$relocated/lib/pkgconfig"
+            prefix="$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pc_dir" \
+              pkg-config --variable=prefix aoahid)"
+            test "$(real_path "$prefix")" = "$(real_path "$relocated")"
+            mode=""
+            if test "$variant" = static; then mode="--static"; fi
+            cflags="$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pc_dir" \
+              pkg-config $mode --cflags aoahid)"
+            libraries="$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pc_dir" \
+              pkg-config $mode --libs aoahid)"
+            case "$cflags $libraries" in
+              *"$PWD/build/stage-"*|*"$AOAHID_LIBUSB_PREFIX"*)
+                echo "$variant pkg-config flags retain a build/install prefix" >&2
+                exit 1
+                ;;
+            esac
+            read -r -a cflag_array <<<"$cflags"
+            read -r -a library_array <<<"$libraries"
+            cc "${cflag_array[@]}" tools/release/consumer/main.c \
+              -o "$relocated_parent/consumer-$variant" "${library_array[@]}"
+            DYLD_LIBRARY_PATH="$relocated/lib" "$relocated_parent/consumer-$variant"
+          done
+
+      - name: Package macOS distributions
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          compiler="$(c++ --version | head -n 1)"
+          cmake_version="$(cmake --version | head -n 1)"
+          libusb_version="$(pkg-config --modversion libusb-1.0)"
+          test "$libusb_version" = 1.0.30
+          prefix="libaoahid-${{ needs.validate.outputs.version }}-macos-${{ matrix.arch }}"
+          for variant in shared static; do
+            python tools/release/package_release.py \
+              --source-root . \
+              --stage "build/stage-$variant" \
+              --out-dir out \
+              --base-name "$prefix-$variant" \
+              --version '${{ needs.validate.outputs.version }}' \
+              --platform macos \
+              --arch '${{ matrix.arch }}' \
+              --variant "$variant" \
+              --source-sha '${{ needs.validate.outputs.source_sha }}' \
+              --created-epoch '${{ needs.validate.outputs.epoch }}' \
+              --libusb-version "$libusb_version" \
+              --build-metadata "runner_image=${ImageOS:-unknown}" \
+              --build-metadata "runner_image_version=${ImageVersion:-unknown}" \
+              --build-metadata "compiler=$compiler" \
+              --build-metadata "cmake=$cmake_version" \
+              --build-metadata 'macos_deployment_target=11.0' \
+              --build-metadata 'signature=ad-hoc, not notarized' \
+              --build-metadata 'libusb_source_commit=87a55632db62c9bdc58cd31d3ccfa673f1bb017f' \
+              --build-metadata 'libusb_source_archive_sha256=fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf' \
+              --build-metadata "libusb_build=unmodified source; ./configure $AOAHID_LIBUSB_CONFIGURE; make; make install; install_name_tool -id @rpath/libusb-1.0.0.dylib; codesign --force --sign -"
           done
 
       - name: Check out pinned vcpkg
@@ -878,7 +1108,7 @@ jobs:
           # corresponding source in the same distribution unit. Re-inspect the
           # runtime bundles that replace it, from the uploaded bytes.
           mapfile -t linux_runtime_bundles < <(
-            find dist -maxdepth 1 -type f -name 'libaoahid-*-runtime.tar.gz' -print | sort
+            find dist -maxdepth 1 -type f -name 'libaoahid-*-linux-*-runtime.tar.gz' -print | sort
           )
           test "${#linux_runtime_bundles[@]}" -eq 2
           rm -rf build/runtime-bundle-check
@@ -1096,7 +1326,7 @@ jobs:
             dist/SHA256SUMS
           )
           shopt -u nullglob
-          test "${#assets[@]}" -eq 23
+          test "${#assets[@]}" -eq 33
           declare -A expected_asset_names=()
           declare -A expected_asset_sizes=()
           declare -A expected_asset_digests=()

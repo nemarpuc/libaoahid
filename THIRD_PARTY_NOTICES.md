@@ -1,8 +1,9 @@
 # Third-party notices
 
 `libaoahid` uses libusb 1.0 at runtime. libusb is distributed separately under
-LGPL-2.1-or-later. Windows release archives that contain `libusb-1.0.dll` also
-contain the corresponding libusb license and notices. Static libusb linkage, if
+LGPL-2.1-or-later. Windows release archives that contain `libusb-1.0.dll`, and
+macOS archives that contain `libusb-1.0.0.dylib`, also contain the corresponding
+libusb license and notices. Static libusb linkage, if
 selected by a distributor, carries the LGPL relinking/source obligations; the
 project release pipeline keeps libusb dynamically linked in both its shared and
 static-libaoahid distributions (the `static` label describes libaoahid itself).
@@ -12,14 +13,15 @@ and corresponding source in the same distribution unit. That rule covers the
 complete `*-shared` and `*-static` archives and the smaller `*-runtime`
 bundles, which contain the shared libraries, `LICENSE`, `NOTICE`, this file,
 `third-party/libusb-copyright`, and `third-party/source/libusb-1.0.30.tar.bz2`.
-The release pipeline publishes no standalone `.so` or `.dll` asset, because a
+The release pipeline publishes no standalone `.so`, `.dylib`, or `.dll` asset, because a
 single loose binary cannot carry those obligations; `collect_release.py`
 refuses to assemble a release whose runtime bundle is missing any of them.
 
 Each binary archive contains the official `libusb-1.0.30.tar.bz2` source
 archive (SHA-256
 `fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf`).
-Linux archives build that source unmodified; the exact `configure` options
+Linux and macOS archives build that source unmodified (macOS also sets the
+install name to `@rpath/libusb-1.0.0.dylib` and signs it ad hoc); the exact `configure` options
 are recorded as `libusb_build` in `share/doc/libaoahid/build-metadata.json`.
 Windows archives also contain the libusb port's exact `vcpkg.json` and
 `portfile.cmake` from pinned vcpkg commit

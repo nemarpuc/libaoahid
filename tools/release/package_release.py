@@ -37,6 +37,7 @@ def validate_arguments(args: argparse.Namespace) -> None:
         raise PackageError("source SHA must be 40 lowercase hexadecimal characters")
     allowed_architectures = {
         "linux": {"x86_64", "aarch64"},
+        "macos": {"x86_64", "arm64"},
         "windows": {"x86_64", "arm64"},
     }
     if args.arch not in allowed_architectures[args.platform]:
@@ -109,7 +110,7 @@ def validate_layout(root: Path, platform: str, variant: str, version: str) -> No
         ),
         expected_private_libraries=(
             ("-lstdc++", "-lc++")
-            if variant == "static" and platform == "linux"
+            if variant == "static" and platform in ("linux", "macos")
             else None
         ),
     )
@@ -143,6 +144,30 @@ def validate_layout(root: Path, platform: str, variant: str, version: str) -> No
         )
         if list(root.glob("lib/libaoahid.so*")):
             raise PackageError("static package contains the libaoahid shared object")
+    elif platform == "macos" and variant == "shared":
+        require_one(root, ("lib/libaoahid.*.*.*.dylib",), "versioned macOS shared library")
+        require_one(root, ("lib/libusb-1.0.0.dylib",), "libusb runtime")
+        if list(root.glob("lib/*.a")):
+            raise PackageError("shared package contains a static archive")
+    elif platform == "macos":
+        require_one(root, ("lib/libaoahid.a",), "macOS static archive")
+        require_one(root, ("lib/libusb-1.0.dylib",), "linkable libusb shared library")
+        require_one(root, ("lib/libusb-1.0.0.dylib",), "libusb runtime")
+        require_one(root, ("include/libusb-1.0/libusb.h",), "libusb public header")
+        libusb_pc = require_one(
+            root,
+            ("lib/pkgconfig/libusb-1.0.pc",),
+            "bundled libusb pkg-config metadata",
+        )
+        pkg_config_metadata.validate_relocatable(
+            libusb_pc.read_bytes(),
+            label="libusb-1.0.pc",
+            expected_name="libusb-1.0",
+            expected_version="1.0.30",
+            expected_library="usb-1.0",
+        )
+        if list(root.glob("lib/libaoahid*.dylib")):
+            raise PackageError("static package contains the libaoahid shared library")
     elif variant == "shared":
         require_one(root, ("bin/aoahid.dll",), "Windows DLL")
         require_one(root, ("lib/aoahid.lib",), "Windows import library")
@@ -203,7 +228,7 @@ def validate_layout(root: Path, platform: str, variant: str, version: str) -> No
                 != generate_spdx.VCPKG_FILE_SHA256[relative]
             ):
                 raise PackageError(f"bundled pinned vcpkg material changed: {relative}")
-    else:
+    elif platform == "linux":
         glibc_path = require_one(
             root,
             ("share/doc/libaoahid/glibc-requirements.json",),
@@ -307,7 +332,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--base-name", required=True)
     parser.add_argument("--version", required=True)
-    parser.add_argument("--platform", choices=("linux", "windows"), required=True)
+    parser.add_argument("--platform", choices=("linux", "macos", "windows"), required=True)
     parser.add_argument("--arch", choices=("x86_64", "aarch64", "arm64"), required=True)
     parser.add_argument("--variant", choices=("shared", "static"), required=True)
     parser.add_argument("--source-sha", required=True)
@@ -324,7 +349,7 @@ def main() -> int:
         if not args.stage.is_dir():
             raise PackageError(f"install stage does not exist: {args.stage}")
         args.out_dir.mkdir(parents=True, exist_ok=True)
-        extension = ".tar.gz" if args.platform == "linux" else ".zip"
+        extension = ".zip" if args.platform == "windows" else ".tar.gz"
         if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.base_name) is None:
             raise PackageError("base name contains a path separator or unsupported character")
         archive = args.out_dir / (args.base_name + extension)
@@ -370,10 +395,10 @@ def main() -> int:
             generate_spdx.validate_document(package_root, document)
             shutil.copy2(internal_sbom, sidecar)
 
-            if args.platform == "linux":
-                write_tar_gz(package_root, archive, args.created_epoch)
-            else:
+            if args.platform == "windows":
                 write_zip(package_root, archive, args.created_epoch)
+            else:
+                write_tar_gz(package_root, archive, args.created_epoch)
     except (
         OSError,
         ValueError,

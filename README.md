@@ -5,7 +5,8 @@
 Send keyboard, mouse, gamepad, multi-touch, and media-key input from a PC to
 an Android device over a plain USB cable. The device needs no root, no app,
 and no USB debugging: it sees an ordinary USB keyboard or touchscreen.
-Windows and Linux; usable from C, C++, Python, C#, and Rust.
+Windows and Linux, and macOS builds that are not yet tested with a device;
+usable from C, C++, Python, C#, and Rust.
 
 `libaoahid` is a C++20 library with a stable C ABI. It drives the HID feature
 of [Android Open Accessory 2.0](https://source.android.com/docs/core/interaction/accessories/aoa2)
@@ -209,16 +210,18 @@ matrix produces and architecture-checks:
 
 - Linux x86_64 and AArch64 shared objects and static archives;
 - Windows x86_64 and ARM64 DLLs, import libraries, and static archives;
+- macOS arm64 and x86_64 dynamic libraries and static archives;
 - headers, relocatable CMake/pkg-config metadata, notices, checksums, and an
   SPDX SBOM.
 
-For version `X.Y.Z`, the GitHub Release contains exactly 23 uploaded assets:
+For version `X.Y.Z`, the GitHub Release contains exactly 33 uploaded assets:
 
-- eight archives: `libaoahid-X.Y.Z-linux-{x86_64,aarch64}-ubuntu22.04-{shared,static}.tar.gz`
-  and `libaoahid-X.Y.Z-windows-{x86_64,arm64}-{shared,static}.zip`;
-- eight matching `.spdx.json` sidecars;
-- four runtime bundles: the same four target names with `-runtime.tar.gz` on
-  Linux and `-runtime.zip` on Windows;
+- twelve archives: `libaoahid-X.Y.Z-linux-{x86_64,aarch64}-ubuntu22.04-{shared,static}.tar.gz`,
+  `libaoahid-X.Y.Z-macos-{arm64,x86_64}-{shared,static}.tar.gz`, and
+  `libaoahid-X.Y.Z-windows-{x86_64,arm64}-{shared,static}.zip`;
+- twelve matching `.spdx.json` sidecars;
+- six runtime bundles: the same six target names with `-runtime.tar.gz` on
+  Linux and macOS and `-runtime.zip` on Windows;
 - the deterministic tagged-tree archive `libaoahid-X.Y.Z-source.tar.gz`;
 - `release-manifest.json` and `SHA256SUMS`.
 
@@ -245,6 +248,12 @@ because an asset that ships the libusb runtime has to carry libusb's license
 and corresponding source in the same distribution unit; a single loose file
 cannot. Packaging refuses to assemble a release if any runtime bundle is
 missing one of those files.
+
+macOS archives target macOS 11 or later and are built on GitHub-hosted runners
+(`macos-15`, `macos-15-intel`). They load the bundled `libusb-1.0.0.dylib`
+through `@rpath`, so keep it next to `libaoahid`. The libraries are signed ad
+hoc and not notarized, and they have not been run against a phone: the macOS
+build is checked with the fake libusb backend only.
 
 Windows release builds use the MSVC dynamic runtime (`/MD`). Deploy the
 architecture-matching supported Visual C++ v14 Redistributable as well as the
@@ -276,7 +285,7 @@ the GitHub Release and its assets.
 | [PROTOCOL.md](docs/PROTOCOL.md) | How AOA 2.0 HID works and how Android handles the device |
 | [LIMITS.md](docs/LIMITS.md) | Numeric limits and validation rules |
 | [LATENCY.md](docs/LATENCY.md) | Latency behavior, tuning, and what the tests measure |
-| [PORTING.md](docs/PORTING.md) | Platform notes: Linux udev, Windows drivers, other hosts |
+| [PORTING.md](docs/PORTING.md) | Platform notes: Linux udev, Windows drivers, macOS, other hosts |
 | [TARGET_MATRIX.md](docs/TARGET_MATRIX.md) | Hardware test results |
 
 ## License
