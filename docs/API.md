@@ -388,6 +388,13 @@ is in [PROFILES.md](PROFILES.md). In short:
   `down = 0` lifts an active one at the given final x/y. `extra` may be null;
   a nonzero value for a field the Spec did not enable is rejected. No free
   slot returns `AOAHID_ERR_OVERFLOW`.
+- **Touch together with a mouse.** A Touchscreen Node and a Mouse Node on the
+  same device are separate input devices. Observed on a Galaxy Tab S11: when
+  both report at the same time, Android drops the one that was there first,
+  so a mouse report sent while a touch contact is down cancels the contact
+  (the contact does not end as a lift). libaoahid does not prevent this and
+  has no primary source for it; hold the mouse reports back while a contact is
+  down, and send the contact's lift before the next mouse report.
 - **Battery.** `has_value = 0` (with `strength = 0`) reports "unknown" and
   requires the Spec to enable the Null state.
 
