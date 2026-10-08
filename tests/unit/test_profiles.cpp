@@ -3,7 +3,6 @@
 /* Verifies generated profile descriptors, layouts, and state obligations in
  * memory; it does not claim target-device acceptance. */
 #include "aoahid.h"
-#include "aoahid.hpp"
 #include "api/internal.hpp"
 #include "hid/usages.hpp"
 #include "hid/validator.hpp"
@@ -1298,61 +1297,6 @@ void test_send_time_report_validation() {
     }
     aoahid_spec_release(spec);
 }
-
-void test_cpp_wrapper_profile_pairing() {
-    aoahid_spec spec{};
-    aoahid_node node{};
-    node.spec = &spec;
-
-    aoa::keyboard_node_ref keyboard{};
-    spec.kind = AOAHID_PROFILE_KEYBOARD;
-    AOAHID_CHECK(aoa::bind(&node, keyboard) == AOAHID_OK);
-    AOAHID_CHECK(keyboard.native_handle() == &node);
-    spec.kind = AOAHID_PROFILE_MOUSE;
-    AOAHID_CHECK(aoa::bind(&node, keyboard) == AOAHID_ERR_PARAM);
-    AOAHID_CHECK(keyboard.native_handle() == nullptr);
-
-    aoa::mouse_node_ref mouse{};
-    AOAHID_CHECK(aoa::bind(&node, mouse) == AOAHID_OK);
-    spec.kind = AOAHID_PROFILE_KEYBOARD;
-    AOAHID_CHECK(aoa::bind(&node, mouse) == AOAHID_ERR_PARAM);
-
-    aoa::toggle_node_ref toggle{};
-    spec.kind = AOAHID_PROFILE_TOGGLE;
-    AOAHID_CHECK(aoa::bind(&node, toggle) == AOAHID_OK);
-    spec.kind = AOAHID_PROFILE_KEYBOARD;
-    AOAHID_CHECK(aoa::bind(&node, toggle) == AOAHID_ERR_PARAM);
-
-    aoa::gamepad_node_ref gamepad{};
-    spec.kind = AOAHID_PROFILE_GAMEPAD;
-    AOAHID_CHECK(aoa::bind(&node, gamepad) == AOAHID_OK);
-    spec.kind = AOAHID_PROFILE_MOUSE;
-    AOAHID_CHECK(aoa::bind(&node, gamepad) == AOAHID_ERR_PARAM);
-
-    aoa::touchscreen_node_ref touchscreen{};
-    spec.kind = AOAHID_PROFILE_TOUCHSCREEN;
-    AOAHID_CHECK(aoa::bind(&node, touchscreen) == AOAHID_OK);
-    spec.kind = AOAHID_PROFILE_MOUSE;
-    AOAHID_CHECK(aoa::bind(&node, touchscreen) == AOAHID_ERR_PARAM);
-
-    aoa::pen_node_ref pen{};
-    spec.kind = AOAHID_PROFILE_PEN;
-    AOAHID_CHECK(aoa::bind(&node, pen) == AOAHID_OK);
-    spec.kind = AOAHID_PROFILE_TOUCHSCREEN;
-    AOAHID_CHECK(aoa::bind(&node, pen) == AOAHID_ERR_PARAM);
-
-    aoa::battery_node_ref battery{};
-    spec.kind = AOAHID_PROFILE_BATTERY;
-    AOAHID_CHECK(aoa::bind(&node, battery) == AOAHID_OK);
-    spec.kind = AOAHID_PROFILE_PEN;
-    AOAHID_CHECK(aoa::bind(&node, battery) == AOAHID_ERR_PARAM);
-
-    aoa::raw_node_ref raw{};
-    spec.kind = AOAHID_PROFILE_RAW;
-    AOAHID_CHECK(aoa::bind(&node, raw) == AOAHID_OK);
-    spec.kind = AOAHID_PROFILE_BATTERY;
-    AOAHID_CHECK(aoa::bind(&node, raw) == AOAHID_ERR_PARAM);
-}
 } // namespace
 
 void test_profiles() {
@@ -1393,7 +1337,6 @@ void test_profiles() {
     test_raw_report_id_order();
     test_raw_factory_bounds_before_allocation();
     test_send_time_report_validation();
-    test_cpp_wrapper_profile_pairing();
 
     aoahid_touchscreen_options invalid_touch = touchscreen_options();
     invalid_touch.contact_identifier = {1, 15, 4U, {}};

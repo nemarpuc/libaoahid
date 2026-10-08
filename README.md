@@ -169,9 +169,9 @@ outline:
 6. Close nodes/channels/device so neutral state is completed before request 55.
 
 The C header is [include/aoahid.h](include/aoahid.h). The optional C++ header
-adds typed node references without changing policy. Python ctypes, C# P/Invoke,
-and Rust `-sys` plus typed wrappers live under `bindings/`; they preserve the C
-layout and do not choose overrides. The native C API applies the same documented
+forwards every C function unchanged under namespace `aoahid`. Python ctypes,
+C# P/Invoke, and Rust `-sys` plus typed wrappers live under `bindings/`; they
+preserve the C layout and do not choose overrides. The native C API applies the same documented
 zero-value transport fallbacks for every language binding.
 
 The device-option fallbacks are 500 ms for control and report transfers, 64

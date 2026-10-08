@@ -30,7 +30,7 @@ extern "C" {
 #endif
 
 #define AOAHID_VERSION_MAJOR 4
-#define AOAHID_VERSION_MINOR 1
+#define AOAHID_VERSION_MINOR 2
 #define AOAHID_VERSION_PATCH 0
 
 typedef struct aoahid_context aoahid_context;

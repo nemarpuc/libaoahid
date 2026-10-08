@@ -2,292 +2,207 @@
 // Copyright (c) 2026 libaoahid contributors
 #pragma once
 
-/* Zero-allocation C++20 typed node references. They add no wrapper-selected
- * values and do not own handles; the C API's documented zero-value transport
- * fallbacks and all lifetime/blocking rules remain those of aoahid.h.
- * Typed references are populated only by bind(), which checks the immutable
- * Node manifest before exposing profile-specific operations. */
+/* Every function of the C ABI in aoahid.h, forwarded unchanged under namespace
+ * aoahid without the aoahid_ prefix. Types, arguments, return values and the
+ * documentation are those of aoahid.h; this header adds nothing else. */
 
 #include "aoahid.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <span>
+namespace aoahid {
 
-namespace aoa {
-
-class node_ref {
-  public:
-    constexpr node_ref() noexcept = default;
-    explicit constexpr node_ref(aoahid_node* value) noexcept : value_(value) {}
-    [[nodiscard]] constexpr aoahid_node* native_handle() const noexcept { return value_; }
-    [[nodiscard]] aoahid_result submit() const noexcept { return aoahid_node_submit(value_); }
-    [[nodiscard]] aoahid_result submit_blocking(std::uint32_t deadline_ms) const noexcept {
-        return aoahid_node_submit_blocking(value_, deadline_ms);
-    }
-
-  protected:
-    aoahid_node* value_{};
-};
-
-class keyboard_node_ref final : public node_ref {
-  public:
-    constexpr keyboard_node_ref() noexcept = default;
-    [[nodiscard]] aoahid_result key(std::uint16_t usage, bool down) const noexcept {
-        return aoahid_kbd(value_, usage, down ? 1U : 0U);
-    }
-
-  private:
-    explicit constexpr keyboard_node_ref(aoahid_node* value) noexcept : node_ref(value) {}
-    friend aoahid_result bind(aoahid_node*, keyboard_node_ref&) noexcept;
-};
-
-class mouse_node_ref final : public node_ref {
-  public:
-    constexpr mouse_node_ref() noexcept = default;
-    [[nodiscard]] aoahid_result move(std::int32_t dx, std::int32_t dy) const noexcept {
-        return aoahid_mouse_move(value_, dx, dy);
-    }
-    [[nodiscard]] aoahid_result scroll(std::int32_t wheel, std::int32_t pan) const noexcept {
-        return aoahid_mouse_scroll(value_, wheel, pan);
-    }
-    [[nodiscard]] aoahid_result button(std::uint32_t index, bool pressed) const noexcept {
-        return aoahid_mouse_button(value_, index, pressed ? 1U : 0U);
-    }
-
-  private:
-    explicit constexpr mouse_node_ref(aoahid_node* value) noexcept : node_ref(value) {}
-    friend aoahid_result bind(aoahid_node*, mouse_node_ref&) noexcept;
-};
-
-/* Covers every allow-listed one-bit selector page: Consumer, System Control,
- * Camera keys, Telephony keys, or a caller-chosen HUT page. Which page a
- * bound Node speaks is decided entirely by the Spec it was opened with. */
-class toggle_node_ref final : public node_ref {
-  public:
-    constexpr toggle_node_ref() noexcept = default;
-    [[nodiscard]] aoahid_result set(std::uint16_t usage, bool down) const noexcept {
-        return aoahid_toggle(value_, usage, down ? 1U : 0U);
-    }
-
-  private:
-    explicit constexpr toggle_node_ref(aoahid_node* value) noexcept : node_ref(value) {}
-    friend aoahid_result bind(aoahid_node*, toggle_node_ref&) noexcept;
-};
-
-class gamepad_node_ref final : public node_ref {
-  public:
-    constexpr gamepad_node_ref() noexcept = default;
-    [[nodiscard]] aoahid_result button(std::uint32_t index, bool pressed) const noexcept {
-        return aoahid_gamepad_button(value_, index, pressed ? 1U : 0U);
-    }
-    [[nodiscard]] aoahid_result axis(std::size_t index, std::int32_t value) const noexcept {
-        return aoahid_gamepad_set_axis(value_, index, value);
-    }
-    [[nodiscard]] aoahid_result dpad(bool up, bool down, bool right, bool left) const noexcept {
-        return aoahid_dpad(value_, up ? 1U : 0U, down ? 1U : 0U, right ? 1U : 0U, left ? 1U : 0U);
-    }
-
-  private:
-    explicit constexpr gamepad_node_ref(aoahid_node* value) noexcept : node_ref(value) {}
-    friend aoahid_result bind(aoahid_node*, gamepad_node_ref&) noexcept;
-};
-
-/* Always fixed-slot Multi-Touch. */
-class touchscreen_node_ref final : public node_ref {
-  public:
-    constexpr touchscreen_node_ref() noexcept = default;
-    [[nodiscard]] aoahid_result touch(std::uint32_t contact_id, bool down, std::int32_t x,
-                                      std::int32_t y,
-                                      const aoahid_touch_extra* extra = nullptr) const noexcept {
-        return aoahid_touch(value_, contact_id, down ? 1U : 0U, x, y, extra);
-    }
-
-  private:
-    explicit constexpr touchscreen_node_ref(aoahid_node* value) noexcept : node_ref(value) {}
-    friend aoahid_result bind(aoahid_node*, touchscreen_node_ref&) noexcept;
-};
-
-/* Always fixed-slot Multi-Touch under the Touch Pad Application Collection.
- * button() is only meaningful when the Spec declared button_count above zero. */
-class touchpad_node_ref final : public node_ref {
-  public:
-    constexpr touchpad_node_ref() noexcept = default;
-    [[nodiscard]] aoahid_result touch(std::uint32_t contact_id, bool down, std::int32_t x,
-                                      std::int32_t y,
-                                      const aoahid_touch_extra* extra = nullptr) const noexcept {
-        return aoahid_touch(value_, contact_id, down ? 1U : 0U, x, y, extra);
-    }
-    [[nodiscard]] aoahid_result button(std::uint32_t index, bool pressed) const noexcept {
-        return aoahid_touchpad_button(value_, index, pressed ? 1U : 0U);
-    }
-
-  private:
-    explicit constexpr touchpad_node_ref(aoahid_node* value) noexcept : node_ref(value) {}
-    friend aoahid_result bind(aoahid_node*, touchpad_node_ref&) noexcept;
-};
-
-class pen_node_ref final : public node_ref {
-  public:
-    constexpr pen_node_ref() noexcept = default;
-    [[nodiscard]] aoahid_result update(const aoahid_pen_sample& sample) const noexcept {
-        return aoahid_pen_update(value_, &sample);
-    }
-    [[nodiscard]] aoahid_result depart() const noexcept { return aoahid_pen_depart(value_); }
-
-  private:
-    explicit constexpr pen_node_ref(aoahid_node* value) noexcept : node_ref(value) {}
-    friend aoahid_result bind(aoahid_node*, pen_node_ref&) noexcept;
-};
-
-class battery_node_ref final : public node_ref {
-  public:
-    constexpr battery_node_ref() noexcept = default;
-    [[nodiscard]] aoahid_result update(std::int32_t strength) const noexcept {
-        return aoahid_battery_update(value_, 1U, strength);
-    }
-    [[nodiscard]] aoahid_result unknown() const noexcept {
-        return aoahid_battery_update(value_, 0U, 0);
-    }
-
-  private:
-    explicit constexpr battery_node_ref(aoahid_node* value) noexcept : node_ref(value) {}
-    friend aoahid_result bind(aoahid_node*, battery_node_ref&) noexcept;
-};
-
-class raw_node_ref final : public node_ref {
-  public:
-    constexpr raw_node_ref() noexcept = default;
-    [[nodiscard]] aoahid_result report(std::span<const std::uint8_t> bytes) const noexcept {
-        return aoahid_raw_submit(value_, bytes.data(), bytes.size());
-    }
-
-  private:
-    explicit constexpr raw_node_ref(aoahid_node* value) noexcept : node_ref(value) {}
-    friend aoahid_result bind(aoahid_node*, raw_node_ref&) noexcept;
-};
-
-namespace detail {
-inline aoahid_result profile_kind(aoahid_node* value, aoahid_profile_kind& kind) noexcept {
-    aoahid_capability_manifest manifest{};
-    manifest.struct_size = static_cast<std::uint32_t>(sizeof(manifest));
-    const aoahid_result result = aoahid_node_manifest(value, &manifest);
-    if (result == AOAHID_OK) {
-        kind = manifest.profile_kind;
-    }
-    return result;
+[[nodiscard]] inline const aoahid_error_detail* last_error() noexcept {
+    return aoahid_last_error();
 }
-} // namespace detail
-
-/* These cold-path factories clear output before reading the immutable Node
- * manifest. A profile mismatch returns AOAHID_ERR_PARAM but deliberately does
- * not manufacture a C-ABI TLS diagnostic after the manifest call succeeded. */
-[[nodiscard]] inline aoahid_result bind(aoahid_node* value, keyboard_node_ref& output) noexcept {
-    output = keyboard_node_ref{};
-    aoahid_profile_kind kind{};
-    const aoahid_result result = detail::profile_kind(value, kind);
-    if (result != AOAHID_OK)
-        return result;
-    if (kind != AOAHID_PROFILE_KEYBOARD)
-        return AOAHID_ERR_PARAM;
-    output = keyboard_node_ref{value};
-    return AOAHID_OK;
+[[nodiscard]] inline const char* result_name(aoahid_result result) noexcept {
+    return aoahid_result_name(result);
 }
-
-[[nodiscard]] inline aoahid_result bind(aoahid_node* value, mouse_node_ref& output) noexcept {
-    output = mouse_node_ref{};
-    aoahid_profile_kind kind{};
-    const aoahid_result result = detail::profile_kind(value, kind);
-    if (result != AOAHID_OK)
-        return result;
-    if (kind != AOAHID_PROFILE_MOUSE)
-        return AOAHID_ERR_PARAM;
-    output = mouse_node_ref{value};
-    return AOAHID_OK;
+[[nodiscard]] inline uint32_t version() noexcept { return aoahid_version(); }
+[[nodiscard]] inline aoahid_result context_create(const aoahid_context_options* options,
+                                                  aoahid_context** out_context) noexcept {
+    return aoahid_context_create(options, out_context);
 }
-
-[[nodiscard]] inline aoahid_result bind(aoahid_node* value, toggle_node_ref& output) noexcept {
-    output = toggle_node_ref{};
-    aoahid_profile_kind kind{};
-    const aoahid_result result = detail::profile_kind(value, kind);
-    if (result != AOAHID_OK)
-        return result;
-    if (kind != AOAHID_PROFILE_TOGGLE)
-        return AOAHID_ERR_PARAM;
-    output = toggle_node_ref{value};
-    return AOAHID_OK;
+[[nodiscard]] inline aoahid_result context_poll(aoahid_context* context,
+                                                uint32_t timeout_ms) noexcept {
+    return aoahid_context_poll(context, timeout_ms);
+}
+[[nodiscard]] inline aoahid_result context_destroy(aoahid_context* context) noexcept {
+    return aoahid_context_destroy(context);
+}
+[[nodiscard]] inline aoahid_result context_destroy_blocking(aoahid_context* context,
+                                                            uint32_t timeout_ms) noexcept {
+    return aoahid_context_destroy_blocking(context, timeout_ms);
+}
+[[nodiscard]] inline aoahid_result discover(aoahid_context* context, uint32_t control_timeout_ms,
+                                            aoahid_discovery** out_discovery) noexcept {
+    return aoahid_discover(context, control_timeout_ms, out_discovery);
+}
+[[nodiscard]] inline size_t discovery_count(const aoahid_discovery* discovery) noexcept {
+    return aoahid_discovery_count(discovery);
+}
+[[nodiscard]] inline const aoahid_device_info* discovery_get(const aoahid_discovery* discovery,
+                                                             size_t index) noexcept {
+    return aoahid_discovery_get(discovery, index);
+}
+inline void discovery_destroy(aoahid_discovery* discovery) noexcept {
+    aoahid_discovery_destroy(discovery);
+}
+[[nodiscard]] inline aoahid_result
+accessory_start(aoahid_context* context, const aoahid_device_info* selected,
+                const aoahid_accessory_options* options) noexcept {
+    return aoahid_accessory_start(context, selected, options);
+}
+[[nodiscard]] inline aoahid_result device_open(aoahid_context* context,
+                                               const aoahid_device_info* selected,
+                                               const aoahid_device_options* options,
+                                               aoahid_device** out_device) noexcept {
+    return aoahid_device_open(context, selected, options, out_device);
+}
+[[nodiscard]] inline aoahid_result device_close(aoahid_device* device) noexcept {
+    return aoahid_device_close(device);
+}
+[[nodiscard]] inline aoahid_result device_latched_error(aoahid_device* device) noexcept {
+    return aoahid_device_latched_error(device);
+}
+[[nodiscard]] inline aoahid_result channel_open(aoahid_device* device,
+                                                const aoahid_channel_options* options,
+                                                aoahid_channel** out_channel) noexcept {
+    return aoahid_channel_open(device, options, out_channel);
+}
+[[nodiscard]] inline aoahid_result channel_close(aoahid_channel* channel) noexcept {
+    return aoahid_channel_close(channel);
+}
+[[nodiscard]] inline aoahid_result channel_write(aoahid_channel* channel, const uint8_t* data,
+                                                 size_t length, size_t* out_written,
+                                                 uint32_t timeout_ms) noexcept {
+    return aoahid_channel_write(channel, data, length, out_written, timeout_ms);
+}
+[[nodiscard]] inline aoahid_result channel_read(aoahid_channel* channel, uint8_t* buffer,
+                                                size_t capacity, size_t* out_received,
+                                                uint32_t timeout_ms) noexcept {
+    return aoahid_channel_read(channel, buffer, capacity, out_received, timeout_ms);
+}
+[[nodiscard]] inline aoahid_result spec_create_keyboard(const aoahid_keyboard_options* options,
+                                                        aoahid_spec** out_spec) noexcept {
+    return aoahid_spec_create_keyboard(options, out_spec);
+}
+[[nodiscard]] inline aoahid_result spec_create_mouse(const aoahid_mouse_options* options,
+                                                     aoahid_spec** out_spec) noexcept {
+    return aoahid_spec_create_mouse(options, out_spec);
+}
+[[nodiscard]] inline aoahid_result spec_create_toggle(const aoahid_toggle_options* options,
+                                                      aoahid_spec** out_spec) noexcept {
+    return aoahid_spec_create_toggle(options, out_spec);
+}
+[[nodiscard]] inline aoahid_result spec_create_gamepad(const aoahid_gamepad_options* options,
+                                                       aoahid_spec** out_spec) noexcept {
+    return aoahid_spec_create_gamepad(options, out_spec);
+}
+[[nodiscard]] inline aoahid_result
+spec_create_touchscreen(const aoahid_touchscreen_options* options,
+                        aoahid_spec** out_spec) noexcept {
+    return aoahid_spec_create_touchscreen(options, out_spec);
+}
+[[nodiscard]] inline aoahid_result spec_create_touchpad(const aoahid_touchpad_options* options,
+                                                        aoahid_spec** out_spec) noexcept {
+    return aoahid_spec_create_touchpad(options, out_spec);
+}
+[[nodiscard]] inline aoahid_result spec_create_pen(const aoahid_pen_options* options,
+                                                   aoahid_spec** out_spec) noexcept {
+    return aoahid_spec_create_pen(options, out_spec);
+}
+[[nodiscard]] inline aoahid_result spec_create_battery(const aoahid_battery_options* options,
+                                                       aoahid_spec** out_spec) noexcept {
+    return aoahid_spec_create_battery(options, out_spec);
+}
+[[nodiscard]] inline aoahid_result spec_create_raw(const aoahid_raw_options* options,
+                                                   aoahid_spec** out_spec) noexcept {
+    return aoahid_spec_create_raw(options, out_spec);
+}
+inline void spec_retain(aoahid_spec* spec) noexcept { aoahid_spec_retain(spec); }
+inline void spec_release(aoahid_spec* spec) noexcept { aoahid_spec_release(spec); }
+[[nodiscard]] inline aoahid_result spec_descriptor(const aoahid_spec* spec, const uint8_t** bytes,
+                                                   size_t* length) noexcept {
+    return aoahid_spec_descriptor(spec, bytes, length);
+}
+[[nodiscard]] inline aoahid_result spec_manifest(const aoahid_spec* spec,
+                                                 aoahid_capability_manifest* manifest) noexcept {
+    return aoahid_spec_manifest(spec, manifest);
+}
+[[nodiscard]] inline aoahid_result node_open(aoahid_device* device, aoahid_spec* spec,
+                                             const aoahid_node_options* options,
+                                             aoahid_node** out_node) noexcept {
+    return aoahid_node_open(device, spec, options, out_node);
+}
+[[nodiscard]] inline aoahid_result node_close(aoahid_node* node) noexcept {
+    return aoahid_node_close(node);
+}
+[[nodiscard]] inline uint16_t node_hid_id(const aoahid_node* node) noexcept {
+    return aoahid_node_hid_id(node);
+}
+[[nodiscard]] inline aoahid_result node_manifest(const aoahid_node* node,
+                                                 aoahid_capability_manifest* manifest) noexcept {
+    return aoahid_node_manifest(node, manifest);
+}
+[[nodiscard]] inline aoahid_result node_submit(aoahid_node* node) noexcept {
+    return aoahid_node_submit(node);
+}
+[[nodiscard]] inline aoahid_result node_submit_blocking(aoahid_node* node,
+                                                        uint32_t deadline_ms) noexcept {
+    return aoahid_node_submit_blocking(node, deadline_ms);
+}
+[[nodiscard]] inline aoahid_result kbd(aoahid_node* node, uint16_t usage, uint32_t down) noexcept {
+    return aoahid_kbd(node, usage, down);
+}
+[[nodiscard]] inline aoahid_result mouse_move(aoahid_node* node, int32_t dx, int32_t dy) noexcept {
+    return aoahid_mouse_move(node, dx, dy);
+}
+[[nodiscard]] inline aoahid_result mouse_scroll(aoahid_node* node, int32_t wheel,
+                                                int32_t pan) noexcept {
+    return aoahid_mouse_scroll(node, wheel, pan);
+}
+[[nodiscard]] inline aoahid_result mouse_button(aoahid_node* node, uint32_t button,
+                                                uint32_t pressed) noexcept {
+    return aoahid_mouse_button(node, button, pressed);
+}
+[[nodiscard]] inline aoahid_result toggle(aoahid_node* node, uint16_t usage,
+                                          uint32_t down) noexcept {
+    return aoahid_toggle(node, usage, down);
+}
+[[nodiscard]] inline aoahid_result gamepad_button(aoahid_node* node, uint32_t button,
+                                                  uint32_t pressed) noexcept {
+    return aoahid_gamepad_button(node, button, pressed);
+}
+[[nodiscard]] inline aoahid_result gamepad_set_axis(aoahid_node* node, size_t axis_index,
+                                                    int32_t value) noexcept {
+    return aoahid_gamepad_set_axis(node, axis_index, value);
+}
+[[nodiscard]] inline aoahid_result dpad(aoahid_node* node, uint32_t up, uint32_t down,
+                                        uint32_t right, uint32_t left) noexcept {
+    return aoahid_dpad(node, up, down, right, left);
+}
+[[nodiscard]] inline aoahid_result touch(aoahid_node* node, uint32_t contact_id, uint32_t down,
+                                         int32_t x, int32_t y,
+                                         const aoahid_touch_extra* extra) noexcept {
+    return aoahid_touch(node, contact_id, down, x, y, extra);
+}
+[[nodiscard]] inline aoahid_result touchpad_button(aoahid_node* node, uint32_t button,
+                                                   uint32_t pressed) noexcept {
+    return aoahid_touchpad_button(node, button, pressed);
+}
+[[nodiscard]] inline aoahid_result pen_update(aoahid_node* node,
+                                              const aoahid_pen_sample* sample) noexcept {
+    return aoahid_pen_update(node, sample);
+}
+[[nodiscard]] inline aoahid_result pen_depart(aoahid_node* node) noexcept {
+    return aoahid_pen_depart(node);
+}
+[[nodiscard]] inline aoahid_result battery_update(aoahid_node* node, uint32_t has_value,
+                                                  int32_t strength) noexcept {
+    return aoahid_battery_update(node, has_value, strength);
+}
+[[nodiscard]] inline aoahid_result raw_submit(aoahid_node* node, const uint8_t* report,
+                                              size_t length) noexcept {
+    return aoahid_raw_submit(node, report, length);
 }
 
-[[nodiscard]] inline aoahid_result bind(aoahid_node* value, gamepad_node_ref& output) noexcept {
-    output = gamepad_node_ref{};
-    aoahid_profile_kind kind{};
-    const aoahid_result result = detail::profile_kind(value, kind);
-    if (result != AOAHID_OK)
-        return result;
-    if (kind != AOAHID_PROFILE_GAMEPAD)
-        return AOAHID_ERR_PARAM;
-    output = gamepad_node_ref{value};
-    return AOAHID_OK;
-}
-
-[[nodiscard]] inline aoahid_result bind(aoahid_node* value, touchscreen_node_ref& output) noexcept {
-    output = touchscreen_node_ref{};
-    aoahid_profile_kind kind{};
-    const aoahid_result result = detail::profile_kind(value, kind);
-    if (result != AOAHID_OK)
-        return result;
-    if (kind != AOAHID_PROFILE_TOUCHSCREEN)
-        return AOAHID_ERR_PARAM;
-    output = touchscreen_node_ref{value};
-    return AOAHID_OK;
-}
-
-[[nodiscard]] inline aoahid_result bind(aoahid_node* value, touchpad_node_ref& output) noexcept {
-    output = touchpad_node_ref{};
-    aoahid_profile_kind kind{};
-    const aoahid_result result = detail::profile_kind(value, kind);
-    if (result != AOAHID_OK)
-        return result;
-    if (kind != AOAHID_PROFILE_TOUCHPAD)
-        return AOAHID_ERR_PARAM;
-    output = touchpad_node_ref{value};
-    return AOAHID_OK;
-}
-
-[[nodiscard]] inline aoahid_result bind(aoahid_node* value, pen_node_ref& output) noexcept {
-    output = pen_node_ref{};
-    aoahid_profile_kind kind{};
-    const aoahid_result result = detail::profile_kind(value, kind);
-    if (result != AOAHID_OK)
-        return result;
-    if (kind != AOAHID_PROFILE_PEN)
-        return AOAHID_ERR_PARAM;
-    output = pen_node_ref{value};
-    return AOAHID_OK;
-}
-
-[[nodiscard]] inline aoahid_result bind(aoahid_node* value, battery_node_ref& output) noexcept {
-    output = battery_node_ref{};
-    aoahid_profile_kind kind{};
-    const aoahid_result result = detail::profile_kind(value, kind);
-    if (result != AOAHID_OK)
-        return result;
-    if (kind != AOAHID_PROFILE_BATTERY)
-        return AOAHID_ERR_PARAM;
-    output = battery_node_ref{value};
-    return AOAHID_OK;
-}
-
-[[nodiscard]] inline aoahid_result bind(aoahid_node* value, raw_node_ref& output) noexcept {
-    output = raw_node_ref{};
-    aoahid_profile_kind kind{};
-    const aoahid_result result = detail::profile_kind(value, kind);
-    if (result != AOAHID_OK)
-        return result;
-    if (kind != AOAHID_PROFILE_RAW)
-        return AOAHID_ERR_PARAM;
-    output = raw_node_ref{value};
-    return AOAHID_OK;
-}
-
-} // namespace aoa
+} // namespace aoahid

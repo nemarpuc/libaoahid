@@ -401,14 +401,12 @@ is in [PROFILES.md](PROFILES.md). In short:
 No profile generates key repeat, debounce, long-press, or any other timed
 action.
 
-### C++ wrapper
+### C++ header
 
-`include/aoahid.hpp` (namespace `aoa`) adds one reference type per profile
-(`keyboard_node_ref`, `mouse_node_ref`, ..., `raw_node_ref`). A typed
-reference starts unbound and is filled only by `aoa::bind(node, ref)`, which
-reads the Node manifest and rejects a Node of another profile. `aoa::node_ref`
-is the untyped wrapper. The wrapper uses the same C structures and adds no
-fallbacks of its own.
+`include/aoahid.hpp` forwards every function of `aoahid.h` unchanged under
+namespace `aoahid`, without the `aoahid_` prefix (`aoahid_kbd` is
+`aoahid::kbd`). Types, arguments, and results are those of the C API, and the
+header adds no checks or fallbacks of its own.
 
 ## Manifest
 

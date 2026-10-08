@@ -5,6 +5,23 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-10-09
+
+No change to the C ABI. The C++ header `aoahid.hpp` was replaced and is not
+source compatible with 4.1.0. It was not hardware-verified again.
+
+### Changed
+
+- `aoahid.hpp` now forwards every function of `aoahid.h` unchanged under
+  namespace `aoahid`, without the `aoahid_` prefix (`aoahid_kbd` is
+  `aoahid::kbd`). It no longer covers just some of the node calls.
+
+### Removed
+
+- The typed node references (`aoa::node_ref`, `aoa::keyboard_node_ref`, ...,
+  `aoa::raw_node_ref`) and `aoa::bind()`. Call the `aoahid::` functions on an
+  `aoahid_node*` instead.
+
 ## [4.1.0] - 2026-10-04
 
 No public API or ABI change. It was not hardware-verified again: the macOS

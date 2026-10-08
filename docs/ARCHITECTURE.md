@@ -10,7 +10,7 @@ function reference see [API.md](API.md); for the implementation behind it
 
 ```
 application
-   │  C ABI (include/aoahid.h)  or  C++ wrapper (include/aoahid.hpp, namespace aoa)
+   │  C ABI (include/aoahid.h)  or  C++ header (include/aoahid.hpp, namespace aoahid)
    ▼
 src/api        ABI boundary: argument/struct validation, handle lifetimes, error records
 src/profiles   immutable Spec per profile + per-Node report state machines
@@ -178,7 +178,7 @@ Device the consumed graph moves to the Context graveyard and is reaped later.
 | Path | Contents |
 | --- | --- |
 | `include/aoahid.h` | The stable C ABI, with per-function ownership, blocking, synchronization, and result contracts. |
-| `include/aoahid.hpp` | Header-only C++ wrapper (namespace `aoa`). |
+| `include/aoahid.hpp` | Header-only C++ forwarders to the C ABI (namespace `aoahid`). |
 | `src/api/` | `c_api.cpp` (ABI boundary, lifetimes, HID ID allocation, event thread), `error_detail.cpp` (thread-local error record, struct validation). |
 | `src/hid/` | Item writer, descriptor builder, descriptor validator, report layout. |
 | `src/profiles/` | `spec.cpp` (Spec factories and descriptor generation), `state.cpp` (per-Node report state machines and serialization). |
