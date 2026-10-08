@@ -19,7 +19,7 @@ source compatible with 4.1.0. It was not hardware-verified again.
 ### Removed
 
 - The typed node references (`aoa::node_ref`, `aoa::keyboard_node_ref`, ...,
-  `aoa::raw_node_ref`) and `aoa::bind()`. Call the `aoahid::` functions on an
+  `aoa::raw_node_ref`) and `aoa::bind`. Call the `aoahid::` functions on an
   `aoahid_node*` instead.
 
 ## [4.1.0] - 2026-10-04
