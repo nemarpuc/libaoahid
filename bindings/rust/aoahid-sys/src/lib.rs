@@ -202,12 +202,18 @@ c_struct!(aoahid_report_id_option {
     value: u8,
     reserved8: [u8; 3],
 });
+c_struct!(aoahid_battery_report {
+    report_id: aoahid_report_id_option,
+    strength: aoahid_integer_field,
+});
 c_struct!(aoahid_keyboard_options {
     struct_size: u32,
     reserved: u32,
     report_id: aoahid_report_id_option,
     usage_minimum: u16,
     usage_maximum: u16,
+    enable_battery: u32,
+    battery: aoahid_battery_report,
 });
 c_struct!(aoahid_mouse_options {
     struct_size: u32,
@@ -220,6 +226,8 @@ c_struct!(aoahid_mouse_options {
     wheel: aoahid_integer_field,
     enable_pan: u32,
     pan: aoahid_integer_field,
+    enable_battery: u32,
+    battery: aoahid_battery_report,
 });
 c_struct!(aoahid_toggle_options {
     struct_size: u32, reserved: u32, report_id: aoahid_report_id_option,
@@ -228,6 +236,8 @@ c_struct!(aoahid_toggle_options {
     usage_semantics: *const aoahid_usage_semantic,
     expected_linux_event_types: *const *const c_char,
     expected_linux_codes: *const *const c_char,
+    enable_battery: u32,
+    battery: aoahid_battery_report,
 });
 c_struct!(aoahid_gamepad_axis_option {
     role: aoahid_axis_role, usage_page: u16, usage: u16, value: aoahid_integer_field,
@@ -240,6 +250,8 @@ c_struct!(aoahid_gamepad_options {
     axis_count: usize, button_count: u32, button_usage_minimum: u16,
     dpad_representation: aoahid_dpad_representation,
     hat_logical_minimum: i32, hat_logical_maximum: i32, hat_bit_width: u32,
+    enable_battery: u32,
+    battery: aoahid_battery_report,
 });
 c_struct!(aoahid_touchscreen_options {
     struct_size: u32,
@@ -264,6 +276,8 @@ c_struct!(aoahid_touchscreen_options {
     scan_time_unit_100us: u32,
     enable_contact_count_maximum_feature_declaration: u32,
     enable_multi_packet_frames: u32,
+    enable_battery: u32,
+    battery: aoahid_battery_report,
 });
 c_struct!(aoahid_touchpad_options {
     struct_size: u32,
@@ -289,6 +303,8 @@ c_struct!(aoahid_touchpad_options {
     enable_contact_count_maximum_feature_declaration: u32,
     enable_multi_packet_frames: u32,
     button_count: u32,
+    enable_battery: u32,
+    battery: aoahid_battery_report,
 });
 c_struct!(aoahid_pen_options {
     struct_size: u32, reserved: u32, report_id: aoahid_report_id_option,
@@ -297,6 +313,8 @@ c_struct!(aoahid_pen_options {
     tilt_y: aoahid_integer_field, enable_twist_target_specific: u32,
     twist: aoahid_integer_field, barrel_usages: *const u16,
     barrel_usage_count: usize, enable_eraser: u32, enable_hover: u32,
+    enable_battery: u32,
+    battery: aoahid_battery_report,
 });
 c_struct!(aoahid_digitizer_options {
     struct_size: u32, reserved: u32, report_id: aoahid_report_id_option,
@@ -305,6 +323,8 @@ c_struct!(aoahid_digitizer_options {
     tilt_y: aoahid_integer_field, enable_twist_target_specific: u32,
     twist: aoahid_integer_field, barrel_usages: *const u16,
     barrel_usage_count: usize, enable_eraser: u32, enable_hover: u32,
+    enable_battery: u32,
+    battery: aoahid_battery_report,
 });
 c_struct!(aoahid_raw_report {
     report_id: aoahid_report_id_option,

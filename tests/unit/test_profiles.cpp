@@ -13,6 +13,7 @@
 #include <array>
 #include <cstdint>
 #include <limits>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -93,6 +94,43 @@ aoahid_keyboard_options keyboard_options() {
     options.usage_minimum = 0x04U;
     options.usage_maximum = 0x65U;
     return options;
+}
+
+// A profile's valid options must also work with a battery report added, and
+// the input side of the descriptor must not change.
+template <typename Options>
+void check_battery_variant(Options options,
+                           aoahid_result(AOAHID_CALL* create)(const Options*, aoahid_spec**)) {
+    options.report_id = {1U, 1U, {0U, 0U, 0U}};
+    aoahid_spec* plain = nullptr;
+    AOAHID_CHECK(create(&options, &plain) == AOAHID_OK);
+    options.enable_battery = 1U;
+    options.battery.report_id = {1U, 2U, {0U, 0U, 0U}};
+    options.battery.strength = {1, 100, 8U, {}};
+    aoahid_spec* spec = nullptr;
+    AOAHID_CHECK(create(&options, &spec) == AOAHID_OK);
+    if (plain != nullptr && spec != nullptr) {
+        // The input side is the plain descriptor without its closing End
+        // Collection; the battery report is the 16 bytes before the new one.
+        AOAHID_CHECK(spec->descriptor.size() == plain->descriptor.size() + 16U);
+        AOAHID_CHECK(std::equal(plain->descriptor.begin(), plain->descriptor.end() - 1,
+                                spec->descriptor.begin()));
+        AOAHID_CHECK(spec->layout.wire_bytes == plain->layout.wire_bytes);
+        AOAHID_CHECK(!plain->has_battery && spec->has_battery &&
+                     spec->battery_layout.report_id == 2U &&
+                     spec->battery_layout.wire_bytes == 2U);
+        aoahid_capability_manifest manifest{};
+        manifest.struct_size = static_cast<std::uint32_t>(sizeof(manifest));
+        AOAHID_CHECK(aoahid_spec_manifest(spec, &manifest) == AOAHID_OK);
+        AOAHID_CHECK(manifest.report_count == 2U && manifest.reports[0].report_id.value == 1U &&
+                     manifest.reports[1].report_id.enabled == 1U &&
+                     manifest.reports[1].report_id.value == 2U &&
+                     manifest.reports[1].wire_length == 2U);
+        AOAHID_CHECK(aoahid_spec_manifest(plain, &manifest) == AOAHID_OK);
+        AOAHID_CHECK(manifest.report_count == 1U);
+    }
+    aoahid_spec_release(plain);
+    aoahid_spec_release(spec);
 }
 
 void test_keyboard_nkro_concurrent_keys() {
@@ -200,6 +238,7 @@ void test_mouse_delta_splitting_and_consumption() {
     options.enable_pan = 1U;
     options.pan = {-15, 15, 8U, {}};
     aoahid_spec* spec = nullptr;
+    check_battery_variant(options, &aoahid_spec_create_mouse);
     AOAHID_CHECK(aoahid_spec_create_mouse(&options, &spec) == AOAHID_OK);
     if (spec == nullptr)
         return;
@@ -290,6 +329,7 @@ void test_usage_control_semantics() {
     options.expected_linux_codes = event_codes.data();
 
     aoahid_spec* spec = nullptr;
+    check_battery_variant(options, &aoahid_spec_create_toggle);
     AOAHID_CHECK(aoahid_spec_create_toggle(&options, &spec) == AOAHID_OK);
     if (spec != nullptr) {
         AOAHID_CHECK(count_item(spec->descriptor, 0x81U, 0x06U) == 2U);
@@ -527,6 +567,7 @@ void test_hat_domain() {
     aoahid_spec* spec = nullptr;
     AOAHID_CHECK(aoahid_spec_create_gamepad(&options, &spec) == AOAHID_ERR_PARAM);
     options.hat_logical_maximum = 7;
+    check_battery_variant(options, &aoahid_spec_create_gamepad);
     AOAHID_CHECK(aoahid_spec_create_gamepad(&options, &spec) == AOAHID_OK);
     if (spec != nullptr) {
         aoahid_capability_manifest manifest{};
@@ -858,6 +899,7 @@ void test_touch_units_feature_and_manifest_status() {
     aoahid_touchscreen_options options = touchscreen_options();
     options.enable_contact_count_maximum_feature_declaration = 1U;
     aoahid_spec* spec = nullptr;
+    check_battery_variant(options, &aoahid_spec_create_touchscreen);
     AOAHID_CHECK(aoahid_spec_create_touchscreen(&options, &spec) == AOAHID_OK);
     if (spec != nullptr) {
         AOAHID_CHECK(count_item(spec->descriptor, 0xB1U, 0x03U) == 1U);
@@ -1061,6 +1103,7 @@ void test_touchpad_button_only_and_mid_frame_guard() {
     aoahid_touchpad_options options = touchpad_options();
     options.button_count = 1U;
     aoahid_spec* spec = nullptr;
+    check_battery_variant(options, &aoahid_spec_create_touchpad);
     AOAHID_CHECK(aoahid_spec_create_touchpad(&options, &spec) == AOAHID_OK);
     if (spec == nullptr)
         return;
@@ -1115,6 +1158,7 @@ void test_pen_away_coordinates() {
     options.barrel_usage_count = barrels.size();
     options.enable_hover = 1U;
     aoahid_spec* spec = nullptr;
+    check_battery_variant(options, &aoahid_spec_create_pen);
     AOAHID_CHECK(aoahid_spec_create_pen(&options, &spec) == AOAHID_OK);
     if (spec == nullptr)
         return;
@@ -1268,6 +1312,7 @@ void test_pen_switch() {
     digitizer.enable_eraser = options.enable_eraser;
     digitizer.enable_hover = options.enable_hover;
     spec = nullptr;
+    check_battery_variant(digitizer, &aoahid_spec_create_digitizer);
     AOAHID_CHECK(aoahid_spec_create_digitizer(&digitizer, &spec) == AOAHID_OK);
     if (spec != nullptr) {
         manifest = {};
@@ -1519,6 +1564,48 @@ void test_battery_builder() {
                  narrow_layout.fields[1].semantic == FieldSemantic::constant_padding);
 }
 
+void test_battery_options() {
+    aoahid_keyboard_options keyboard = keyboard_options();
+    check_battery_variant(keyboard, &aoahid_spec_create_keyboard);
+
+    keyboard.report_id = {1U, 1U, {0U, 0U, 0U}};
+    keyboard.enable_battery = 1U;
+    keyboard.battery.report_id = {1U, 2U, {0U, 0U, 0U}};
+    keyboard.battery.strength = {1, 100, 8U, {}};
+    const auto rejects = [&](const char* field) {
+        aoahid_spec* refused = nullptr;
+        const bool param = aoahid_spec_create_keyboard(&keyboard, &refused) == AOAHID_ERR_PARAM;
+        const std::string_view named = aoahid_last_error()->field;
+        aoahid_spec_release(refused);
+        return param && named == field;
+    };
+    const aoahid_keyboard_options good = keyboard;
+
+    keyboard.enable_battery = 2U;
+    AOAHID_CHECK(rejects("keyboard.enable_battery"));
+    keyboard = good;
+    keyboard.enable_battery = 0U; // battery left filled in
+    AOAHID_CHECK(rejects("keyboard.battery"));
+    keyboard = good;
+    keyboard.report_id = {0U, 0U, {0U, 0U, 0U}}; // input report has no ID
+    AOAHID_CHECK(rejects("keyboard.battery.report_id"));
+    keyboard = good;
+    keyboard.battery.report_id = {0U, 0U, {0U, 0U, 0U}};
+    AOAHID_CHECK(rejects("keyboard.battery.report_id"));
+    keyboard = good;
+    keyboard.battery.report_id.value = 1U; // same as the input report
+    AOAHID_CHECK(rejects("keyboard.battery.report_id"));
+    keyboard = good;
+    keyboard.battery.strength = {100, 1, 8U, {}};
+    AOAHID_CHECK(rejects("keyboard.battery.strength"));
+    keyboard = good;
+    keyboard.battery.strength = {-1, 100, 8U, {}};
+    AOAHID_CHECK(rejects("keyboard.battery.strength"));
+    keyboard = good;
+    keyboard.battery.strength = {1, 300, 8U, {}}; // does not fit the width
+    AOAHID_CHECK(rejects("keyboard.battery.strength"));
+}
+
 void test_profiles() {
     aoahid_keyboard_options zero{};
     auto* spec = reinterpret_cast<aoahid_spec*>(static_cast<std::uintptr_t>(1U));
@@ -1560,6 +1647,7 @@ void test_profiles() {
     test_raw_factory_bounds_before_allocation();
     test_send_time_report_validation();
     test_battery_builder();
+    test_battery_options();
 
     aoahid_touchscreen_options invalid_touch = touchscreen_options();
     invalid_touch.contact_id = {1, 15, 4U, {}};

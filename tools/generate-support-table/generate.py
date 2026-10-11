@@ -31,6 +31,7 @@ ROWS = (
     Presentation("digitizer", "Digitizer", "conditional", "Target classification and mapping evidence required"),
     Presentation("camera-keys", "Toggle: Camera keys", "conditional", "HUT Camera Auto-focus/Shutter subset only"),
     Presentation("telephony-keys", "Toggle: Telephony keys", "conditional", "Caller allow-list and target mapping required"),
+    Presentation("keyboard-battery", "Battery report (shown on a Keyboard)", "conditional", "Second Input report inside any generated profile; Linux registers a battery only with an input device"),
     Presentation("raw-validated", "Validated raw descriptor", "unknown", "Explicit no-Android-support acknowledgement"),
 )
 

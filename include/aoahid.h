@@ -328,6 +328,19 @@ typedef struct aoahid_report_id_option {
     uint8_t reserved8[3];
 } aoahid_report_id_option;
 
+/* Battery Strength (Generic Device Controls 0x06/0x20) as a second Input
+ * report in the profile's own Application Collection. Linux registers a
+ * battery only for a HID device that also has input, so it rides on a
+ * profile instead of being one. Disabled state is all-zero. When enabled,
+ * the profile's report_id and this report_id must both be enabled and
+ * differ; neither is chosen for you. There is no "unknown" value: Linux drops
+ * out-of-range battery values and reports the level as unknown until the
+ * first one arrives. */
+typedef struct aoahid_battery_report {
+    aoahid_report_id_option report_id;
+    aoahid_integer_field strength;
+} aoahid_battery_report;
+
 /* The Keyboard profile is exclusively full-NKRO: every declared Usage is a
  * one-bit Variable field, so every simultaneously pressed key is reported at
  * once with no Array slot count and no ErrorRollOver overflow encoding. */
@@ -337,6 +350,8 @@ typedef struct aoahid_keyboard_options {
     aoahid_report_id_option report_id;
     uint16_t usage_minimum;
     uint16_t usage_maximum;
+    uint32_t enable_battery;
+    aoahid_battery_report battery;
 } aoahid_keyboard_options;
 
 typedef struct aoahid_mouse_options {
@@ -350,6 +365,8 @@ typedef struct aoahid_mouse_options {
     aoahid_integer_field wheel;
     uint32_t enable_pan;
     aoahid_integer_field pan;
+    uint32_t enable_battery;
+    aoahid_battery_report battery;
 } aoahid_mouse_options;
 
 /* The four pointer arrays below each contain allowed_usage_count entries.
@@ -378,6 +395,8 @@ typedef struct aoahid_toggle_options {
     const aoahid_usage_semantic* usage_semantics;
     const char* const* expected_linux_event_types;
     const char* const* expected_linux_codes;
+    uint32_t enable_battery;
+    aoahid_battery_report battery;
 } aoahid_toggle_options;
 
 typedef struct aoahid_gamepad_axis_option {
@@ -405,6 +424,8 @@ typedef struct aoahid_gamepad_options {
     int32_t hat_logical_minimum;
     int32_t hat_logical_maximum;
     uint32_t hat_bit_width;
+    uint32_t enable_battery;
+    aoahid_battery_report battery;
 } aoahid_gamepad_options;
 
 /* Always the fixed-slot Multi-Touch report shape (explicit Contact
@@ -439,6 +460,8 @@ typedef struct aoahid_touchscreen_options {
     uint32_t scan_time_unit_100us;
     uint32_t enable_contact_count_maximum_feature_declaration;
     uint32_t enable_multi_packet_frames;
+    uint32_t enable_battery;
+    aoahid_battery_report battery;
 } aoahid_touchscreen_options;
 
 /* Same fixed-slot Multi-Touch report shape as aoahid_touchscreen_options, under the
@@ -474,6 +497,8 @@ typedef struct aoahid_touchpad_options {
     uint32_t enable_contact_count_maximum_feature_declaration;
     uint32_t enable_multi_packet_frames;
     uint32_t button_count;
+    uint32_t enable_battery;
+    aoahid_battery_report battery;
 } aoahid_touchpad_options;
 
 typedef struct aoahid_pen_options {
@@ -497,6 +522,8 @@ typedef struct aoahid_pen_options {
      * selector. It is not the separate Eraser Usage (0D/45). */
     uint32_t enable_eraser;
     uint32_t enable_hover;
+    uint32_t enable_battery;
+    aoahid_battery_report battery;
 } aoahid_pen_options;
 
 /* Same stylus report shape as aoahid_pen_options, under the Digitizers /
@@ -522,6 +549,8 @@ typedef struct aoahid_digitizer_options {
      * selector. It is not the separate Eraser Usage (0D/45). */
     uint32_t enable_eraser;
     uint32_t enable_hover;
+    uint32_t enable_battery;
+    aoahid_battery_report battery;
 } aoahid_digitizer_options;
 
 typedef struct aoahid_raw_report {
@@ -1412,7 +1441,9 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_digitizer_update(aoahid_node* node,
                                                              const aoahid_digitizer_sample* sample);
 
 /* aoahid_battery_update
- * Ownership: Borrows a Node; no ownership changes.
+ * Ownership: Borrows a Node whose Spec was created with enable_battery; no
+ * ownership changes. The report is sent by the next aoahid_node_submit that
+ * has no input report to send, and only when the value changed.
  * Blocking: Does not block, allocate, log, or perform I/O.
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
  * submission calls. It is rejected while one report is in flight.

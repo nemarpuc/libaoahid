@@ -141,17 +141,101 @@ struct GeneratedSpecIdentity {
     aoahid_android_status status;
 };
 
+struct BatteryRequest {
+    std::uint32_t enabled;
+    aoahid_battery_report report;
+    aoahid_report_id_option input_report_id;
+};
+
+struct BatteryFieldNames {
+    const char* enable;
+    const char* battery;
+    const char* report_id;
+    const char* strength;
+};
+
+constexpr BatteryFieldNames kKeyboardBatteryNames{"keyboard.enable_battery", "keyboard.battery",
+                                                  "keyboard.battery.report_id",
+                                                  "keyboard.battery.strength"};
+constexpr BatteryFieldNames kMouseBatteryNames{"mouse.enable_battery", "mouse.battery",
+                                               "mouse.battery.report_id",
+                                               "mouse.battery.strength"};
+constexpr BatteryFieldNames kToggleBatteryNames{"toggle.enable_battery", "toggle.battery",
+                                                "toggle.battery.report_id",
+                                                "toggle.battery.strength"};
+constexpr BatteryFieldNames kGamepadBatteryNames{"gamepad.enable_battery", "gamepad.battery",
+                                                 "gamepad.battery.report_id",
+                                                 "gamepad.battery.strength"};
+constexpr BatteryFieldNames kTouchscreenBatteryNames{
+    "touchscreen.enable_battery", "touchscreen.battery", "touchscreen.battery.report_id",
+    "touchscreen.battery.strength"};
+constexpr BatteryFieldNames kTouchpadBatteryNames{"touchpad.enable_battery", "touchpad.battery",
+                                                  "touchpad.battery.report_id",
+                                                  "touchpad.battery.strength"};
+constexpr BatteryFieldNames kPenBatteryNames{"pen.enable_battery", "pen.battery",
+                                             "pen.battery.report_id", "pen.battery.strength"};
+constexpr BatteryFieldNames kDigitizerBatteryNames{"digitizer.enable_battery", "digitizer.battery",
+                                                   "digitizer.battery.report_id",
+                                                   "digitizer.battery.strength"};
+
+bool validate_battery(const BatteryRequest& request, const BatteryFieldNames& names) noexcept {
+    if (!validate_option_boolean(request.enabled, names.enable)) {
+        return false;
+    }
+    const aoahid_battery_report& battery = request.report;
+    if (request.enabled == 0U) {
+        const bool zero =
+            battery.report_id.enabled == 0U && battery.report_id.value == 0U &&
+            battery.report_id.reserved8[0] == 0U && battery.report_id.reserved8[1] == 0U &&
+            battery.report_id.reserved8[2] == 0U && battery.strength.logical_minimum == 0 &&
+            battery.strength.logical_maximum == 0 && battery.strength.bit_width == 0U &&
+            physical_is_zero(battery.strength.physical);
+        if (!zero) {
+            set_error(AOAHID_ERR_PARAM, names.battery,
+                      "battery must be all zero while enable_battery is zero.");
+        }
+        return zero;
+    }
+    if (!validate_report_id(battery.report_id, names.report_id)) {
+        return false;
+    }
+    if (request.input_report_id.enabled != 1U || battery.report_id.enabled != 1U ||
+        battery.report_id.value == request.input_report_id.value) {
+        set_error(AOAHID_ERR_PARAM, names.report_id,
+                  "A battery report needs the profile's Report ID and its own, with different "
+                  "values.");
+        return false;
+    }
+    if (!validate_field(battery.strength, names.strength) ||
+        battery.strength.logical_minimum < 0 ||
+        battery.strength.logical_maximum <= battery.strength.logical_minimum) {
+        set_error(AOAHID_ERR_PARAM, names.strength,
+                  "Battery Strength requires an ordered nonnegative range that fits its width.");
+        return false;
+    }
+    return true;
+}
+
 template <typename Emit>
 aoahid_result build_generated_spec(const GeneratedSpecIdentity identity,
-                                   aoa::detail::SpecConfig config, Emit emit,
-                                   aoahid_spec** out_spec) {
+                                   aoa::detail::SpecConfig config, const BatteryRequest& battery,
+                                   Emit emit, aoahid_spec** out_spec) {
     if (out_spec == nullptr) {
         set_error(AOAHID_ERR_PARAM, "out_spec", "The output pointer is null.");
         return AOAHID_ERR_PARAM;
     }
     *out_spec = nullptr;
     auto spec = std::make_unique<aoahid_spec>();
+    const aoa::hid::BatteryField battery_field{
+        battery.report.report_id.value, battery.report.strength.logical_minimum,
+        battery.report.strength.logical_maximum,
+        static_cast<std::uint8_t>(battery.report.strength.bit_width),
+        battery.report.strength.physical};
+    const bool has_battery = battery.enabled == 1U;
     DescriptorBuilder counting_builder(nullptr, kAoaDescriptorWireMaximum, &spec->layout);
+    if (has_battery) {
+        counting_builder.set_battery(battery_field, &spec->battery_layout);
+    }
     const bool counted = emit(counting_builder);
     counting_builder.finish();
     if (!counted || !counting_builder.good()) {
@@ -162,6 +246,9 @@ aoahid_result build_generated_spec(const GeneratedSpecIdentity identity,
     spec->requirements = counting_builder.requirements();
     std::vector<std::uint8_t> construction(counting_builder.descriptor_size());
     DescriptorBuilder emitting_builder(construction.data(), construction.size(), nullptr);
+    if (has_battery) {
+        emitting_builder.set_battery(battery_field, nullptr);
+    }
     const bool emitted = emit(emitting_builder);
     emitting_builder.finish();
     if (!emitted || !emitting_builder.good() ||
@@ -180,7 +267,8 @@ aoahid_result build_generated_spec(const GeneratedSpecIdentity identity,
         return AOAHID_ERR_INTERNAL;
     }
     const aoa::hid::ValidationIssue validation =
-        aoa::hid::validate_generated(construction.data(), construction.size(), spec->layout);
+        aoa::hid::validate_generated(construction.data(), construction.size(), spec->layout,
+                                     has_battery ? &spec->battery_layout : nullptr);
     if (validation.result != AOAHID_OK) {
         set_error(validation.result, validation.field, validation.reason, 0, 0, 0, 0,
                   static_cast<std::uint32_t>(validation.offset), 0);
@@ -193,6 +281,13 @@ aoahid_result build_generated_spec(const GeneratedSpecIdentity identity,
     spec->report_capabilities.push_back(aoahid_report_capability{
         {spec->layout.has_report_id ? 1U : 0U, spec->layout.report_id, {0U, 0U, 0U}},
         static_cast<std::uint32_t>(spec->layout.wire_bytes)});
+    if (has_battery) {
+        spec->has_battery = true;
+        spec->battery = battery.report;
+        spec->report_capabilities.push_back(aoahid_report_capability{
+            {1U, spec->battery_layout.report_id, {0U, 0U, 0U}},
+            static_cast<std::uint32_t>(spec->battery_layout.wire_bytes)});
+    }
     *out_spec = spec.release();
     aoa::detail::clear_error();
     return AOAHID_OK;
@@ -421,8 +516,12 @@ aoahid_result create_usage_control_spec(const aoahid_toggle_options* options,
     config.options.usage_semantics = nullptr;
     config.options.expected_linux_event_types = nullptr;
     config.options.expected_linux_codes = nullptr;
+    const BatteryRequest battery{options->enable_battery, options->battery, options->report_id};
+    if (!validate_battery(battery, kToggleBatteryNames)) {
+        return AOAHID_ERR_PARAM;
+    }
     return build_generated_spec(
-        GeneratedSpecIdentity{AOAHID_PROFILE_TOGGLE, AOAHID_ANDROID_CONDITIONAL}, std::move(config),
+        GeneratedSpecIdentity{AOAHID_PROFILE_TOGGLE, AOAHID_ANDROID_CONDITIONAL}, std::move(config), battery,
         [=](DescriptorBuilder& builder) { return emit_usage_controls(builder, *options); },
         out_spec);
 }
@@ -566,8 +665,12 @@ static aoahid_result aoahid_spec_create_keyboard_impl(const aoahid_keyboard_opti
 
     aoa::detail::KeyboardConfig config{};
     config.options = *options;
+    const BatteryRequest battery{options->enable_battery, options->battery, options->report_id};
+    if (!validate_battery(battery, kKeyboardBatteryNames)) {
+        return AOAHID_ERR_PARAM;
+    }
     return build_generated_spec(
-        GeneratedSpecIdentity{AOAHID_PROFILE_KEYBOARD, AOAHID_ANDROID_CONDITIONAL}, config,
+        GeneratedSpecIdentity{AOAHID_PROFILE_KEYBOARD, AOAHID_ANDROID_CONDITIONAL}, config, battery,
         [=](DescriptorBuilder& builder) {
             if (!builder.begin_application(aoa::hid::usage::page_generic_desktop,
                                            aoa::hid::usage::keyboard) ||
@@ -627,8 +730,12 @@ static aoahid_result aoahid_spec_create_mouse_impl(const aoahid_mouse_options* o
     }
     aoa::detail::MouseConfig config{};
     config.options = *options;
+    const BatteryRequest battery{options->enable_battery, options->battery, options->report_id};
+    if (!validate_battery(battery, kMouseBatteryNames)) {
+        return AOAHID_ERR_PARAM;
+    }
     return build_generated_spec(
-        GeneratedSpecIdentity{AOAHID_PROFILE_MOUSE, AOAHID_ANDROID_PORTABLE_CANDIDATE}, config,
+        GeneratedSpecIdentity{AOAHID_PROFILE_MOUSE, AOAHID_ANDROID_PORTABLE_CANDIDATE}, config, battery,
         [=](DescriptorBuilder& builder) {
             if (!builder.begin_application(aoa::hid::usage::page_generic_desktop,
                                            aoa::hid::usage::mouse) ||
@@ -805,8 +912,12 @@ static aoahid_result create_controller_spec(const aoahid_gamepad_options* option
         options->dpad_representation != AOAHID_DPAD_HAT || !has_android_abxy
             ? AOAHID_ANDROID_CONDITIONAL
             : AOAHID_ANDROID_PORTABLE_CANDIDATE;
+    const BatteryRequest battery{options->enable_battery, options->battery, options->report_id};
+    if (!validate_battery(battery, kGamepadBatteryNames)) {
+        return AOAHID_ERR_PARAM;
+    }
     return build_generated_spec(
-        GeneratedSpecIdentity{AOAHID_PROFILE_GAMEPAD, android_status}, std::move(config),
+        GeneratedSpecIdentity{AOAHID_PROFILE_GAMEPAD, android_status}, std::move(config), battery,
         [=](DescriptorBuilder& builder) {
             if (!builder.begin_application(aoa::hid::usage::page_generic_desktop,
                                            aoa::hid::usage::gamepad) ||
@@ -969,7 +1080,8 @@ create_touch_spec_from_fields(const aoa::detail::TouchFields& fields, const Touc
                               // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                               const aoahid_profile_kind profile_kind,
                               const std::uint16_t application_usage,
-                              const aoahid_android_status android_status, aoahid_spec** out_spec) {
+                              const aoahid_android_status android_status,
+                              const BatteryRequest& battery, aoahid_spec** out_spec) {
     if (!validate_report_id(fields.report_id, names.report_id) ||
         !validate_field(fields.x, names.x) || !validate_field(fields.y, names.y) ||
         fields.x.logical_minimum > 0 || fields.x.logical_maximum < 0 ||
@@ -1084,8 +1196,13 @@ create_touch_spec_from_fields(const aoa::detail::TouchFields& fields, const Touc
     }
     aoa::detail::TouchConfig config{};
     config.fields = fields;
+    if (!validate_battery(battery, profile_kind == AOAHID_PROFILE_TOUCHSCREEN
+                                       ? kTouchscreenBatteryNames
+                                       : kTouchpadBatteryNames)) {
+        return AOAHID_ERR_PARAM;
+    }
     return build_generated_spec(
-        GeneratedSpecIdentity{profile_kind, android_status}, config,
+        GeneratedSpecIdentity{profile_kind, android_status}, config, battery,
         [=](DescriptorBuilder& builder) {
             if (!builder.begin_application(aoa::hid::usage::page_digitizers, application_usage) ||
                 !builder.set_report_id(fields.report_id.enabled == 1U, fields.report_id.value)) {
@@ -1228,7 +1345,10 @@ static aoahid_result aoahid_spec_create_touchscreen_impl(const aoahid_touchscree
     fields.button_count = 0U;
     return create_touch_spec_from_fields(fields, kTouchscreenFieldNames, AOAHID_PROFILE_TOUCHSCREEN,
                                          aoa::hid::usage::touch_screen,
-                                         AOAHID_ANDROID_PORTABLE_CANDIDATE, out_spec);
+                                         AOAHID_ANDROID_PORTABLE_CANDIDATE,
+                                         BatteryRequest{options->enable_battery, options->battery,
+                                                        options->report_id},
+                                         out_spec);
 }
 
 static aoahid_result aoahid_spec_create_touchpad_impl(const aoahid_touchpad_options* options,
@@ -1250,6 +1370,8 @@ static aoahid_result aoahid_spec_create_touchpad_impl(const aoahid_touchpad_opti
     fields.button_count = options->button_count;
     return create_touch_spec_from_fields(fields, kTouchpadFieldNames, AOAHID_PROFILE_TOUCHPAD,
                                          aoa::hid::usage::touch_pad, AOAHID_ANDROID_CONDITIONAL,
+                                         BatteryRequest{options->enable_battery, options->battery,
+                                                        options->report_id},
                                          out_spec);
 }
 
@@ -1324,10 +1446,15 @@ static aoahid_result create_stylus_spec(const aoahid_pen_options* options,
         }
     }
     config.options.barrel_usages = nullptr;
+    const BatteryRequest battery{options->enable_battery, options->battery, options->report_id};
+    if (!validate_battery(battery,
+                          kind == AOAHID_PROFILE_PEN ? kPenBatteryNames : kDigitizerBatteryNames)) {
+        return AOAHID_ERR_PARAM;
+    }
     return build_generated_spec(
         GeneratedSpecIdentity{kind, kind == AOAHID_PROFILE_PEN ? AOAHID_ANDROID_PORTABLE_CANDIDATE
                                                                : AOAHID_ANDROID_CONDITIONAL},
-        config,
+        config, battery,
         [=](DescriptorBuilder& builder) {
             const std::uint16_t application =
                 kind == AOAHID_PROFILE_PEN ? aoa::hid::usage::pen : aoa::hid::usage::digitizer;
@@ -1452,6 +1579,8 @@ static aoahid_result aoahid_spec_create_digitizer_impl(const aoahid_digitizer_op
     pen.barrel_usage_count = options->barrel_usage_count;
     pen.enable_eraser = options->enable_eraser;
     pen.enable_hover = options->enable_hover;
+    pen.enable_battery = options->enable_battery;
+    pen.battery = options->battery;
     return create_stylus_spec(&pen, AOAHID_PROFILE_DIGITIZER, out_spec);
 }
 

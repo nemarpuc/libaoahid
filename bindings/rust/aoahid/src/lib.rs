@@ -175,6 +175,11 @@ macro_rules! node_type {
             pub fn submit_blocking(self, timeout_ms: u32) -> Result<(), Error> {
                 self.0.submit_blocking(timeout_ms)
             }
+
+            /// Sets the battery level; the Spec must have a battery report.
+            pub fn battery(self, strength: i32) -> Result<(), Error> {
+                result(unsafe { sys::aoahid_battery_update(self.as_ptr(), strength) })
+            }
         }
     };
 }

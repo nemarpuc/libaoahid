@@ -75,6 +75,7 @@ See [PORTING.md](docs/PORTING.md#windows).
 | Digitizer | conditional | yes | no | no | Target classification and mapping evidence required |
 | Toggle: Camera keys | conditional | yes | no | no | HUT Camera Auto-focus/Shutter subset only |
 | Toggle: Telephony keys | conditional | yes | no | no | Caller allow-list and target mapping required |
+| Battery report (shown on a Keyboard) | conditional | yes | no | no | Second Input report inside any generated profile; Linux registers a battery only with an input device |
 | Validated raw descriptor | unknown | yes | no | no | Explicit no-Android-support acknowledgement |
 <!-- profile-table:end -->
 

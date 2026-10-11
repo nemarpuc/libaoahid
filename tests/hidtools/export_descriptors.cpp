@@ -270,6 +270,14 @@ int main(const int argc, char** argv) {
          ok;
     spec = nullptr;
 
+    keyboard.enable_battery = 1U;
+    keyboard.battery.report_id = {1U, 8U, {0U, 0U, 0U}};
+    keyboard.battery.strength = {1, 100, 8U, {}};
+    ok = emit_descriptor(output_directory, "keyboard-battery",
+                         aoahid_spec_create_keyboard(&keyboard, &spec), spec) &&
+         ok;
+    spec = nullptr;
+
     aoahid_mouse_options mouse{};
     mouse.struct_size = static_cast<std::uint32_t>(sizeof(mouse));
     mouse.button_count = 5U;

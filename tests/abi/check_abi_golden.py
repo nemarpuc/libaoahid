@@ -163,6 +163,13 @@ class ReportIdOption(c.Structure):
     _fields_ = [("enabled", U32), ("value", U8), ("reserved8", U8 * 3)]
 
 
+class BatteryReport(c.Structure):
+    _fields_ = [
+        ("report_id", ReportIdOption),
+        ("strength", IntegerField),
+    ]
+
+
 class KeyboardOptions(c.Structure):
     _fields_ = [
         ("struct_size", U32),
@@ -170,6 +177,8 @@ class KeyboardOptions(c.Structure):
         ("report_id", ReportIdOption),
         ("usage_minimum", U16),
         ("usage_maximum", U16),
+        ("enable_battery", U32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -185,6 +194,8 @@ class MouseOptions(c.Structure):
         ("wheel", IntegerField),
         ("enable_pan", U32),
         ("pan", IntegerField),
+        ("enable_battery", U32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -202,6 +213,8 @@ class ToggleOptions(c.Structure):
         ("usage_semantics", I32_PTR),
         ("expected_linux_event_types", CHAR_PTR_PTR),
         ("expected_linux_codes", CHAR_PTR_PTR),
+        ("enable_battery", U32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -230,6 +243,8 @@ class GamepadOptions(c.Structure):
         ("hat_logical_minimum", I32),
         ("hat_logical_maximum", I32),
         ("hat_bit_width", U32),
+        ("enable_battery", U32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -257,6 +272,8 @@ class TouchscreenOptions(c.Structure):
         ("scan_time_unit_100us", U32),
         ("enable_contact_count_maximum_feature_declaration", U32),
         ("enable_multi_packet_frames", U32),
+        ("enable_battery", U32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -285,6 +302,8 @@ class TouchpadOptions(c.Structure):
         ("enable_contact_count_maximum_feature_declaration", U32),
         ("enable_multi_packet_frames", U32),
         ("button_count", U32),
+        ("enable_battery", U32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -306,6 +325,8 @@ class PenOptions(c.Structure):
         ("barrel_usage_count", SIZE),
         ("enable_eraser", U32),
         ("enable_hover", U32),
+        ("enable_battery", U32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -327,6 +348,8 @@ class DigitizerOptions(c.Structure):
         ("barrel_usage_count", SIZE),
         ("enable_eraser", U32),
         ("enable_hover", U32),
+        ("enable_battery", U32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -433,6 +456,7 @@ GOLDEN_STRUCTS = {
     "aoahid_physical_properties": PhysicalProperties,
     "aoahid_integer_field": IntegerField,
     "aoahid_report_id_option": ReportIdOption,
+    "aoahid_battery_report": BatteryReport,
     "aoahid_keyboard_options": KeyboardOptions,
     "aoahid_mouse_options": MouseOptions,
     "aoahid_toggle_options": ToggleOptions,

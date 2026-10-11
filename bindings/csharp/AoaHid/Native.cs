@@ -201,6 +201,13 @@ public unsafe struct ReportId
 }
 
 [StructLayout(LayoutKind.Sequential)]
+public struct BatteryReport
+{
+    public ReportId ReportId;
+    public IntegerField Strength;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 public struct KeyboardOptions
 {
     public uint StructSize;
@@ -208,6 +215,8 @@ public struct KeyboardOptions
     public ReportId ReportId;
     public ushort UsageMinimum;
     public ushort UsageMaximum;
+    public uint EnableBattery;
+    public BatteryReport Battery;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -223,6 +232,8 @@ public struct MouseOptions
     public IntegerField Wheel;
     public uint EnablePan;
     public IntegerField Pan;
+    public uint EnableBattery;
+    public BatteryReport Battery;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -240,6 +251,8 @@ public struct ToggleOptions
     public nint UsageSemantics;
     public nint ExpectedLinuxEventTypes;
     public nint ExpectedLinuxCodes;
+    public uint EnableBattery;
+    public BatteryReport Battery;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -268,6 +281,8 @@ public struct GamepadOptions
     public int HatLogicalMinimum;
     public int HatLogicalMaximum;
     public uint HatBitWidth;
+    public uint EnableBattery;
+    public BatteryReport Battery;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -295,6 +310,8 @@ public struct TouchscreenOptions
     public uint ScanTimeUnit100us;
     public uint EnableContactCountMaximumFeatureDeclaration;
     public uint EnableMultiPacketFrames;
+    public uint EnableBattery;
+    public BatteryReport Battery;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -323,6 +340,8 @@ public struct TouchpadOptions
     public uint EnableContactCountMaximumFeatureDeclaration;
     public uint EnableMultiPacketFrames;
     public uint ButtonCount;
+    public uint EnableBattery;
+    public BatteryReport Battery;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -344,6 +363,8 @@ public struct PenOptions
     public nuint BarrelUsageCount;
     public uint EnableEraser;
     public uint EnableHover;
+    public uint EnableBattery;
+    public BatteryReport Battery;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -365,6 +386,8 @@ public struct DigitizerOptions
     public nuint BarrelUsageCount;
     public uint EnableEraser;
     public uint EnableHover;
+    public uint EnableBattery;
+    public BatteryReport Battery;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -552,6 +575,7 @@ public static class Native
             ["aoahid_physical_properties"] = typeof(PhysicalProperties),
             ["aoahid_integer_field"] = typeof(IntegerField),
             ["aoahid_report_id_option"] = typeof(ReportId),
+            ["aoahid_battery_report"] = typeof(BatteryReport),
             ["aoahid_keyboard_options"] = typeof(KeyboardOptions),
             ["aoahid_mouse_options"] = typeof(MouseOptions),
             ["aoahid_toggle_options"] = typeof(ToggleOptions),

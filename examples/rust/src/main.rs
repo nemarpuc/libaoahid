@@ -129,6 +129,13 @@ fn report_id_absent() -> sys::aoahid_report_id_option {
     }
 }
 
+fn battery_absent() -> sys::aoahid_battery_report {
+    sys::aoahid_battery_report {
+        report_id: report_id_absent(),
+        strength: field(0, 0, 0),
+    }
+}
+
 fn create_specs() -> Result<Specs, sys::aoahid_result> {
     let keyboard_options = sys::aoahid_keyboard_options {
         struct_size: struct_size::<sys::aoahid_keyboard_options>(),
@@ -136,6 +143,8 @@ fn create_specs() -> Result<Specs, sys::aoahid_result> {
         report_id: report_id_absent(),
         usage_minimum: KEYBOARD_A_USAGE,
         usage_maximum: KEYBOARD_APPLICATION_USAGE,
+        enable_battery: 0,
+        battery: battery_absent(),
     };
     let mouse_options = sys::aoahid_mouse_options {
         struct_size: struct_size::<sys::aoahid_mouse_options>(),
@@ -148,6 +157,8 @@ fn create_specs() -> Result<Specs, sys::aoahid_result> {
         wheel: field(RELATIVE_MINIMUM, RELATIVE_MAXIMUM, RELATIVE_BITS),
         enable_pan: 0,
         pan: field(0, 0, 0),
+        enable_battery: 0,
+        battery: battery_absent(),
     };
     let touchscreen_options = sys::aoahid_touchscreen_options {
         struct_size: struct_size::<sys::aoahid_touchscreen_options>(),
@@ -172,6 +183,8 @@ fn create_specs() -> Result<Specs, sys::aoahid_result> {
         scan_time_unit_100us: 0,
         enable_contact_count_maximum_feature_declaration: 0,
         enable_multi_packet_frames: 0,
+        enable_battery: 0,
+        battery: battery_absent(),
     };
     let mut specs = Specs {
         keyboard: ptr::null_mut(),

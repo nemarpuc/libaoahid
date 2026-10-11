@@ -189,12 +189,18 @@ int main(void) {
     AOAHID_FIELD(aoahid_report_id_option, value);
     AOAHID_FIELD(aoahid_report_id_option, reserved8);
 
+    AOAHID_BEGIN(aoahid_battery_report);
+    AOAHID_FIELD(aoahid_battery_report, report_id);
+    AOAHID_FIELD(aoahid_battery_report, strength);
+
     AOAHID_BEGIN(aoahid_keyboard_options);
     AOAHID_FIELD(aoahid_keyboard_options, struct_size);
     AOAHID_FIELD(aoahid_keyboard_options, reserved);
     AOAHID_FIELD(aoahid_keyboard_options, report_id);
     AOAHID_FIELD(aoahid_keyboard_options, usage_minimum);
     AOAHID_FIELD(aoahid_keyboard_options, usage_maximum);
+    AOAHID_FIELD(aoahid_keyboard_options, enable_battery);
+    AOAHID_FIELD(aoahid_keyboard_options, battery);
 
     AOAHID_BEGIN(aoahid_mouse_options);
     AOAHID_FIELD(aoahid_mouse_options, struct_size);
@@ -207,6 +213,8 @@ int main(void) {
     AOAHID_FIELD(aoahid_mouse_options, wheel);
     AOAHID_FIELD(aoahid_mouse_options, enable_pan);
     AOAHID_FIELD(aoahid_mouse_options, pan);
+    AOAHID_FIELD(aoahid_mouse_options, enable_battery);
+    AOAHID_FIELD(aoahid_mouse_options, battery);
 
     AOAHID_BEGIN(aoahid_toggle_options);
     AOAHID_FIELD(aoahid_toggle_options, struct_size);
@@ -221,6 +229,8 @@ int main(void) {
     AOAHID_FIELD(aoahid_toggle_options, usage_semantics);
     AOAHID_FIELD(aoahid_toggle_options, expected_linux_event_types);
     AOAHID_FIELD(aoahid_toggle_options, expected_linux_codes);
+    AOAHID_FIELD(aoahid_toggle_options, enable_battery);
+    AOAHID_FIELD(aoahid_toggle_options, battery);
 
     AOAHID_BEGIN(aoahid_gamepad_axis_option);
     AOAHID_FIELD(aoahid_gamepad_axis_option, role);
@@ -243,6 +253,8 @@ int main(void) {
     AOAHID_FIELD(aoahid_gamepad_options, hat_logical_minimum);
     AOAHID_FIELD(aoahid_gamepad_options, hat_logical_maximum);
     AOAHID_FIELD(aoahid_gamepad_options, hat_bit_width);
+    AOAHID_FIELD(aoahid_gamepad_options, enable_battery);
+    AOAHID_FIELD(aoahid_gamepad_options, battery);
 
     AOAHID_BEGIN(aoahid_touchscreen_options);
     AOAHID_FIELD(aoahid_touchscreen_options, struct_size);
@@ -267,6 +279,8 @@ int main(void) {
     AOAHID_FIELD(aoahid_touchscreen_options, scan_time_unit_100us);
     AOAHID_FIELD(aoahid_touchscreen_options, enable_contact_count_maximum_feature_declaration);
     AOAHID_FIELD(aoahid_touchscreen_options, enable_multi_packet_frames);
+    AOAHID_FIELD(aoahid_touchscreen_options, enable_battery);
+    AOAHID_FIELD(aoahid_touchscreen_options, battery);
 
     AOAHID_BEGIN(aoahid_touchpad_options);
     AOAHID_FIELD(aoahid_touchpad_options, struct_size);
@@ -292,6 +306,8 @@ int main(void) {
     AOAHID_FIELD(aoahid_touchpad_options, enable_contact_count_maximum_feature_declaration);
     AOAHID_FIELD(aoahid_touchpad_options, enable_multi_packet_frames);
     AOAHID_FIELD(aoahid_touchpad_options, button_count);
+    AOAHID_FIELD(aoahid_touchpad_options, enable_battery);
+    AOAHID_FIELD(aoahid_touchpad_options, battery);
 
     AOAHID_BEGIN(aoahid_pen_options);
     AOAHID_FIELD(aoahid_pen_options, struct_size);
@@ -310,6 +326,8 @@ int main(void) {
     AOAHID_FIELD(aoahid_pen_options, barrel_usage_count);
     AOAHID_FIELD(aoahid_pen_options, enable_eraser);
     AOAHID_FIELD(aoahid_pen_options, enable_hover);
+    AOAHID_FIELD(aoahid_pen_options, enable_battery);
+    AOAHID_FIELD(aoahid_pen_options, battery);
 
     AOAHID_BEGIN(aoahid_digitizer_options);
     AOAHID_FIELD(aoahid_digitizer_options, struct_size);
@@ -328,6 +346,8 @@ int main(void) {
     AOAHID_FIELD(aoahid_digitizer_options, barrel_usage_count);
     AOAHID_FIELD(aoahid_digitizer_options, enable_eraser);
     AOAHID_FIELD(aoahid_digitizer_options, enable_hover);
+    AOAHID_FIELD(aoahid_digitizer_options, enable_battery);
+    AOAHID_FIELD(aoahid_digitizer_options, battery);
 
     AOAHID_BEGIN(aoahid_raw_report);
     AOAHID_FIELD(aoahid_raw_report, report_id);

@@ -237,9 +237,23 @@ fn rust_layout() -> BTreeMap<String, usize> {
     );
     layout!(
         values,
+        aoahid_battery_report,
+        "aoahid_battery_report",
+        [report_id, strength]
+    );
+    layout!(
+        values,
         aoahid_keyboard_options,
         "aoahid_keyboard_options",
-        [struct_size, reserved, report_id, usage_minimum, usage_maximum]
+        [
+            struct_size,
+            reserved,
+            report_id,
+            usage_minimum,
+            usage_maximum,
+            enable_battery,
+            battery
+        ]
     );
     layout!(
         values,
@@ -255,7 +269,9 @@ fn rust_layout() -> BTreeMap<String, usize> {
             enable_wheel,
             wheel,
             enable_pan,
-            pan
+            pan,
+            enable_battery,
+            battery
         ]
     );
     layout!(
@@ -274,7 +290,9 @@ fn rust_layout() -> BTreeMap<String, usize> {
             allowed_usage_count,
             usage_semantics,
             expected_linux_event_types,
-            expected_linux_codes
+            expected_linux_codes,
+            enable_battery,
+            battery
         ]
     );
     layout!(
@@ -306,7 +324,9 @@ fn rust_layout() -> BTreeMap<String, usize> {
             dpad_representation,
             hat_logical_minimum,
             hat_logical_maximum,
-            hat_bit_width
+            hat_bit_width,
+            enable_battery,
+            battery
         ]
     );
     layout!(
@@ -335,7 +355,9 @@ fn rust_layout() -> BTreeMap<String, usize> {
             scan_time,
             scan_time_unit_100us,
             enable_contact_count_maximum_feature_declaration,
-            enable_multi_packet_frames
+            enable_multi_packet_frames,
+            enable_battery,
+            battery
         ]
     );
     layout!(
@@ -365,7 +387,9 @@ fn rust_layout() -> BTreeMap<String, usize> {
             scan_time_unit_100us,
             enable_contact_count_maximum_feature_declaration,
             enable_multi_packet_frames,
-            button_count
+            button_count,
+            enable_battery,
+            battery
         ]
     );
     layout!(
@@ -388,7 +412,9 @@ fn rust_layout() -> BTreeMap<String, usize> {
             barrel_usages,
             barrel_usage_count,
             enable_eraser,
-            enable_hover
+            enable_hover,
+            enable_battery,
+            battery
         ]
     );
     layout!(
@@ -411,7 +437,9 @@ fn rust_layout() -> BTreeMap<String, usize> {
             barrel_usages,
             barrel_usage_count,
             enable_eraser,
-            enable_hover
+            enable_hover,
+            enable_battery,
+            battery
         ]
     );
     layout!(

@@ -263,6 +263,13 @@ class ReportId(c.Structure):
     ]
 
 
+class BatteryReport(c.Structure):
+    _fields_ = [
+        ("report_id", ReportId),
+        ("strength", IntegerField),
+    ]
+
+
 class KeyboardOptions(c.Structure):
     _fields_ = [
         ("struct_size", c.c_uint32),
@@ -270,6 +277,8 @@ class KeyboardOptions(c.Structure):
         ("report_id", ReportId),
         ("usage_minimum", c.c_uint16),
         ("usage_maximum", c.c_uint16),
+        ("enable_battery", c.c_uint32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -285,6 +294,8 @@ class MouseOptions(c.Structure):
         ("wheel", IntegerField),
         ("enable_pan", c.c_uint32),
         ("pan", IntegerField),
+        ("enable_battery", c.c_uint32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -302,6 +313,8 @@ class ToggleOptions(c.Structure):
         ("usage_semantics", c.POINTER(c.c_int32)),
         ("expected_linux_event_types", c.POINTER(c.c_char_p)),
         ("expected_linux_codes", c.POINTER(c.c_char_p)),
+        ("enable_battery", c.c_uint32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -330,6 +343,8 @@ class GamepadOptions(c.Structure):
         ("hat_logical_minimum", c.c_int32),
         ("hat_logical_maximum", c.c_int32),
         ("hat_bit_width", c.c_uint32),
+        ("enable_battery", c.c_uint32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -357,6 +372,8 @@ class TouchscreenOptions(c.Structure):
         ("scan_time_unit_100us", c.c_uint32),
         ("enable_contact_count_maximum_feature_declaration", c.c_uint32),
         ("enable_multi_packet_frames", c.c_uint32),
+        ("enable_battery", c.c_uint32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -385,6 +402,8 @@ class TouchpadOptions(c.Structure):
         ("enable_contact_count_maximum_feature_declaration", c.c_uint32),
         ("enable_multi_packet_frames", c.c_uint32),
         ("button_count", c.c_uint32),
+        ("enable_battery", c.c_uint32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -406,6 +425,8 @@ class PenOptions(c.Structure):
         ("barrel_usage_count", c.c_size_t),
         ("enable_eraser", c.c_uint32),
         ("enable_hover", c.c_uint32),
+        ("enable_battery", c.c_uint32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -427,6 +448,8 @@ class DigitizerOptions(c.Structure):
         ("barrel_usage_count", c.c_size_t),
         ("enable_eraser", c.c_uint32),
         ("enable_hover", c.c_uint32),
+        ("enable_battery", c.c_uint32),
+        ("battery", BatteryReport),
     ]
 
 
@@ -533,6 +556,7 @@ ABI_STRUCTS = {
     "aoahid_physical_properties": PhysicalProperties,
     "aoahid_integer_field": IntegerField,
     "aoahid_report_id_option": ReportId,
+    "aoahid_battery_report": BatteryReport,
     "aoahid_keyboard_options": KeyboardOptions,
     "aoahid_mouse_options": MouseOptions,
     "aoahid_toggle_options": ToggleOptions,
@@ -653,6 +677,7 @@ __all__ += [
     "PhysicalProperties",
     "IntegerField",
     "ReportId",
+    "BatteryReport",
     "KeyboardOptions",
     "MouseOptions",
     "ToggleOptions",

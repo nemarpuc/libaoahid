@@ -272,6 +272,10 @@ struct aoahid_spec {
     aoa::hid::DescriptorRequirements requirements;
     std::vector<aoahid_report_capability> report_capabilities;
     aoa::detail::SpecConfig config;
+    // The optional battery report: a second Input report with its own layout.
+    bool has_battery{};
+    aoahid_battery_report battery{};
+    aoa::hid::ReportLayout battery_layout;
 };
 
 struct aoahid_context {
