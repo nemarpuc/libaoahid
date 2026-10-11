@@ -66,14 +66,13 @@ pub const AOAHID_LOG_TRACE: i32 = 4;
 
 pub const AOAHID_PROFILE_KEYBOARD: i32 = 1;
 pub const AOAHID_PROFILE_MOUSE: i32 = 2;
-pub const AOAHID_PROFILE_TOGGLE: i32 = 3;
-pub const AOAHID_PROFILE_GAMEPAD: i32 = 4;
-pub const AOAHID_PROFILE_TOUCHSCREEN: i32 = 5;
-pub const AOAHID_PROFILE_PEN: i32 = 6;
-pub const AOAHID_PROFILE_BATTERY: i32 = 7;
-pub const AOAHID_PROFILE_RAW: i32 = 8;
-pub const AOAHID_PROFILE_TOUCHPAD: i32 = 9;
-pub const AOAHID_PROFILE_DIGITIZER: i32 = 10;
+pub const AOAHID_PROFILE_TOGGLE: i32 = 8;
+pub const AOAHID_PROFILE_GAMEPAD: i32 = 7;
+pub const AOAHID_PROFILE_TOUCHSCREEN: i32 = 3;
+pub const AOAHID_PROFILE_PEN: i32 = 5;
+pub const AOAHID_PROFILE_RAW: i32 = 9;
+pub const AOAHID_PROFILE_TOUCHPAD: i32 = 4;
+pub const AOAHID_PROFILE_DIGITIZER: i32 = 6;
 pub const AOAHID_ANDROID_PORTABLE_CANDIDATE: i32 = 1;
 pub const AOAHID_ANDROID_CONDITIONAL: i32 = 2;
 pub const AOAHID_ANDROID_CUSTOM_SYSTEM_ONLY: i32 = 3;
@@ -307,13 +306,6 @@ c_struct!(aoahid_digitizer_options {
     twist: aoahid_integer_field, barrel_usages: *const u16,
     barrel_usage_count: usize, enable_eraser: u32, enable_hover: u32,
 });
-c_struct!(aoahid_battery_options {
-    struct_size: u32,
-    reserved: u32,
-    report_id: aoahid_report_id_option,
-    strength: aoahid_integer_field,
-    enable_unknown_null_state: u32,
-});
 c_struct!(aoahid_raw_report {
     report_id: aoahid_report_id_option,
     wire_length: u32,
@@ -463,10 +455,6 @@ extern "C" {
         options: *const aoahid_digitizer_options,
         out_spec: *mut *mut aoahid_spec,
     ) -> aoahid_result;
-    pub fn aoahid_spec_create_battery(
-        options: *const aoahid_battery_options,
-        out_spec: *mut *mut aoahid_spec,
-    ) -> aoahid_result;
     pub fn aoahid_spec_create_raw(
         options: *const aoahid_raw_options,
         out_spec: *mut *mut aoahid_spec,
@@ -547,7 +535,6 @@ extern "C" {
     ) -> aoahid_result;
     pub fn aoahid_battery_update(
         node: *mut aoahid_node,
-        has_value: u32,
         strength: i32,
     ) -> aoahid_result;
     pub fn aoahid_raw_submit(

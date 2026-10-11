@@ -330,16 +330,6 @@ class DigitizerOptions(c.Structure):
     ]
 
 
-class BatteryOptions(c.Structure):
-    _fields_ = [
-        ("struct_size", U32),
-        ("reserved", U32),
-        ("report_id", ReportIdOption),
-        ("strength", IntegerField),
-        ("enable_unknown_null_state", U32),
-    ]
-
-
 class RawReport(c.Structure):
     _fields_ = [
         ("report_id", ReportIdOption),
@@ -452,7 +442,6 @@ GOLDEN_STRUCTS = {
     "aoahid_touchpad_options": TouchpadOptions,
     "aoahid_pen_options": PenOptions,
     "aoahid_digitizer_options": DigitizerOptions,
-    "aoahid_battery_options": BatteryOptions,
     "aoahid_raw_report": RawReport,
     "aoahid_raw_options": RawOptions,
     "aoahid_report_capability": ReportCapability,
@@ -496,14 +485,13 @@ GOLDEN_CONSTANTS = {
     "AOAHID_LOG_TRACE": 4,
     "AOAHID_PROFILE_KEYBOARD": 1,
     "AOAHID_PROFILE_MOUSE": 2,
-    "AOAHID_PROFILE_TOGGLE": 3,
-    "AOAHID_PROFILE_GAMEPAD": 4,
-    "AOAHID_PROFILE_TOUCHSCREEN": 5,
-    "AOAHID_PROFILE_PEN": 6,
-    "AOAHID_PROFILE_BATTERY": 7,
-    "AOAHID_PROFILE_RAW": 8,
-    "AOAHID_PROFILE_TOUCHPAD": 9,
-    "AOAHID_PROFILE_DIGITIZER": 10,
+    "AOAHID_PROFILE_TOGGLE": 8,
+    "AOAHID_PROFILE_GAMEPAD": 7,
+    "AOAHID_PROFILE_TOUCHSCREEN": 3,
+    "AOAHID_PROFILE_PEN": 5,
+    "AOAHID_PROFILE_RAW": 9,
+    "AOAHID_PROFILE_TOUCHPAD": 4,
+    "AOAHID_PROFILE_DIGITIZER": 6,
     "AOAHID_ANDROID_PORTABLE_CANDIDATE": 1,
     "AOAHID_ANDROID_CONDITIONAL": 2,
     "AOAHID_ANDROID_CUSTOM_SYSTEM_ONLY": 3,

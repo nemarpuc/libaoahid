@@ -89,10 +89,6 @@ struct PenConfig {
     std::vector<std::uint16_t> barrel_usages;
 };
 
-struct BatteryConfig {
-    aoahid_battery_options options{};
-};
-
 struct RawConfig {
     std::vector<aoahid_raw_report> reports;
     std::vector<std::uint8_t> trailing_valid_masks;
@@ -117,7 +113,7 @@ struct DeferredError {
 };
 
 using SpecConfig = std::variant<std::monostate, KeyboardConfig, MouseConfig, ConsumerConfig,
-                                GamepadConfig, TouchConfig, PenConfig, BatteryConfig, RawConfig>;
+                                GamepadConfig, TouchConfig, PenConfig, RawConfig>;
 
 // One touch contact as the state machine keeps it; not part of the public ABI.
 struct TouchContact {
@@ -202,7 +198,7 @@ struct RawState {
 };
 
 using NodeState = std::variant<std::monostate, KeyboardState, MouseState, ConsumerState,
-                               GamepadState, TouchState, PenState, BatteryState, RawState>;
+                               GamepadState, TouchState, PenState, RawState>;
 
 void set_error(aoahid_result result, const char* field, const char* reason,
                std::int32_t native_status = 0, std::int32_t aoa_request = 0,

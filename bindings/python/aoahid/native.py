@@ -48,14 +48,13 @@ AOAHID_LOG_TRACE = 4
 
 AOAHID_PROFILE_KEYBOARD = 1
 AOAHID_PROFILE_MOUSE = 2
-AOAHID_PROFILE_TOGGLE = 3
-AOAHID_PROFILE_GAMEPAD = 4
-AOAHID_PROFILE_TOUCHSCREEN = 5
-AOAHID_PROFILE_PEN = 6
-AOAHID_PROFILE_BATTERY = 7
-AOAHID_PROFILE_RAW = 8
-AOAHID_PROFILE_TOUCHPAD = 9
-AOAHID_PROFILE_DIGITIZER = 10
+AOAHID_PROFILE_TOGGLE = 8
+AOAHID_PROFILE_GAMEPAD = 7
+AOAHID_PROFILE_TOUCHSCREEN = 3
+AOAHID_PROFILE_PEN = 5
+AOAHID_PROFILE_RAW = 9
+AOAHID_PROFILE_TOUCHPAD = 4
+AOAHID_PROFILE_DIGITIZER = 6
 
 AOAHID_ANDROID_PORTABLE_CANDIDATE = 1
 AOAHID_ANDROID_CONDITIONAL = 2
@@ -431,16 +430,6 @@ class DigitizerOptions(c.Structure):
     ]
 
 
-class BatteryOptions(c.Structure):
-    _fields_ = [
-        ("struct_size", c.c_uint32),
-        ("reserved", c.c_uint32),
-        ("report_id", ReportId),
-        ("strength", IntegerField),
-        ("enable_unknown_null_state", c.c_uint32),
-    ]
-
-
 class RawReport(c.Structure):
     _fields_ = [
         ("report_id", ReportId),
@@ -553,7 +542,6 @@ ABI_STRUCTS = {
     "aoahid_touchpad_options": TouchpadOptions,
     "aoahid_pen_options": PenOptions,
     "aoahid_digitizer_options": DigitizerOptions,
-    "aoahid_battery_options": BatteryOptions,
     "aoahid_raw_report": RawReport,
     "aoahid_raw_options": RawOptions,
     "aoahid_report_capability": ReportCapability,
@@ -604,7 +592,6 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
         "aoahid_spec_create_touchpad": TouchpadOptions,
         "aoahid_spec_create_pen": PenOptions,
         "aoahid_spec_create_digitizer": DigitizerOptions,
-        "aoahid_spec_create_battery": BatteryOptions,
         "aoahid_spec_create_raw": RawOptions,
     }
     for name, option_type in factories.items():
@@ -633,7 +620,7 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
     declare("aoahid_touchpad_button", [NodeP, c.c_uint32, c.c_uint32], result)
     declare("aoahid_pen_update", [NodeP, c.POINTER(PenSample)], result)
     declare("aoahid_digitizer_update", [NodeP, c.POINTER(DigitizerSample)], result)
-    declare("aoahid_battery_update", [NodeP, c.c_uint32, c.c_int32], result)
+    declare("aoahid_battery_update", [NodeP, c.c_int32], result)
     declare("aoahid_raw_submit", [NodeP, c.POINTER(c.c_uint8), c.c_size_t], result)
     return library
 
@@ -675,7 +662,6 @@ __all__ += [
     "TouchpadOptions",
     "PenOptions",
     "DigitizerOptions",
-    "BatteryOptions",
     "RawReport",
     "RawOptions",
     "ReportCapability",

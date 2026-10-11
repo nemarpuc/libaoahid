@@ -75,7 +75,6 @@ See [PORTING.md](docs/PORTING.md#windows).
 | Digitizer | conditional | yes | no | no | Target classification and mapping evidence required |
 | Toggle: Camera keys | conditional | yes | no | no | HUT Camera Auto-focus/Shutter subset only |
 | Toggle: Telephony keys | conditional | yes | no | no | Caller allow-list and target mapping required |
-| Battery Strength telemetry | conditional | yes | no | no | Kernel power-supply association and OEM dependent |
 | Validated raw descriptor | unknown | yes | no | no | Explicit no-Android-support acknowledgement |
 <!-- profile-table:end -->
 

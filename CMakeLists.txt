@@ -537,7 +537,6 @@ if(AOAHID_BUILD_EXAMPLES)
       touchpad
       pen
       digitizer
-      battery
       raw)
   foreach(aoahid_profile_example IN LISTS AOAHID_PROFILE_EXAMPLES)
     add_executable(aoahid_example_${aoahid_profile_example}
@@ -563,7 +562,7 @@ if(AOAHID_BUILD_EXAMPLES)
   # Human-observable real-device verification programs (docs/QUICKSTART.md).
   # These need an actual phone and are meant to be watched, so unlike the
   # examples above they are never registered as ctest cases.
-  set(AOAHID_VERIFY_EXAMPLES keyboard touch mouse toggle battery all accessory)
+  set(AOAHID_VERIFY_EXAMPLES keyboard touch mouse toggle all accessory)
   foreach(aoahid_verify_example IN LISTS AOAHID_VERIFY_EXAMPLES)
     add_executable(aoahid_verify_${aoahid_verify_example}
         examples/c/verify/verify_${aoahid_verify_example}.c)

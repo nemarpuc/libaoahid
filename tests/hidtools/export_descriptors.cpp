@@ -467,15 +467,6 @@ int main(const int argc, char** argv) {
          ok;
     spec = nullptr;
 
-    aoahid_battery_options battery{};
-    battery.struct_size = static_cast<std::uint32_t>(sizeof(battery));
-    battery.strength = {0, 100, 7U, {}};
-    battery.enable_unknown_null_state = 1U;
-    ok = emit_descriptor(output_directory, "battery", aoahid_spec_create_battery(&battery, &spec),
-                         spec) &&
-         ok;
-    spec = nullptr;
-
     static constexpr std::array<std::uint8_t, 21U> raw_descriptor{
         0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U, 0x85U, 0x01U, 0x15U, 0x00U, 0x25U,
         0x01U, 0x75U, 0x01U, 0x95U, 0x01U, 0x09U, 0x01U, 0x81U, 0x02U, 0xC0U};

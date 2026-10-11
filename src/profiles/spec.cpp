@@ -1455,54 +1455,6 @@ static aoahid_result aoahid_spec_create_digitizer_impl(const aoahid_digitizer_op
     return create_stylus_spec(&pen, AOAHID_PROFILE_DIGITIZER, out_spec);
 }
 
-static aoahid_result aoahid_spec_create_battery_impl(const aoahid_battery_options* options,
-                                                     aoahid_spec** out_spec) {
-    aoa::detail::clear_error();
-    if (options == nullptr ||
-        !aoa::detail::valid_struct(options, options == nullptr ? 0U : options->struct_size,
-                                   static_cast<std::uint32_t>(sizeof(*options)),
-                                   "battery_options")) {
-        return AOAHID_ERR_PARAM;
-    }
-    if (options->reserved != 0U || !validate_report_id(options->report_id, "battery.report_id") ||
-        !validate_field(options->strength, "battery.strength") ||
-        options->strength.logical_minimum < 0 ||
-        options->strength.logical_maximum <= options->strength.logical_minimum ||
-        !validate_option_boolean(options->enable_unknown_null_state,
-                                 "battery.enable_unknown_null_state") ||
-        (options->enable_unknown_null_state == 1U &&
-         !has_null_encoding(NullEncodingRange{options->strength.logical_minimum,
-                                              options->strength.logical_maximum,
-                                              options->strength.bit_width}))) {
-        set_error(AOAHID_ERR_PARAM, "battery",
-                  "Battery Strength requires an ordered nonnegative range; enabled unknown state "
-                  "requires an unused encoding.");
-        return AOAHID_ERR_PARAM;
-    }
-    aoa::detail::BatteryConfig config{};
-    config.options = *options;
-    return build_generated_spec(
-        GeneratedSpecIdentity{AOAHID_PROFILE_BATTERY, AOAHID_ANDROID_CONDITIONAL}, config,
-        [=](DescriptorBuilder& builder) {
-            if (!builder.begin_application(aoa::hid::usage::page_generic_device_controls,
-                                           aoa::hid::usage::background_nonuser_controls) ||
-                !builder.set_report_id(options->report_id.enabled == 1U,
-                                       options->report_id.value) ||
-                !builder.variable(
-                    aoa::hid::usage::page_generic_device_controls,
-                    aoa::hid::usage::battery_strength, options->strength.logical_minimum,
-                    options->strength.logical_maximum,
-                    static_cast<std::uint8_t>(options->strength.bit_width), false,
-                    options->enable_unknown_null_state == 1U, FieldSemantic::battery_strength, 0U,
-                    false, &options->strength.physical)) {
-                return false;
-            }
-            pad_report(builder);
-            return builder.end_collection();
-        },
-        out_spec);
-}
-
 static aoahid_result aoahid_spec_create_raw_impl(const aoahid_raw_options* options,
                                                  aoahid_spec** out_spec) {
     aoa::detail::clear_error();
@@ -1670,11 +1622,6 @@ aoahid_result AOAHID_CALL aoahid_spec_create_digitizer(const aoahid_digitizer_op
                             [&] { return aoahid_spec_create_digitizer_impl(options, out_spec); });
 }
 
-aoahid_result AOAHID_CALL aoahid_spec_create_battery(const aoahid_battery_options* options,
-                                                     aoahid_spec** out_spec) {
-    return abi_spec_factory(out_spec, "spec.create_battery",
-                            [&] { return aoahid_spec_create_battery_impl(options, out_spec); });
-}
 
 aoahid_result AOAHID_CALL aoahid_spec_create_raw(const aoahid_raw_options* options,
                                                  aoahid_spec** out_spec) {

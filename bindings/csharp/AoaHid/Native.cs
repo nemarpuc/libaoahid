@@ -34,9 +34,9 @@ public enum DpadRepresentation : int { None = 1, Hat = 2, Buttons = 3 }
 
 public enum ProfileKind : int
 {
-    Keyboard = 1, Mouse = 2, Toggle = 3, Gamepad = 4,
-    Touchscreen = 5, Pen = 6, Battery = 7, Raw = 8,
-    Touchpad = 9, Digitizer = 10,
+    Keyboard = 1, Mouse = 2, Touchscreen = 3, Touchpad = 4,
+    Pen = 5, Digitizer = 6, Gamepad = 7, Toggle = 8,
+    Raw = 9,
 }
 
 public enum AndroidStatus : int
@@ -368,16 +368,6 @@ public struct DigitizerOptions
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct BatteryOptions
-{
-    public uint StructSize;
-    public uint Reserved;
-    public ReportId ReportId;
-    public IntegerField Strength;
-    public uint EnableUnknownNullState;
-}
-
-[StructLayout(LayoutKind.Sequential)]
 public struct RawReport
 {
     public ReportId ReportId;
@@ -507,14 +497,13 @@ public static class Native
             ["AOAHID_LOG_TRACE"] = 4,
             ["AOAHID_PROFILE_KEYBOARD"] = 1,
             ["AOAHID_PROFILE_MOUSE"] = 2,
-            ["AOAHID_PROFILE_TOGGLE"] = 3,
-            ["AOAHID_PROFILE_GAMEPAD"] = 4,
-            ["AOAHID_PROFILE_TOUCHSCREEN"] = 5,
-            ["AOAHID_PROFILE_PEN"] = 6,
-            ["AOAHID_PROFILE_BATTERY"] = 7,
-            ["AOAHID_PROFILE_RAW"] = 8,
-            ["AOAHID_PROFILE_TOUCHPAD"] = 9,
-            ["AOAHID_PROFILE_DIGITIZER"] = 10,
+            ["AOAHID_PROFILE_TOGGLE"] = 8,
+            ["AOAHID_PROFILE_GAMEPAD"] = 7,
+            ["AOAHID_PROFILE_TOUCHSCREEN"] = 3,
+            ["AOAHID_PROFILE_PEN"] = 5,
+            ["AOAHID_PROFILE_RAW"] = 9,
+            ["AOAHID_PROFILE_TOUCHPAD"] = 4,
+            ["AOAHID_PROFILE_DIGITIZER"] = 6,
             ["AOAHID_ANDROID_PORTABLE_CANDIDATE"] = 1,
             ["AOAHID_ANDROID_CONDITIONAL"] = 2,
             ["AOAHID_ANDROID_CUSTOM_SYSTEM_ONLY"] = 3,
@@ -572,7 +561,6 @@ public static class Native
             ["aoahid_touchpad_options"] = typeof(TouchpadOptions),
             ["aoahid_pen_options"] = typeof(PenOptions),
             ["aoahid_digitizer_options"] = typeof(DigitizerOptions),
-            ["aoahid_battery_options"] = typeof(BatteryOptions),
             ["aoahid_raw_report"] = typeof(RawReport),
             ["aoahid_raw_options"] = typeof(RawOptions),
             ["aoahid_report_capability"] = typeof(ReportCapability),
@@ -639,8 +627,6 @@ public static class Native
     public static extern Result SpecCreatePen(in PenOptions options, out nint spec);
     [DllImport(Library, EntryPoint = "aoahid_spec_create_digitizer", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateDigitizer(in DigitizerOptions options, out nint spec);
-    [DllImport(Library, EntryPoint = "aoahid_spec_create_battery", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result SpecCreateBattery(in BatteryOptions options, out nint spec);
     [DllImport(Library, EntryPoint = "aoahid_spec_create_raw", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateRaw(in RawOptions options, out nint spec);
     [DllImport(Library, EntryPoint = "aoahid_spec_retain", ExactSpelling = true, CallingConvention = Call)]
@@ -695,7 +681,7 @@ public static class Native
     [DllImport(Library, EntryPoint = "aoahid_digitizer_update", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DigitizerUpdate(nint node, in DigitizerSample sample);
     [DllImport(Library, EntryPoint = "aoahid_battery_update", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result BatteryUpdate(nint node, uint hasValue, int strength);
+    public static extern Result BatteryUpdate(nint node, int strength);
     [DllImport(Library, EntryPoint = "aoahid_raw_submit", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result RawSubmit(nint node, nint report, nuint length);
 }

@@ -31,7 +31,6 @@ ROWS = (
     Presentation("digitizer", "Digitizer", "conditional", "Target classification and mapping evidence required"),
     Presentation("camera-keys", "Toggle: Camera keys", "conditional", "HUT Camera Auto-focus/Shutter subset only"),
     Presentation("telephony-keys", "Toggle: Telephony keys", "conditional", "Caller allow-list and target mapping required"),
-    Presentation("battery", "Battery Strength telemetry", "conditional", "Kernel power-supply association and OEM dependent"),
     Presentation("raw-validated", "Validated raw descriptor", "unknown", "Explicit no-Android-support acknowledgement"),
 )
 

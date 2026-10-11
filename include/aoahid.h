@@ -89,23 +89,22 @@ typedef int32_t aoahid_profile_kind;
 enum {
     AOAHID_PROFILE_KEYBOARD = 1,
     AOAHID_PROFILE_MOUSE = 2,
+    /* Always the fixed-slot Multi-Touch Touch Screen Application Collection
+     * Usage. */
+    AOAHID_PROFILE_TOUCHSCREEN = 3,
+    /* Always the Digitizers / Touch Pad Application Collection Usage. */
+    AOAHID_PROFILE_TOUCHPAD = 4,
+    /* Always the Digitizers / Pen Application Collection Usage. */
+    AOAHID_PROFILE_PEN = 5,
+    /* Always the Digitizers / Digitizer Application Collection Usage. */
+    AOAHID_PROFILE_DIGITIZER = 6,
+    /* Always the Generic Desktop / Game Pad Application Collection Usage. */
+    AOAHID_PROFILE_GAMEPAD = 7,
     /* One-bit allow-listed selector controls on any HUT Usage Page: Consumer,
      * System Control, Camera Control, Telephony, or a caller-chosen page. The
      * exact Application Collection and field Usage Page are caller fields. */
-    AOAHID_PROFILE_TOGGLE = 3,
-    /* Always the Generic Desktop / Game Pad Application Collection Usage. */
-    AOAHID_PROFILE_GAMEPAD = 4,
-    /* Always the fixed-slot Multi-Touch Touch Screen Application Collection
-     * Usage. */
-    AOAHID_PROFILE_TOUCHSCREEN = 5,
-    /* Always the Digitizers / Pen Application Collection Usage. */
-    AOAHID_PROFILE_PEN = 6,
-    AOAHID_PROFILE_BATTERY = 7,
-    AOAHID_PROFILE_RAW = 8,
-    /* Always the Digitizers / Touch Pad Application Collection Usage. */
-    AOAHID_PROFILE_TOUCHPAD = 9,
-    /* Always the Digitizers / Digitizer Application Collection Usage. */
-    AOAHID_PROFILE_DIGITIZER = 10
+    AOAHID_PROFILE_TOGGLE = 8,
+    AOAHID_PROFILE_RAW = 9
 };
 
 typedef int32_t aoahid_android_status;
@@ -524,14 +523,6 @@ typedef struct aoahid_digitizer_options {
     uint32_t enable_eraser;
     uint32_t enable_hover;
 } aoahid_digitizer_options;
-
-typedef struct aoahid_battery_options {
-    uint32_t struct_size;
-    uint32_t reserved;
-    aoahid_report_id_option report_id;
-    aoahid_integer_field strength;
-    uint32_t enable_unknown_null_state;
-} aoahid_battery_options;
 
 typedef struct aoahid_raw_report {
     aoahid_report_id_option report_id;
@@ -1068,19 +1059,6 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_spec_create_pen(const aoahid_pen_opt
 AOAHID_API aoahid_result AOAHID_CALL
 aoahid_spec_create_digitizer(const aoahid_digitizer_options* options, aoahid_spec** out_spec);
 
-/* aoahid_spec_create_battery
- * Ownership: Borrows and copies options. On success, out_spec receives one
- * caller-owned immutable reference; it is null on every failure.
- * Blocking: Performs validation and allocation but no I/O or waiting.
- * Synchronization: Has no Context domain and may run concurrently; out_spec and
- * caller-owned options must not be concurrently mutated.
- * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid pointers/ABI fields, range,
- * flag, or null-state declaration; AOAHID_ERR_OVERFLOW for descriptor/layout
- * overflow; AOAHID_ERR_INTERNAL for allocation, generation inconsistency, or an
- * unexpected exception. */
-AOAHID_API aoahid_result AOAHID_CALL
-aoahid_spec_create_battery(const aoahid_battery_options* options, aoahid_spec** out_spec);
-
 /* aoahid_spec_create_raw
  * Ownership: Borrows descriptor and report table for the call and copies them.
  * On success, out_spec receives one caller-owned immutable reference; it is null
@@ -1434,16 +1412,15 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_digitizer_update(aoahid_node* node,
                                                              const aoahid_digitizer_sample* sample);
 
 /* aoahid_battery_update
- * Ownership: Borrows a Battery Node; no ownership changes.
+ * Ownership: Borrows a Node; no ownership changes.
  * Blocking: Does not block, allocate, log, or perform I/O.
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
  * submission calls. It is rejected while one report is in flight.
- * Returns: AOAHID_OK; AOAHID_ERR_PARAM for an invalid Node/profile, nonboolean
- * presence flag, disallowed unknown state, or out-of-range strength;
- * AOAHID_ERR_BUSY for an in-flight report; AOAHID_ERR_NO_DEVICE for sticky loss;
- * AOAHID_ERR_INTERNAL for unexpected ABI-boundary failure. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_battery_update(aoahid_node* node, uint32_t has_value,
-                                                           int32_t strength);
+ * Returns: AOAHID_OK; AOAHID_ERR_PARAM for an invalid Node, a Node without a
+ * battery report, or an out-of-range strength; AOAHID_ERR_BUSY for an in-flight
+ * report; AOAHID_ERR_NO_DEVICE for sticky loss; AOAHID_ERR_INTERNAL for
+ * unexpected ABI-boundary failure. */
+AOAHID_API aoahid_result AOAHID_CALL aoahid_battery_update(aoahid_node* node, int32_t strength);
 
 /* aoahid_raw_submit
  * Ownership: Borrows a Raw Node and report; the bytes are copied into the

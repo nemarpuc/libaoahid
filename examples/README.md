@@ -27,7 +27,6 @@ cc -std=c17 -O2 -Iinclude $EX/c/profiles/gamepad.c     lib/libaoahid.a -lstdc++ 
 cc -std=c17 -O2 -Iinclude $EX/c/profiles/touchscreen.c lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o touchscreen
 cc -std=c17 -O2 -Iinclude $EX/c/profiles/touchpad.c    lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o touchpad
 cc -std=c17 -O2 -Iinclude $EX/c/profiles/pen.c         lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o pen
-cc -std=c17 -O2 -Iinclude $EX/c/profiles/battery.c     lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o battery
 cc -std=c17 -O2 -Iinclude $EX/c/profiles/raw.c         lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o raw
 
 # The full discovery-to-teardown lifecycle example. Opens a real device if one
@@ -40,7 +39,6 @@ cc -std=c17 -O2 -Iinclude $EX/c/verify/verify_keyboard.c lib/libaoahid.a -lstdc+
 cc -std=c17 -O2 -Iinclude $EX/c/verify/verify_touch.c    lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -lm -o verify_touch
 cc -std=c17 -O2 -Iinclude $EX/c/verify/verify_mouse.c    lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -lm -o verify_mouse
 cc -std=c17 -O2 -Iinclude $EX/c/verify/verify_toggle.c   lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o verify_toggle
-cc -std=c17 -O2 -Iinclude $EX/c/verify/verify_battery.c  lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o verify_battery
 cc -std=c17 -O2 -Iinclude $EX/c/verify/verify_all.c      lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -lm -o verify_all
 cc -std=c17 -O2 -Iinclude $EX/c/verify/verify_accessory.c lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o verify_accessory
 ```

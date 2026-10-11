@@ -443,10 +443,6 @@ aoahid_result initialize_node_state(aoahid_node* node) {
     case AOAHID_PROFILE_DIGITIZER:
         node->state = aoa::detail::PenState{};
         break;
-    case AOAHID_PROFILE_BATTERY:
-        node->state = aoa::detail::BatteryState{};
-        node->dirty = false;
-        break;
     case AOAHID_PROFILE_RAW:
         node->state = aoa::detail::RawState{};
         node->dirty = false;
@@ -602,8 +598,7 @@ void make_neutral(aoahid_node* node) noexcept {
         had_non_neutral_state = neutralize_pen(pen);
     }
     node->dirty = (had_non_neutral_state || node->emitted_non_neutral) &&
-                  node->spec->kind != AOAHID_PROFILE_RAW &&
-                  node->spec->kind != AOAHID_PROFILE_BATTERY;
+                  node->spec->kind != AOAHID_PROFILE_RAW;
 }
 
 aoahid_result poll_until_idle(aoahid_node* node, const std::uint32_t timeout_ms) {

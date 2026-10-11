@@ -332,7 +332,6 @@ aoahid_result serialize_node(aoahid_node* node, std::uint8_t* report, const std:
     const GamepadState* gamepad = state<GamepadState>(node);
     const TouchState* touch = state<TouchState>(node);
     const PenState* pen = state<PenState>(node);
-    const BatteryState* battery = state<BatteryState>(node);
     const KeyboardConfig* keyboard_config = config<KeyboardConfig>(node);
     const GamepadConfig* gamepad_config = config<GamepadConfig>(node);
     const TouchConfig* touch_config = config<TouchConfig>(node);
@@ -506,12 +505,7 @@ aoahid_result serialize_node(aoahid_node* node, std::uint8_t* report, const std:
                         : (pen->tool_switch_departure ? pen->emitted.twist : pen->desired.twist);
             break;
         case FieldSemantic::battery_strength:
-            if (battery != nullptr && battery->has_value) {
-                value = battery->strength;
-            } else {
-                value = hat_null(field);
-                allow_null = true;
-            }
+            ok = false;
             break;
         case FieldSemantic::constant_padding:
             continue;
@@ -1171,32 +1165,12 @@ static aoahid_result stylus_update_impl(aoahid_node* node, const aoahid_profile_
     return AOAHID_OK;
 }
 
-static aoahid_result aoahid_battery_update_impl(aoahid_node* node, const std::uint32_t has_value,
-                                                const std::int32_t strength) {
+static aoahid_result aoahid_battery_update_impl(aoahid_node* node, const std::int32_t strength) {
     aoa::detail::clear_error();
-    const aoahid_result check = usable(node, AOAHID_PROFILE_BATTERY, "battery.update");
-    if (check != AOAHID_OK)
-        return check;
-    if (!aoa::detail::valid_boolean(has_value)) {
-        set_error(AOAHID_ERR_PARAM, "battery.has_value", "has_value must be exactly zero or one.");
-        return AOAHID_ERR_PARAM;
-    }
-    const auto* spec = config<aoa::detail::BatteryConfig>(node);
-    if ((has_value == 0U && strength != 0) ||
-        (has_value == 0U && spec->options.enable_unknown_null_state != 1U) ||
-        (has_value == 1U && !in_range(strength, spec->options.strength))) {
-        set_error(AOAHID_ERR_PARAM, "battery.strength",
-                  "The value is outside the declared range or unknown state was not enabled.");
-        return AOAHID_ERR_PARAM;
-    }
-    auto* battery = state<aoa::detail::BatteryState>(node);
-    const bool next_has_value = has_value == 1U;
-    const std::int32_t next_strength = next_has_value ? strength : 0;
-    const bool changed = battery->has_value != next_has_value || battery->strength != next_strength;
-    battery->has_value = next_has_value;
-    battery->strength = next_strength;
-    node->dirty = node->dirty || changed;
-    return AOAHID_OK;
+    static_cast<void>(node);
+    static_cast<void>(strength);
+    set_error(AOAHID_ERR_PARAM, "battery.update", "The node has no battery report.");
+    return AOAHID_ERR_PARAM;
 }
 
 aoahid_result AOAHID_CALL aoahid_keyboard_key(aoahid_node* node, const std::uint16_t usage,
@@ -1298,10 +1272,9 @@ aoahid_result AOAHID_CALL aoahid_digitizer_update(aoahid_node* node,
     });
 }
 
-aoahid_result AOAHID_CALL aoahid_battery_update(aoahid_node* node, const std::uint32_t has_value,
-                                                const std::int32_t strength) {
+aoahid_result AOAHID_CALL aoahid_battery_update(aoahid_node* node, const std::int32_t strength) {
     return abi_state_result("battery.update",
-                            [&] { return aoahid_battery_update_impl(node, has_value, strength); });
+                            [&] { return aoahid_battery_update_impl(node, strength); });
 }
 
 } // extern "C"

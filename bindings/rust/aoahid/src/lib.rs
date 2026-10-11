@@ -123,11 +123,6 @@ pointer_spec_type!(
     sys::aoahid_digitizer_options,
     sys::aoahid_spec_create_digitizer
 );
-safe_spec_type!(
-    BatterySpec,
-    sys::aoahid_battery_options,
-    sys::aoahid_spec_create_battery
-);
 pointer_spec_type!(
     RawSpec,
     sys::aoahid_raw_options,
@@ -192,7 +187,6 @@ node_type!(TouchscreenNodeRef);
 node_type!(TouchpadNodeRef);
 node_type!(PenNodeRef);
 node_type!(DigitizerNodeRef);
-node_type!(BatteryNodeRef);
 node_type!(RawNodeRef);
 
 impl KeyboardNodeRef {
@@ -303,15 +297,6 @@ impl PenNodeRef {
 impl DigitizerNodeRef {
     pub fn update(self, sample: &sys::aoahid_digitizer_sample) -> Result<(), Error> {
         result(unsafe { sys::aoahid_digitizer_update(self.as_ptr(), sample) })
-    }
-}
-
-impl BatteryNodeRef {
-    pub fn update(self, strength: i32) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_battery_update(self.as_ptr(), 1, strength) })
-    }
-    pub fn unknown(self) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_battery_update(self.as_ptr(), 0, 0) })
     }
 }
 

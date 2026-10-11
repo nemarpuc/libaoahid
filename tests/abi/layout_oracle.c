@@ -50,7 +50,6 @@ int main(void) {
     AOAHID_CONSTANT(AOAHID_PROFILE_GAMEPAD);
     AOAHID_CONSTANT(AOAHID_PROFILE_TOUCHSCREEN);
     AOAHID_CONSTANT(AOAHID_PROFILE_PEN);
-    AOAHID_CONSTANT(AOAHID_PROFILE_BATTERY);
     AOAHID_CONSTANT(AOAHID_PROFILE_RAW);
     AOAHID_CONSTANT(AOAHID_PROFILE_TOUCHPAD);
     AOAHID_CONSTANT(AOAHID_PROFILE_DIGITIZER);
@@ -329,13 +328,6 @@ int main(void) {
     AOAHID_FIELD(aoahid_digitizer_options, barrel_usage_count);
     AOAHID_FIELD(aoahid_digitizer_options, enable_eraser);
     AOAHID_FIELD(aoahid_digitizer_options, enable_hover);
-
-    AOAHID_BEGIN(aoahid_battery_options);
-    AOAHID_FIELD(aoahid_battery_options, struct_size);
-    AOAHID_FIELD(aoahid_battery_options, reserved);
-    AOAHID_FIELD(aoahid_battery_options, report_id);
-    AOAHID_FIELD(aoahid_battery_options, strength);
-    AOAHID_FIELD(aoahid_battery_options, enable_unknown_null_state);
 
     AOAHID_BEGIN(aoahid_raw_report);
     AOAHID_FIELD(aoahid_raw_report, report_id);

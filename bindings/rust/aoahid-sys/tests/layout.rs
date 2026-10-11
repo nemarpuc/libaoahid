@@ -67,7 +67,6 @@ fn rust_constants() -> BTreeMap<String, usize> {
             AOAHID_PROFILE_GAMEPAD,
             AOAHID_PROFILE_TOUCHSCREEN,
             AOAHID_PROFILE_PEN,
-            AOAHID_PROFILE_BATTERY,
             AOAHID_PROFILE_RAW,
             AOAHID_PROFILE_TOUCHPAD,
             AOAHID_PROFILE_DIGITIZER,
@@ -413,18 +412,6 @@ fn rust_layout() -> BTreeMap<String, usize> {
             barrel_usage_count,
             enable_eraser,
             enable_hover
-        ]
-    );
-    layout!(
-        values,
-        aoahid_battery_options,
-        "aoahid_battery_options",
-        [
-            struct_size,
-            reserved,
-            report_id,
-            strength,
-            enable_unknown_null_state
         ]
     );
     layout!(

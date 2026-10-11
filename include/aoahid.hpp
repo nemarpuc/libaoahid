@@ -114,10 +114,6 @@ spec_create_touchscreen(const aoahid_touchscreen_options* options,
                                                          aoahid_spec** out_spec) noexcept {
     return aoahid_spec_create_digitizer(options, out_spec);
 }
-[[nodiscard]] inline aoahid_result spec_create_battery(const aoahid_battery_options* options,
-                                                       aoahid_spec** out_spec) noexcept {
-    return aoahid_spec_create_battery(options, out_spec);
-}
 [[nodiscard]] inline aoahid_result spec_create_raw(const aoahid_raw_options* options,
                                                    aoahid_spec** out_spec) noexcept {
     return aoahid_spec_create_raw(options, out_spec);
@@ -207,9 +203,8 @@ touchscreen_contact(aoahid_node* node, uint32_t contact_id, uint32_t down, int32
 digitizer_update(aoahid_node* node, const aoahid_digitizer_sample* sample) noexcept {
     return aoahid_digitizer_update(node, sample);
 }
-[[nodiscard]] inline aoahid_result battery_update(aoahid_node* node, uint32_t has_value,
-                                                  int32_t strength) noexcept {
-    return aoahid_battery_update(node, has_value, strength);
+[[nodiscard]] inline aoahid_result battery_update(aoahid_node* node, int32_t strength) noexcept {
+    return aoahid_battery_update(node, strength);
 }
 [[nodiscard]] inline aoahid_result raw_submit(aoahid_node* node, const uint8_t* report,
                                               size_t length) noexcept {

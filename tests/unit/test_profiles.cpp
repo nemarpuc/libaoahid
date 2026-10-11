@@ -1514,60 +1514,10 @@ void test_profiles() {
     aoahid_spec_release(spec);
     spec = nullptr;
 
-    aoahid_battery_options battery{};
-    battery.struct_size = static_cast<std::uint32_t>(sizeof(battery));
-    battery.report_id = {0U, 0U, {0U, 0U, 0U}};
-    battery.strength = {0, 100, 7U, {}};
-    battery.enable_unknown_null_state = 1U;
-    AOAHID_CHECK(aoahid_spec_create_battery(&battery, &spec) == AOAHID_OK);
-    if (spec != nullptr) {
-        aoahid_node battery_node{};
-        battery_node.spec = spec;
-        battery_node.state = aoa::detail::BatteryState{};
-        std::array<std::uint8_t, 8U> battery_report{};
-        std::size_t battery_length = 0U;
-        AOAHID_CHECK(aoahid_battery_update(&battery_node, 1U, 0) == AOAHID_OK);
-        AOAHID_CHECK(aoa::detail::serialize_node(&battery_node, battery_report.data(),
-                                                 battery_report.size(),
-                                                 &battery_length) == AOAHID_OK);
-        const auto* strength = field(spec, aoa::hid::FieldSemantic::battery_strength);
-        AOAHID_CHECK(strength != nullptr && extract(battery_report.data(), *strength) == 0U);
-        AOAHID_CHECK(aoa::detail::validate_serialized_report(spec, battery_report.data(),
-                                                             battery_length) == AOAHID_OK);
-        AOAHID_CHECK(aoahid_battery_update(&battery_node, 0U, 1) == AOAHID_ERR_PARAM);
-        AOAHID_CHECK(aoahid_battery_update(&battery_node, 0U, 0) == AOAHID_OK);
-        AOAHID_CHECK(aoa::detail::serialize_node(&battery_node, battery_report.data(),
-                                                 battery_report.size(),
-                                                 &battery_length) == AOAHID_OK);
-        AOAHID_CHECK(battery_length == 1U);
-        AOAHID_CHECK(strength != nullptr && strength->has_null_state &&
-                     extract(battery_report.data(), *strength) == 127U);
-        AOAHID_CHECK(aoa::detail::validate_serialized_report(spec, battery_report.data(),
-                                                             battery_length) == AOAHID_OK);
-    }
-    aoahid_spec_release(spec);
-
-    battery.enable_unknown_null_state = 0U;
-    spec = nullptr;
-    AOAHID_CHECK(aoahid_spec_create_battery(&battery, &spec) == AOAHID_OK);
-    if (spec != nullptr) {
-        const auto* strength = field(spec, aoa::hid::FieldSemantic::battery_strength);
-        AOAHID_CHECK(strength != nullptr && !strength->has_null_state);
-        aoahid_node battery_node{};
-        battery_node.spec = spec;
-        battery_node.state = aoa::detail::BatteryState{};
-        std::array<std::uint8_t, 8U> battery_report{};
-        std::size_t battery_length = 0U;
-        AOAHID_CHECK(aoa::detail::serialize_node(&battery_node, battery_report.data(),
-                                                 battery_report.size(),
-                                                 &battery_length) == AOAHID_ERR_INTERNAL);
-        AOAHID_CHECK(aoahid_battery_update(&battery_node, 1U, 50) == AOAHID_OK);
-        AOAHID_CHECK(aoa::detail::serialize_node(&battery_node, battery_report.data(),
-                                                 battery_report.size(),
-                                                 &battery_length) == AOAHID_OK);
-        AOAHID_CHECK(strength != nullptr && extract(battery_report.data(), *strength) == 50U);
-        AOAHID_CHECK(aoa::detail::validate_serialized_report(spec, battery_report.data(),
-                                                             battery_length) == AOAHID_OK);
-        aoahid_spec_release(spec);
-    }
+    // The profile numbers are part of the ABI.
+    AOAHID_CHECK(AOAHID_PROFILE_KEYBOARD == 1 && AOAHID_PROFILE_MOUSE == 2 &&
+                 AOAHID_PROFILE_TOUCHSCREEN == 3 && AOAHID_PROFILE_TOUCHPAD == 4 &&
+                 AOAHID_PROFILE_PEN == 5 && AOAHID_PROFILE_DIGITIZER == 6 &&
+                 AOAHID_PROFILE_GAMEPAD == 7 && AOAHID_PROFILE_TOGGLE == 8 &&
+                 AOAHID_PROFILE_RAW == 9);
 }
