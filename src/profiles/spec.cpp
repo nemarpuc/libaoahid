@@ -1265,15 +1265,10 @@ static aoahid_result aoahid_spec_create_touchpad_impl(const aoahid_touchpad_opti
                                          out_spec);
 }
 
-static aoahid_result aoahid_spec_create_pen_impl(const aoahid_pen_options* options,
-                                                 aoahid_spec** out_spec) {
-    aoa::detail::clear_error();
-    if (options == nullptr ||
-        !aoa::detail::valid_struct(options, options == nullptr ? 0U : options->struct_size,
-                                   static_cast<std::uint32_t>(sizeof(*options)), "pen_options")) {
-        return aoa::detail::finish_result(AOAHID_ERR_PARAM, "pen_options",
-                                          "The pen options contain an invalid required field.");
-    }
+// Pen and Digitizer share one report shape; only the Application Usage and
+// the Android classification differ.
+static aoahid_result create_stylus_spec(const aoahid_pen_options* options,
+                                        const aoahid_profile_kind kind, aoahid_spec** out_spec) {
     if (options->reserved != 0U || !validate_report_id(options->report_id, "pen.report_id") ||
         !validate_field(options->x, "pen.x") || !validate_field(options->y, "pen.y") ||
         options->x.logical_minimum > 0 || options->x.logical_maximum < 0 ||
@@ -1285,9 +1280,7 @@ static aoahid_result aoahid_spec_create_pen_impl(const aoahid_pen_options* optio
         !validate_option_boolean(options->enable_eraser, "pen.enable_eraser") ||
         !validate_option_boolean(options->enable_hover, "pen.enable_hover") ||
         options->barrel_usage_count > 32U ||
-        (options->barrel_usage_count != 0U && options->barrel_usages == nullptr) ||
-        (options->mode != AOAHID_PEN_DIRECT_SCREEN &&
-         options->mode != AOAHID_PEN_INDIRECT_TABLET)) {
+        (options->barrel_usage_count != 0U && options->barrel_usages == nullptr)) {
         return aoa::detail::finish_result(
             AOAHID_ERR_PARAM, "pen_options",
             "An enabled pen field has an invalid range or bit width.");
@@ -1344,14 +1337,12 @@ static aoahid_result aoahid_spec_create_pen_impl(const aoahid_pen_options* optio
     }
     config.options.barrel_usages = nullptr;
     return build_generated_spec(
-        GeneratedSpecIdentity{AOAHID_PROFILE_PEN, options->mode == AOAHID_PEN_DIRECT_SCREEN
-                                                      ? AOAHID_ANDROID_PORTABLE_CANDIDATE
-                                                      : AOAHID_ANDROID_CONDITIONAL},
+        GeneratedSpecIdentity{kind, kind == AOAHID_PROFILE_PEN ? AOAHID_ANDROID_PORTABLE_CANDIDATE
+                                                               : AOAHID_ANDROID_CONDITIONAL},
         config,
         [=](DescriptorBuilder& builder) {
-            const std::uint16_t application = options->mode == AOAHID_PEN_DIRECT_SCREEN
-                                                  ? aoa::hid::usage::pen
-                                                  : aoa::hid::usage::digitizer;
+            const std::uint16_t application =
+                kind == AOAHID_PROFILE_PEN ? aoa::hid::usage::pen : aoa::hid::usage::digitizer;
             if (!builder.begin_application(aoa::hid::usage::page_digitizers, application) ||
                 !builder.set_report_id(options->report_id.enabled == 1U,
                                        options->report_id.value) ||
@@ -1431,6 +1422,49 @@ static aoahid_result aoahid_spec_create_pen_impl(const aoahid_pen_options* optio
             return builder.end_collection() && builder.end_collection();
         },
         out_spec);
+}
+
+static aoahid_result aoahid_spec_create_pen_impl(const aoahid_pen_options* options,
+                                                 aoahid_spec** out_spec) {
+    aoa::detail::clear_error();
+    if (options == nullptr ||
+        !aoa::detail::valid_struct(options, options == nullptr ? 0U : options->struct_size,
+                                   static_cast<std::uint32_t>(sizeof(*options)), "pen_options")) {
+        return aoa::detail::finish_result(AOAHID_ERR_PARAM, "pen_options",
+                                          "The pen options contain an invalid required field.");
+    }
+    return create_stylus_spec(options, AOAHID_PROFILE_PEN, out_spec);
+}
+
+static aoahid_result aoahid_spec_create_digitizer_impl(const aoahid_digitizer_options* options,
+                                                       aoahid_spec** out_spec) {
+    aoa::detail::clear_error();
+    if (options == nullptr ||
+        !aoa::detail::valid_struct(options, options == nullptr ? 0U : options->struct_size,
+                                   static_cast<std::uint32_t>(sizeof(*options)),
+                                   "digitizer_options")) {
+        return aoa::detail::finish_result(
+            AOAHID_ERR_PARAM, "digitizer_options",
+            "The digitizer options contain an invalid required field.");
+    }
+    aoahid_pen_options pen{};
+    pen.struct_size = static_cast<std::uint32_t>(sizeof(pen));
+    pen.reserved = options->reserved;
+    pen.report_id = options->report_id;
+    pen.x = options->x;
+    pen.y = options->y;
+    pen.enable_pressure = options->enable_pressure;
+    pen.pressure = options->pressure;
+    pen.enable_tilt = options->enable_tilt;
+    pen.tilt_x = options->tilt_x;
+    pen.tilt_y = options->tilt_y;
+    pen.enable_twist_target_specific = options->enable_twist_target_specific;
+    pen.twist = options->twist;
+    pen.barrel_usages = options->barrel_usages;
+    pen.barrel_usage_count = options->barrel_usage_count;
+    pen.enable_eraser = options->enable_eraser;
+    pen.enable_hover = options->enable_hover;
+    return create_stylus_spec(&pen, AOAHID_PROFILE_DIGITIZER, out_spec);
 }
 
 static aoahid_result aoahid_spec_create_battery_impl(const aoahid_battery_options* options,
@@ -1640,6 +1674,12 @@ aoahid_result AOAHID_CALL aoahid_spec_create_pen(const aoahid_pen_options* optio
                                                  aoahid_spec** out_spec) {
     return abi_spec_factory(out_spec, "spec.create_pen",
                             [&] { return aoahid_spec_create_pen_impl(options, out_spec); });
+}
+
+aoahid_result AOAHID_CALL aoahid_spec_create_digitizer(const aoahid_digitizer_options* options,
+                                                       aoahid_spec** out_spec) {
+    return abi_spec_factory(out_spec, "spec.create_digitizer",
+                            [&] { return aoahid_spec_create_digitizer_impl(options, out_spec); });
 }
 
 aoahid_result AOAHID_CALL aoahid_spec_create_battery(const aoahid_battery_options* options,

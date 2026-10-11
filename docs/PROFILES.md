@@ -1,6 +1,6 @@
 # HID Input Profiles
 
-libaoahid builds HID report descriptors for nine profile kinds and keeps a
+libaoahid builds HID report descriptors for ten profile kinds and keeps a
 state machine per Node that turns simple calls (`aoahid_kbd`, `aoahid_touch`,
 ...) into reports. This page describes each descriptor, what the library
 derives for you, and which values you must choose. The C calls are summarized
@@ -23,7 +23,7 @@ Tested on real hardware (Samsung Galaxy Tab S11 and POCO F6 Pro, from Windows
 - Gamepad
 - Toggle as Consumer Control media keys
 
-Not yet tested on hardware: Pen, Touchpad, Battery, Raw, and Toggle on the
+Not yet tested on hardware: Pen, Digitizer, Touchpad, Battery, Raw, and Toggle on the
 System Control, Camera Control, and Telephony pages. Their descriptors are
 checked by unit and golden tests only. See [TARGET_MATRIX.md](TARGET_MATRIX.md)
 for per-target results.
@@ -33,9 +33,9 @@ form, independent of this testing:
 
 | Profile | `android_status` |
 |---|---|
-| Mouse, Touchscreen, direct-screen Pen | `AOAHID_ANDROID_PORTABLE_CANDIDATE` |
+| Mouse, Touchscreen, Pen | `AOAHID_ANDROID_PORTABLE_CANDIDATE` |
 | Gamepad with canonical Hat and Buttons starting at 1 with at least 5 buttons | `AOAHID_ANDROID_PORTABLE_CANDIDATE` |
-| Keyboard, Toggle, Touchpad, indirect Pen, Battery, other Gamepad forms | `AOAHID_ANDROID_CONDITIONAL` |
+| Keyboard, Toggle, Touchpad, Digitizer, Battery, other Gamepad forms | `AOAHID_ANDROID_CONDITIONAL` |
 | Raw | `AOAHID_ANDROID_UNKNOWN` |
 
 "Portable candidate" means the form follows documented Android input behavior;
@@ -330,13 +330,24 @@ pressed)` sets a one-based button; it is rejected with `AOAHID_ERR_BUSY` while
 a multi-packet contact frame is being sent. With `button_count = 0` every
 button index is out of range. Close clears buttons and lifts all contacts.
 
-## Pen
+## Pen and Digitizer
 
-`aoahid_spec_create_pen(&aoahid_pen_options)`
+`aoahid_spec_create_pen(&aoahid_pen_options)` and
+`aoahid_spec_create_digitizer(&aoahid_digitizer_options)`
 
-- `mode = AOAHID_PEN_DIRECT_SCREEN`: Digitizers / Pen (`0x0D/0x02`), portable
-  candidate. `mode = AOAHID_PEN_INDIRECT_TABLET`: Digitizers / Digitizer
-  (`0x0D/0x01`), conditional. Both use a Stylus (`0x20`) Physical Collection.
+The two profiles share one report shape and one state machine; the options
+structures have the same fields. They differ only in the Application
+Collection Usage and in how Linux and Android classify the device:
+
+| | Pen | Digitizer |
+|---|---|---|
+| Application Collection | Digitizers / Pen (`0x0D/0x02`) | Digitizers / Digitizer (`0x0D/0x01`) |
+| Linux input property | `INPUT_PROP_DIRECT` | `INPUT_PROP_POINTER` |
+| `android_status` | `AOAHID_ANDROID_PORTABLE_CANDIDATE` | `AOAHID_ANDROID_CONDITIONAL` |
+
+Both use a Stylus (`0x20`) Physical Collection, and `aoahid_pen_update` and
+`aoahid_pen_depart` accept a Node of either profile.
+
 - Bits, in this order: Invert (`0x3C`, only with `enable_eraser`), Tip Switch
   (`0x42`), In Range (`0x32`), then one bit per barrel Usage.
 - `barrel_usages`: up to 32 unique entries, each Barrel Switch (`0x44`) or

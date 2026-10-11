@@ -29,8 +29,8 @@
 extern "C" {
 #endif
 
-#define AOAHID_VERSION_MAJOR 4
-#define AOAHID_VERSION_MINOR 2
+#define AOAHID_VERSION_MAJOR 1
+#define AOAHID_VERSION_MINOR 0
 #define AOAHID_VERSION_PATCH 0
 
 typedef struct aoahid_context aoahid_context;
@@ -98,11 +98,14 @@ enum {
     /* Always the fixed-slot Multi-Touch Touch Screen Application Collection
      * Usage. */
     AOAHID_PROFILE_TOUCHSCREEN = 5,
+    /* Always the Digitizers / Pen Application Collection Usage. */
     AOAHID_PROFILE_PEN = 6,
     AOAHID_PROFILE_BATTERY = 7,
     AOAHID_PROFILE_RAW = 8,
     /* Always the Digitizers / Touch Pad Application Collection Usage. */
-    AOAHID_PROFILE_TOUCHPAD = 9
+    AOAHID_PROFILE_TOUCHPAD = 9,
+    /* Always the Digitizers / Digitizer Application Collection Usage. */
+    AOAHID_PROFILE_DIGITIZER = 10
 };
 
 typedef int32_t aoahid_android_status;
@@ -113,9 +116,6 @@ enum {
     AOAHID_ANDROID_UNSUPPORTED = 4,
     AOAHID_ANDROID_UNKNOWN = 5
 };
-
-typedef int32_t aoahid_pen_mode;
-enum { AOAHID_PEN_DIRECT_SCREEN = 1, AOAHID_PEN_INDIRECT_TABLET = 2 };
 
 typedef int32_t aoahid_axis_role;
 enum {
@@ -481,7 +481,6 @@ typedef struct aoahid_pen_options {
     uint32_t struct_size;
     uint32_t reserved;
     aoahid_report_id_option report_id;
-    aoahid_pen_mode mode;
     aoahid_integer_field x;
     aoahid_integer_field y;
     uint32_t enable_pressure;
@@ -500,6 +499,31 @@ typedef struct aoahid_pen_options {
     uint32_t enable_eraser;
     uint32_t enable_hover;
 } aoahid_pen_options;
+
+/* Same stylus report shape as aoahid_pen_options, under the Digitizers /
+ * Digitizer Application Collection Usage instead of Pen. */
+typedef struct aoahid_digitizer_options {
+    uint32_t struct_size;
+    uint32_t reserved;
+    aoahid_report_id_option report_id;
+    aoahid_integer_field x;
+    aoahid_integer_field y;
+    uint32_t enable_pressure;
+    aoahid_integer_field pressure;
+    uint32_t enable_tilt;
+    aoahid_integer_field tilt_x;
+    aoahid_integer_field tilt_y;
+    uint32_t enable_twist_target_specific;
+    aoahid_integer_field twist;
+    /* Exact Digitizers-page Usage IDs for caller-selected barrel controls.
+     * HUT does not define these controls as a contiguous numeric range. */
+    const uint16_t* barrel_usages;
+    size_t barrel_usage_count;
+    /* When enabled, the wire field is HUT Invert (0D/3C), the opposite-end
+     * selector. It is not the separate Eraser Usage (0D/45). */
+    uint32_t enable_eraser;
+    uint32_t enable_hover;
+} aoahid_digitizer_options;
 
 typedef struct aoahid_battery_options {
     uint32_t struct_size;
@@ -1010,12 +1034,26 @@ aoahid_spec_create_touchpad(const aoahid_touchpad_options* options, aoahid_spec*
  * Blocking: Performs validation and allocation but no I/O or waiting.
  * Synchronization: Has no Context domain and may run concurrently; caller-owned
  * input/output storage must not be concurrently mutated.
- * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid pointers/ABI fields, mode,
+ * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid pointers/ABI fields,
  * fields, flags, or barrel usages; AOAHID_ERR_OVERFLOW for descriptor/layout
  * overflow; AOAHID_ERR_INTERNAL for allocation, generation inconsistency, or an
  * unexpected exception. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_spec_create_pen(const aoahid_pen_options* options,
                                                             aoahid_spec** out_spec);
+
+/* aoahid_spec_create_digitizer
+ * Ownership: Borrows options and barrel_usages for the call and copies them. On
+ * success, out_spec receives one caller-owned immutable reference; it is null on
+ * every failure.
+ * Blocking: Performs validation and allocation but no I/O or waiting.
+ * Synchronization: Has no Context domain and may run concurrently; caller-owned
+ * input/output storage must not be concurrently mutated.
+ * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid pointers/ABI fields,
+ * fields, flags, or barrel usages; AOAHID_ERR_OVERFLOW for descriptor/layout
+ * overflow; AOAHID_ERR_INTERNAL for allocation, generation inconsistency, or an
+ * unexpected exception. */
+AOAHID_API aoahid_result AOAHID_CALL
+aoahid_spec_create_digitizer(const aoahid_digitizer_options* options, aoahid_spec** out_spec);
 
 /* aoahid_spec_create_battery
  * Ownership: Borrows and copies options. On success, out_spec receives one
@@ -1330,7 +1368,7 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_touchpad_button(aoahid_node* node, u
                                                             uint32_t pressed);
 
 /* aoahid_pen_update
- * Ownership: Borrows a Pen Node and sample for the call; it copies the sample and
+ * Ownership: Borrows a Pen or Digitizer Node and sample for the call; it copies the sample and
  * changes no ownership.
  * Blocking: Does not block, allocate, log, or perform I/O.
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
@@ -1343,7 +1381,7 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_pen_update(aoahid_node* node,
                                                        const aoahid_pen_sample* sample);
 
 /* aoahid_pen_depart
- * Ownership: Borrows a Pen Node; no ownership changes.
+ * Ownership: Borrows a Pen or Digitizer Node; no ownership changes.
  * Blocking: Does not block, allocate, log, or perform I/O.
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
  * submission calls. It is rejected while one report is in flight.

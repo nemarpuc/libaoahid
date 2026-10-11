@@ -29,13 +29,12 @@ pub type aoahid_interface_claim_policy = i32;
 pub type aoahid_log_level = i32;
 pub type aoahid_profile_kind = i32;
 pub type aoahid_android_status = i32;
-pub type aoahid_pen_mode = i32;
 pub type aoahid_axis_role = i32;
 pub type aoahid_dpad_representation = i32;
 pub type aoahid_usage_semantic = i32;
 
-pub const AOAHID_VERSION_MAJOR: u32 = 4;
-pub const AOAHID_VERSION_MINOR: u32 = 2;
+pub const AOAHID_VERSION_MAJOR: u32 = 1;
+pub const AOAHID_VERSION_MINOR: u32 = 0;
 pub const AOAHID_VERSION_PATCH: u32 = 0;
 pub const AOAHID_OK: i32 = 0;
 pub const AOAHID_ERR_PARAM: i32 = 1;
@@ -74,13 +73,12 @@ pub const AOAHID_PROFILE_PEN: i32 = 6;
 pub const AOAHID_PROFILE_BATTERY: i32 = 7;
 pub const AOAHID_PROFILE_RAW: i32 = 8;
 pub const AOAHID_PROFILE_TOUCHPAD: i32 = 9;
+pub const AOAHID_PROFILE_DIGITIZER: i32 = 10;
 pub const AOAHID_ANDROID_PORTABLE_CANDIDATE: i32 = 1;
 pub const AOAHID_ANDROID_CONDITIONAL: i32 = 2;
 pub const AOAHID_ANDROID_CUSTOM_SYSTEM_ONLY: i32 = 3;
 pub const AOAHID_ANDROID_UNSUPPORTED: i32 = 4;
 pub const AOAHID_ANDROID_UNKNOWN: i32 = 5;
-pub const AOAHID_PEN_DIRECT_SCREEN: i32 = 1;
-pub const AOAHID_PEN_INDIRECT_TABLET: i32 = 2;
 
 pub const AOAHID_AXIS_X: i32 = 1;
 pub const AOAHID_AXIS_Y: i32 = 2;
@@ -295,7 +293,14 @@ c_struct!(aoahid_touchpad_options {
 });
 c_struct!(aoahid_pen_options {
     struct_size: u32, reserved: u32, report_id: aoahid_report_id_option,
-    mode: aoahid_pen_mode,
+    x: aoahid_integer_field, y: aoahid_integer_field, enable_pressure: u32,
+    pressure: aoahid_integer_field, enable_tilt: u32, tilt_x: aoahid_integer_field,
+    tilt_y: aoahid_integer_field, enable_twist_target_specific: u32,
+    twist: aoahid_integer_field, barrel_usages: *const u16,
+    barrel_usage_count: usize, enable_eraser: u32, enable_hover: u32,
+});
+c_struct!(aoahid_digitizer_options {
+    struct_size: u32, reserved: u32, report_id: aoahid_report_id_option,
     x: aoahid_integer_field, y: aoahid_integer_field, enable_pressure: u32,
     pressure: aoahid_integer_field, enable_tilt: u32, tilt_x: aoahid_integer_field,
     tilt_y: aoahid_integer_field, enable_twist_target_specific: u32,
@@ -447,6 +452,10 @@ extern "C" {
     ) -> aoahid_result;
     pub fn aoahid_spec_create_pen(
         options: *const aoahid_pen_options,
+        out_spec: *mut *mut aoahid_spec,
+    ) -> aoahid_result;
+    pub fn aoahid_spec_create_digitizer(
+        options: *const aoahid_digitizer_options,
         out_spec: *mut *mut aoahid_spec,
     ) -> aoahid_result;
     pub fn aoahid_spec_create_battery(

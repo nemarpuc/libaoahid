@@ -15,7 +15,6 @@ _Static_assert(sizeof(aoahid_interface_claim_policy) == sizeof(int32_t),
 _Static_assert(sizeof(aoahid_log_level) == sizeof(int32_t), "aoahid_log_level ABI width");
 _Static_assert(sizeof(aoahid_profile_kind) == sizeof(int32_t), "aoahid_profile_kind ABI width");
 _Static_assert(sizeof(aoahid_android_status) == sizeof(int32_t), "aoahid_android_status ABI width");
-_Static_assert(sizeof(aoahid_pen_mode) == sizeof(int32_t), "aoahid_pen_mode ABI width");
 _Static_assert(sizeof(aoahid_axis_role) == sizeof(int32_t), "aoahid_axis_role ABI width");
 _Static_assert(sizeof(aoahid_dpad_representation) == sizeof(int32_t),
                "aoahid_dpad_representation ABI width");

@@ -2,7 +2,7 @@
 # Copyright (c) 2026 libaoahid contributors
 cmake_minimum_required(VERSION 3.20)
 
-project(libaoahid VERSION 4.2.0
+project(libaoahid VERSION 1.0.0
     DESCRIPTION "Explicit host-side Android Open Accessory HID input library"
     HOMEPAGE_URL "https://github.com/nemarpuc/libaoahid"
     LANGUAGES C CXX)
@@ -253,7 +253,7 @@ function(aoahid_configure_library target kind objects)
       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   set_target_properties(${target} PROPERTIES
       VERSION ${PROJECT_VERSION}
-      SOVERSION 4
+      SOVERSION 1
       CXX_STANDARD 20
       CXX_STANDARD_REQUIRED YES)
   if(AOAHID_INSTRUMENT_LINK_OPTIONS)
@@ -288,7 +288,11 @@ if(AOAHID_BUILD_SHARED)
         "${AOAHID_APPLE_EXPORT_LIST}")
   elseif(UNIX)
     set(AOAHID_VERSION_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/cmake/aoahid.map")
-    target_link_options(aoahid PRIVATE "-Wl,--version-script=${AOAHID_VERSION_SCRIPT}")
+    # The ABI is plain C, so the C++ runtime stays private to the shared
+    # object: no libstdc++ or libgcc_s dependency, no runtime symbols exported.
+    target_link_options(aoahid PRIVATE
+        -static-libstdc++ -static-libgcc "-Wl,--exclude-libs,ALL"
+        "-Wl,--version-script=${AOAHID_VERSION_SCRIPT}")
     set_property(TARGET aoahid APPEND PROPERTY LINK_DEPENDS "${AOAHID_VERSION_SCRIPT}")
   endif()
 endif()
@@ -532,6 +536,7 @@ if(AOAHID_BUILD_EXAMPLES)
       touchscreen
       touchpad
       pen
+      digitizer
       battery
       raw)
   foreach(aoahid_profile_example IN LISTS AOAHID_PROFILE_EXAMPLES)

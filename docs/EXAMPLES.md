@@ -41,7 +41,7 @@ The close helpers follow the ABI's ownership rules (see `include/aoahid.h`):
 ## One example per profile kind
 
 `examples/c/profiles/` holds one small, self-contained program for each of the
-nine `aoahid_profile_kind` values. Each file carries the complete option set
+ten `aoahid_profile_kind` values. Each file carries the complete option set
 for its own profile and nothing else, so it can be copied into a product and
 edited directly. None of them creates a Context or opens a device, so they run
 anywhere the library links. With both `AOAHID_BUILD_EXAMPLES` and
@@ -59,8 +59,9 @@ anywhere the library links. With both `AOAHID_BUILD_EXAMPLES` and
 | 7 | `AOAHID_PROFILE_BATTERY` | `battery.c` | `aoahid_spec_create_battery` |
 | 8 | `AOAHID_PROFILE_RAW` | `raw.c` | `aoahid_spec_create_raw` |
 | 9 | `AOAHID_PROFILE_TOUCHPAD` | `touchpad.c` | `aoahid_spec_create_touchpad` |
+| 10 | `AOAHID_PROFILE_DIGITIZER` | `digitizer.c` | `aoahid_spec_create_digitizer` |
 
-`profile_example.h` is shared by all nine. It holds only the reporting
+`profile_example.h` is shared by all ten. It holds only the reporting
 helper; it contains no product values, so each example remains the single
 source of its own options. That helper prints two things: the descriptor size
 and report layout the library derived from the caller's options, and then the

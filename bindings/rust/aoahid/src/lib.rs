@@ -118,6 +118,11 @@ pointer_spec_type!(
     sys::aoahid_pen_options,
     sys::aoahid_spec_create_pen
 );
+pointer_spec_type!(
+    DigitizerSpec,
+    sys::aoahid_digitizer_options,
+    sys::aoahid_spec_create_digitizer
+);
 safe_spec_type!(
     BatterySpec,
     sys::aoahid_battery_options,
@@ -186,6 +191,7 @@ node_type!(GamepadNodeRef);
 node_type!(TouchscreenNodeRef);
 node_type!(TouchpadNodeRef);
 node_type!(PenNodeRef);
+node_type!(DigitizerNodeRef);
 node_type!(BatteryNodeRef);
 node_type!(RawNodeRef);
 
@@ -287,6 +293,17 @@ impl TouchpadNodeRef {
 }
 
 impl PenNodeRef {
+    pub fn update(self, sample: &sys::aoahid_pen_sample) -> Result<(), Error> {
+        result(unsafe { sys::aoahid_pen_update(self.as_ptr(), sample) })
+    }
+    pub fn depart(self) -> Result<(), Error> {
+        result(unsafe { sys::aoahid_pen_depart(self.as_ptr()) })
+    }
+}
+
+/// Same stylus report shape as `PenNodeRef`, under the Digitizer Application
+/// Collection.
+impl DigitizerNodeRef {
     pub fn update(self, sample: &sys::aoahid_pen_sample) -> Result<(), Error> {
         result(unsafe { sys::aoahid_pen_update(self.as_ptr(), sample) })
     }

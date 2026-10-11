@@ -30,14 +30,13 @@ public enum EventMode : int { CallerPoll = 1, InternalThread = 2 }
 public enum ChannelReadMode : int { Stream = 0, Request = 1 }
 public enum ClaimPolicy : int { None = 1, Explicit = 2 }
 public enum LogLevel : int { Disabled = 1, Error = 2, Info = 3, Trace = 4 }
-public enum PenMode : int { DirectScreen = 1, IndirectTablet = 2 }
 public enum DpadRepresentation : int { None = 1, Hat = 2, Buttons = 3 }
 
 public enum ProfileKind : int
 {
     Keyboard = 1, Mouse = 2, Toggle = 3, Gamepad = 4,
     Touchscreen = 5, Pen = 6, Battery = 7, Raw = 8,
-    Touchpad = 9,
+    Touchpad = 9, Digitizer = 10,
 }
 
 public enum AndroidStatus : int
@@ -332,7 +331,27 @@ public struct PenOptions
     public uint StructSize;
     public uint Reserved;
     public ReportId ReportId;
-    public PenMode Mode;
+    public IntegerField X;
+    public IntegerField Y;
+    public uint EnablePressure;
+    public IntegerField Pressure;
+    public uint EnableTilt;
+    public IntegerField TiltX;
+    public IntegerField TiltY;
+    public uint EnableTwistTargetSpecific;
+    public IntegerField Twist;
+    public nint BarrelUsages;
+    public nuint BarrelUsageCount;
+    public uint EnableEraser;
+    public uint EnableHover;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct DigitizerOptions
+{
+    public uint StructSize;
+    public uint Reserved;
+    public ReportId ReportId;
     public IntegerField X;
     public IntegerField Y;
     public uint EnablePressure;
@@ -445,8 +464,8 @@ public static class Native
 {
     private const string Library = "aoahid";
     private const CallingConvention Call = CallingConvention.Cdecl;
-    public const uint AOAHID_VERSION_MAJOR = 4;
-    public const uint AOAHID_VERSION_MINOR = 2;
+    public const uint AOAHID_VERSION_MAJOR = 1;
+    public const uint AOAHID_VERSION_MINOR = 0;
     public const uint AOAHID_VERSION_PATCH = 0;
 
     public static readonly IReadOnlyDictionary<string, int> AbiConstants =
@@ -487,13 +506,12 @@ public static class Native
             ["AOAHID_PROFILE_BATTERY"] = 7,
             ["AOAHID_PROFILE_RAW"] = 8,
             ["AOAHID_PROFILE_TOUCHPAD"] = 9,
+            ["AOAHID_PROFILE_DIGITIZER"] = 10,
             ["AOAHID_ANDROID_PORTABLE_CANDIDATE"] = 1,
             ["AOAHID_ANDROID_CONDITIONAL"] = 2,
             ["AOAHID_ANDROID_CUSTOM_SYSTEM_ONLY"] = 3,
             ["AOAHID_ANDROID_UNSUPPORTED"] = 4,
             ["AOAHID_ANDROID_UNKNOWN"] = 5,
-            ["AOAHID_PEN_DIRECT_SCREEN"] = 1,
-            ["AOAHID_PEN_INDIRECT_TABLET"] = 2,
             ["AOAHID_AXIS_X"] = 1,
             ["AOAHID_AXIS_Y"] = 2,
             ["AOAHID_AXIS_Z"] = 3,
@@ -545,6 +563,7 @@ public static class Native
             ["aoahid_touchscreen_options"] = typeof(TouchscreenOptions),
             ["aoahid_touchpad_options"] = typeof(TouchpadOptions),
             ["aoahid_pen_options"] = typeof(PenOptions),
+            ["aoahid_digitizer_options"] = typeof(DigitizerOptions),
             ["aoahid_battery_options"] = typeof(BatteryOptions),
             ["aoahid_raw_report"] = typeof(RawReport),
             ["aoahid_raw_options"] = typeof(RawOptions),
@@ -609,6 +628,8 @@ public static class Native
     public static extern Result SpecCreateTouchpad(in TouchpadOptions options, out nint spec);
     [DllImport(Library, EntryPoint = "aoahid_spec_create_pen", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreatePen(in PenOptions options, out nint spec);
+    [DllImport(Library, EntryPoint = "aoahid_spec_create_digitizer", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result SpecCreateDigitizer(in DigitizerOptions options, out nint spec);
     [DllImport(Library, EntryPoint = "aoahid_spec_create_battery", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateBattery(in BatteryOptions options, out nint spec);
     [DllImport(Library, EntryPoint = "aoahid_spec_create_raw", ExactSpelling = true, CallingConvention = Call)]

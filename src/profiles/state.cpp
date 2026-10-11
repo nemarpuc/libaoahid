@@ -51,9 +51,10 @@ aoahid_result link_available(const aoahid_node* node, const char* field) noexcep
     return AOAHID_ERR_NO_DEVICE;
 }
 
-aoahid_result usable(const aoahid_node* node, const aoahid_profile_kind kind,
-                     const char* field) noexcept {
-    if (node == nullptr || node->closed || node->spec == nullptr || node->spec->kind != kind) {
+aoahid_result usable(const aoahid_node* node, const aoahid_profile_kind kind, const char* field,
+                     const aoahid_profile_kind alternate = 0) noexcept {
+    if (node == nullptr || node->closed || node->spec == nullptr ||
+        (node->spec->kind != kind && node->spec->kind != alternate)) {
         set_error(AOAHID_ERR_PARAM, field, "The operation does not match the node profile.");
         return AOAHID_ERR_PARAM;
     }
@@ -1124,7 +1125,8 @@ static aoahid_result aoahid_touchpad_button_impl(aoahid_node* node, const std::u
 
 static aoahid_result aoahid_pen_update_impl(aoahid_node* node, const aoahid_pen_sample* sample) {
     aoa::detail::clear_error();
-    const aoahid_result check = usable(node, AOAHID_PROFILE_PEN, "pen.update");
+    const aoahid_result check =
+        usable(node, AOAHID_PROFILE_PEN, "pen.update", AOAHID_PROFILE_DIGITIZER);
     if (check != AOAHID_OK)
         return check;
     if (sample == nullptr) {
@@ -1176,7 +1178,8 @@ static aoahid_result aoahid_pen_update_impl(aoahid_node* node, const aoahid_pen_
 
 static aoahid_result aoahid_pen_depart_impl(aoahid_node* node) {
     aoa::detail::clear_error();
-    const aoahid_result check = usable(node, AOAHID_PROFILE_PEN, "pen.depart");
+    const aoahid_result check =
+        usable(node, AOAHID_PROFILE_PEN, "pen.depart", AOAHID_PROFILE_DIGITIZER);
     if (check != AOAHID_OK)
         return check;
     auto* pen = state<aoa::detail::PenState>(node);

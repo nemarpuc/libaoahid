@@ -5,30 +5,70 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
-## [4.2.0] - 2026-10-09
+## [1.0.0] - 2026-10-11
+
+The first stable release under this version number. The earlier release tags
+and their version numbers were withdrawn; their change history is kept below
+under "Earlier history". It was not hardware-verified: the Pen and Digitizer
+profiles have not been run against a phone, and the `Verified` rows in
+`docs/TARGET_MATRIX.md` are unchanged.
+
+### Changed (breaking)
+
+- The Pen profile is split in two, like Touch Screen and Touch Pad. `PEN` is
+  the direct-screen stylus under Digitizers / Pen (`0x0D/0x02`). The indirect
+  tablet form is the new `AOAHID_PROFILE_DIGITIZER` (= 10), created with
+  `aoahid_spec_create_digitizer(&aoahid_digitizer_options)`, under Digitizers /
+  Digitizer (`0x0D/0x01`).
+- `aoahid_pen_options` no longer has a `mode` field. `aoahid_pen_mode`,
+  `AOAHID_PEN_DIRECT_SCREEN`, and `AOAHID_PEN_INDIRECT_TABLET` are removed.
+- `aoahid_pen_update` and `aoahid_pen_depart` accept Nodes of both profiles.
+  The descriptors are byte-identical to the former `mode` forms; the golden
+  file `pen-indirect.hex` is now `digitizer.hex`.
+
+### Added
+
+- `aoahid_digitizer_options`, `aoahid_spec_create_digitizer`,
+  `aoahid::spec_create_digitizer`, `AOAHID_PROFILE_DIGITIZER`, and the matching
+  Python, C#, and Rust binding entries; the example
+  `examples/c/profiles/digitizer.c`.
+
+### Changed
+
+- On Linux and other non-Apple Unix targets the shared library links the C++
+  runtime statically (`-static-libstdc++ -static-libgcc`) and exports no
+  runtime symbols, so it no longer depends on `libstdc++` or `libgcc_s`.
+
+## Earlier history
+
+The entries below are the change history of the releases before 1.0.0. Their
+version numbers and tags were withdrawn, so they are listed by date. A version
+number inside an entry refers to one of those withdrawn releases.
+
+### 2026-10-09
 
 No change to the C ABI. The C++ header `aoahid.hpp` was replaced and is not
 source compatible with 4.1.0. It was not hardware-verified again.
 
-### Changed
+#### Changed
 
 - `aoahid.hpp` now forwards every function of `aoahid.h` unchanged under
   namespace `aoahid`, without the `aoahid_` prefix (`aoahid_kbd` is
   `aoahid::kbd`). It no longer covers just some of the node calls.
 
-### Removed
+#### Removed
 
 - The typed node references (`aoa::node_ref`, `aoa::keyboard_node_ref`, ...,
   `aoa::raw_node_ref`) and `aoa::bind`. Call the `aoahid::` functions on an
   `aoahid_node*` instead.
 
-## [4.1.0] - 2026-10-04
+### 2026-10-04
 
 No public API or ABI change. It was not hardware-verified again: the macOS
 archives were not run against a phone, and the `Verified` rows in
 `docs/TARGET_MATRIX.md` are still the 4.0.2 results.
 
-### Added
+#### Added
 
 - Release archives for macOS arm64 and x86_64: `libaoahid-X.Y.Z-macos-{arm64,x86_64}-{shared,static}.tar.gz`,
   their SPDX sidecars, and `-runtime.tar.gz` bundles. They bundle libusb 1.0.30
@@ -37,13 +77,13 @@ archives were not run against a phone, and the `Verified` rows in
   assets instead of 23. They are checked with the fake libusb backend and
   installed-package consumers only.
 
-## [4.0.5] - 2026-10-04
+### 2026-10-04
 
 No public API or ABI change. It was not hardware-verified again: it was checked
 with the host test suite only, so the `Verified` rows in
 `docs/TARGET_MATRIX.md` are still the 4.0.2 results.
 
-### Changed
+#### Changed
 
 - Two changes from 4.0.4 are taken out again, and the code they touched is
   that of 4.0.3. The atomic flag that let `aoahid_node_submit` skip the
@@ -54,13 +94,13 @@ with the host test suite only, so the `Verified` rows in
 - The field-width fix from 4.0.4 stays: every combination of widths from 1 to
   32 bits is accepted.
 
-## [4.0.4] - 2026-10-04
+### 2026-10-04
 
 No public API or ABI change. It was not hardware-verified again: it was checked
 with the host test suite only (including the ThreadSanitizer build), so the
 `Verified` rows in `docs/TARGET_MATRIX.md` are still the 4.0.2 results.
 
-### Fixed
+#### Fixed
 
 - Mouse, Pen, Touchscreen, and Touchpad Specs no longer reject width
   combinations that put a field across a fifth byte: a 32-bit Y behind a
@@ -74,13 +114,13 @@ with the host test suite only (including the ThreadSanitizer build), so the
   thread, and the USB handle stayed open until the next USB event or the
   60-second idle bound.
 
-### Changed
+#### Changed
 
 - `aoahid_node_submit` and `aoahid_raw_submit` in internal-thread mode read
   one atomic flag instead of locking the Context mutex to find that no
   deferred error is latched.
 
-### Documentation
+#### Documentation
 
 - `aoahid_spec_create_toggle` in `aoahid.h`: a Camera Control Usage outside
   Auto-focus/Shutter returns `AOAHID_ERR_PARAM`, as the code always did. The
@@ -91,13 +131,13 @@ with the host test suite only (including the ThreadSanitizer build), so the
   the Channel, the descriptor generator, and the test and release tooling,
   with source references.
 
-## [4.0.3] - 2026-10-03
+### 2026-10-03
 
 No public API, ABI, or behavior change. A maintenance release. It was not
 hardware-verified again: it was checked with the host test suite only, so the
 `Verified` rows in `docs/TARGET_MATRIX.md` are still the 4.0.2 results.
 
-### Changed
+#### Changed
 
 - The raw descriptor validator is split by HID item type (Global, Local, Main,
   Input) and names the item tags instead of using bare numbers. The old and
@@ -108,19 +148,19 @@ hardware-verified again: it was checked with the host test suite only, so the
   `aoahid_error_detail` copied before a later touch Spec call on the same
   thread could read a different name.
 
-### Tests
+#### Tests
 
 - `aoahid_tests` runs only the suites named on its command line
   (`item_writer`, `profiles`, `transport`, `identity`); with no argument it
   runs them all, as before.
 
-## [4.0.2] - 2026-09-30
+### 2026-09-30
 
 No public API or ABI change. Hardware-verified on a Samsung Galaxy Tab S11 and a
 POCO F6 Pro (Windows 10 x64 and Arch Linux): the profiles and paths marked
 `Verified` in `docs/TARGET_MATRIX.md`; every other row is still unverified.
 
-### Fixed
+#### Fixed
 
 - `aoahid_node_submit_blocking` in internal-thread mode no longer spins when
   every transfer pool slot belongs to other Nodes. It waits for a Device-level
@@ -131,7 +171,7 @@ POCO F6 Pro (Windows 10 x64 and Arch Linux): the profiles and paths marked
   `aoahid_node_open` (Android has not finished registering the HID). The
   NO_DEVICE message now covers the case before the request was sent.
 
-### Documentation
+#### Documentation
 
 - Added `docs/ARCHITECTURE.md` and `docs/PROTOCOL.md`, verified against the code
   and official sources.
@@ -154,19 +194,19 @@ POCO F6 Pro (Windows 10 x64 and Arch Linux): the profiles and paths marked
   the README in `docs/PROTOCOL.md`.
 - README: link to the introduction article on DEV.
 
-### Examples and tooling
+#### Examples and tooling
 
 - `verify_mouse` and `verify_touch` wait 100 ms after `aoahid_node_open`.
 - The release, license-header, and provenance checks and the Doxygen
   configuration no longer refer to the removed working notes.
 
-## [4.0.1] - 2026-09-29
+### 2026-09-29
 
 No library code changed. Hardware-verified on a Samsung Galaxy Tab S11 and a
 POCO F6 Pro (Windows 10 x64 and Arch Linux): the profiles and paths marked
 `Verified` in `docs/TARGET_MATRIX.md`; every other row is still unverified.
 
-### Documentation
+#### Documentation
 
 - README: a Demo section with a video of aoahid_player, an app built on this
   library.
@@ -179,9 +219,9 @@ POCO F6 Pro (Windows 10 x64 and Arch Linux): the profiles and paths marked
 - `docs/PORTING.md`: the Samsung-on-Windows driver note is a hardware
   observation, not a user report.
 
-## [4.0.0] - 2026-09-28
+### 2026-09-28
 
-### Changed (breaking)
+#### Changed (breaking)
 
 - `aoahid_device_open` sends no AOA request. It no longer sends request 51 to
   re-check the version, so it no longer returns `AOAHID_ERR_NOT_AOA` or a
@@ -210,21 +250,21 @@ POCO F6 Pro (Windows 10 x64 and Arch Linux): the profiles and paths marked
   removed names. The C#, Python, Rust, and C examples print each device's AOA
   version and refuse a version below 2 themselves.
 
-### Documentation
+#### Documentation
 
 - The guide, API, design, and example documents describe probe-free open and
   caller-side version checks, and no longer describe ABI placeholders. The
   guide's first-report policy now matches the library, which has never retried
   since 2.0.0.
 
-### Verification status
+#### Verification status
 
 Fake-backend tests only (the dev, TSan, and ASan/UBSan configurations).
 Nothing is hardware-verified.
 
-## [3.0.5] - 2026-09-28
+### 2026-09-28
 
-### Changed
+#### Changed
 
 - Reports are serialized a byte at a time instead of a bit at a time, about
   2.9 times faster for a 16-contact touchscreen report (766 ns to 267 ns on
@@ -234,7 +274,7 @@ Nothing is hardware-verified.
   protocol-version check, and setup-packet fields rewritten on every submit
   although acquiring the transfer slot had already written them.
 
-### Fixed
+#### Fixed
 
 - `examples/c/verify`: a failure could print "no field" and "no reason"
   instead of the failing call's diagnostic, because `aoahid_result_name()`
@@ -246,7 +286,7 @@ Nothing is hardware-verified.
   `operator delete` overloads in `tests/integration/test_transport.cpp` no
   longer take top-level `const` parameters.
 
-### Documentation
+#### Documentation
 
 - README: the ADB section no longer suggests `adb connect localhost:5555`, a
   port the adb server scans for emulators, and describes how
@@ -255,14 +295,14 @@ Nothing is hardware-verified.
   turns it on, and `aoahid_verify_all` is listed with the other verify
   programs. `examples/README.md` lists `touchpad.c`.
 
-### Verification status
+#### Verification status
 
 Fake-backend tests only (the dev, TSan, and ASan/UBSan configurations, and a
 Clang build). Nothing is hardware-verified.
 
-## [3.0.4] - 2026-09-27
+### 2026-09-27
 
-### Changed
+#### Changed
 
 - The repository is renamed from `nemarpuc/Libaoa_hid` to
   `nemarpuc/libaoahid`, matching the library (`libaoahid`), header
@@ -273,13 +313,13 @@ Clang build). Nothing is hardware-verified.
 - 3.0.3 was tagged, but its release did not publish because the repository
   was renamed while the release job ran. 3.0.4 contains all of 3.0.3.
 
-### Verification status
+#### Verification status
 
 No library code changed. Nothing is hardware-verified.
 
-## [3.0.3] - 2026-09-27
+### 2026-09-27
 
-### Changed
+#### Changed
 
 - The C verification examples' "no USB device found" message names the
   platform's usual cause: the udev rule on Linux, and a driver libusb can open
@@ -290,13 +330,13 @@ No library code changed. Nothing is hardware-verified.
   driver instead of WinUSB, with the Samsung (`dg_ssudbus`) report as an
   example.
 
-### Verification status
+#### Verification status
 
 No library code changed. Nothing is hardware-verified.
 
-## [3.0.2] - 2026-09-27
+### 2026-09-27
 
-### Fixed
+#### Fixed
 
 - On Windows, a Channel on the interface that libusb's WinUSB backend
   auto-claims for control transfers (typically ADB) could lose its claim when
@@ -306,25 +346,25 @@ No library code changed. Nothing is hardware-verified.
   returns `AOAHID_ERR_TIMEOUT` if one still is. `aoahid_channel_close` waits
   the same way (best effort) before releasing it.
 
-### Verification status
+#### Verification status
 
 Fake-backend tests only. Nothing is hardware-verified.
 
-## [3.0.1] - 2026-09-27
+### 2026-09-27
 
-### Packaging
+#### Packaging
 
 - Linux archives record how the bundled libusb was built from the bundled
   source (`libusb_build` in `share/doc/libaoahid/build-metadata.json`), and
   `THIRD_PARTY_NOTICES.md` points to it. The library itself is unchanged.
 
-### Verification status
+#### Verification status
 
 No library code changed. Nothing is hardware-verified.
 
-## [3.0.0] - 2026-09-24
+### 2026-09-24
 
-### Added
+#### Added
 
 - `aoahid_channel_options.read_mode` and `aoahid_channel_read_mode`.
   `AOAHID_CHANNEL_READ_STREAM` (zero) keeps the read-ahead byte stream.
@@ -337,26 +377,26 @@ No library code changed. Nothing is hardware-verified.
   lost.
 - The Python, C#, and Rust bindings expose the new field and constants.
 
-### Changed (breaking)
+#### Changed (breaking)
 
 - `aoahid_channel_options` grows by one 32-bit field, so its `struct_size`
   changes. Rebuild every caller against this header. Zero keeps the 2.x
   behavior.
 
-### Documentation
+#### Documentation
 
 - `docs/API.md` explains when a stream-mode read waits (a Bulk IN transfer
   completes only when full or on a short packet), with AOSP adb references.
 
-### Verification status
+#### Verification status
 
 Verified with fake-libusb tests (request sizing, pending timeout, buffered
 remainder, zero-length packet, unplug), plus ASan/UBSan and ThreadSanitizer.
 Nothing is hardware-verified.
 
-## [2.0.1] - 2026-09-23
+### 2026-09-23
 
-### Removed
+#### Removed
 
 - An outdated design note describing a rejected automatic design and an
   unimplemented ADB-server plan. `docs/API.md` now cites the
@@ -366,15 +406,15 @@ Nothing is hardware-verified.
   from that rejected design. No public function, structure, value, or behavior
   changes; the ABI is identical to 2.0.0.
 
-### Verification status
+#### Verification status
 
 Documentation and dead-code removal only. Nothing is hardware-verified; the
 accessory-mode and Channel hypotheses in `docs/TARGET_MATRIX.md` remain
 **[unverified on hardware]**, and every profile remains not hardware-verified.
 
-## [2.0.0] - 2026-09-23
+### 2026-09-23
 
-### Changed (breaking)
+#### Changed (breaking)
 
 - The library never retries a transfer. The first report after
   `aoahid_node_open` used to be resent automatically after a STALL (default 20
@@ -389,7 +429,7 @@ accessory-mode and Channel hypotheses in `docs/TARGET_MATRIX.md` remain
 - SOVERSION 2 (`libaoahid.so.2`) with the ELF symbol-version node
   `AOAHID_2.0`, because the change above alters documented behavior.
 
-### Added
+#### Added
 
 - `aoahid_accessory_start` with `aoahid_accessory_options`: sends AOA requests
   51, 52 (the caller's `aoahid_aoa_strings`; a nonempty manufacturer and model
@@ -415,7 +455,7 @@ accessory-mode and Channel hypotheses in `docs/TARGET_MATRIX.md` remain
   is on.
 - C, Python, C#, and Rust declarations for every new function and structure.
 
-### Changed
+#### Changed
 
 - Every USB handle is owned by one internal Port shared by the Device and its
   Channels. `aoahid_discover` probes a device that an open Device already holds
@@ -427,7 +467,7 @@ accessory-mode and Channel hypotheses in `docs/TARGET_MATRIX.md` remain
 - `udev/51-aoahid.rules` comments describe the accessory-mode VID/PID range
   that `aoahid_accessory_start` produces; the rules themselves are unchanged.
 
-### Verification status
+#### Verification status
 
 The new accessory start and Bulk Channels are tested only against the
 deterministic fake libusb backend (including ThreadSanitizer runs and an
@@ -438,9 +478,9 @@ on Linux and Windows, and the first-report STALL behavior without library
 retry, are recorded as **[unverified on hardware]**. No profile's status in
 `TARGET_MATRIX.md` changes: every profile remains not hardware-verified.
 
-## [1.0.0] - 2026-09-22
+### 2026-09-22
 
-### Added
+#### Added
 
 - `examples/c/verify/verify_toggle.c` and `verify_battery.c`, joining
   `verify_keyboard`/`verify_touch`/`verify_mouse`/`verify_all` as
@@ -454,7 +494,7 @@ retry, are recorded as **[unverified on hardware]**. No profile's status in
   confirming it means checking `adb shell dumpsys battery` and
   `/sys/class/power_supply` instead.
 
-### Fixed
+#### Fixed
 
 - `aoahid_toggle(node, usage, 0)` (release) silently ignored `usage`
   entirely, always releasing whichever Usage was currently pressed
@@ -471,7 +511,7 @@ retry, are recorded as **[unverified on hardware]**. No profile's status in
   for the reference shape), so `aoahid_spec_create_toggle` always failed with
   `AOAHID_ERR_UNSET_FIELD` and the program could never run.
 
-### Verification status
+#### Verification status
 
 `verify_toggle` and `verify_battery` were each run once against one physical
 Samsung Android target after the fixes above, confirming both now run to
@@ -486,9 +526,9 @@ profile's status in `TARGET_MATRIX.md`: Toggle and Battery Strength remain
 fix and both new example programs touch neither the wire format nor the
 generated descriptor of any profile.
 
-## [0.5.3] - 2026-09-20
+### 2026-09-20
 
-### Fixed
+#### Fixed
 
 - Four generated profiles (Gamepad, Mouse, Pen, Touchscreen/Touchpad) could
   reject an otherwise-valid caller configuration with
@@ -515,7 +555,7 @@ generated descriptor of any profile.
   before it. See `LIMITS.md`, "Field ordering inside generated profiles",
   which documents this for the first time.
 
-### Verification status
+#### Verification status
 
 This release changes only the internal bit/byte layout of the four affected
 profiles' generated descriptors where a caller's field widths previously hit
@@ -529,9 +569,9 @@ padding gaps this release now closes. No profile gains or loses a
 hardware-verification claim; every profile remains **not hardware-verified**
 (see `TARGET_MATRIX.md`).
 
-## [0.5.2] - 2026-09-17
+### 2026-09-17
 
-### Reverted
+#### Reverted
 
 - All four runtime behavior changes from 0.5.1 (the `store_bits()`
   byte-aligned fast path, the `StateGuard` CPU-pause/yield spin backoff, the
@@ -545,7 +585,7 @@ hardware-verification claim; every profile remains **not hardware-verified**
   0.5.1 remains published as-is; this release reverts to the prior runtime
   behavior on top of it.
 
-### Added
+#### Added
 
 - `tools/release/sync_version.py`: a single command
   (`python tools/release/sync_version.py X.Y.Z`) that writes a new release
@@ -561,16 +601,16 @@ hardware-verification claim; every profile remains **not hardware-verified**
   and `sync_version.py` updates those in place, so the file no longer needs
   a rename on every release.
 
-### Verification status
+#### Verification status
 
 This release only reverts 0.5.1's runtime changes and adds release
 tooling; it changes no on-wire descriptor shape and no public ABI. It
 neither adds nor retracts any hardware-verification claim. Every profile
 remains **not hardware-verified** (see `TARGET_MATRIX.md`).
 
-## [0.5.1] - 2026-09-17
+### 2026-09-17
 
-### Changed
+#### Changed
 
 - `store_bits()` (the wire-report serializer used by every profile) now
   writes byte-aligned 8/16/24/32-bit fields directly instead of iterating
@@ -591,7 +631,7 @@ remains **not hardware-verified** (see `TARGET_MATRIX.md`).
   classes on their primary descriptor. This avoids probing devices that can
   require elevation or trigger stricter host-controller behavior on Windows.
 
-### Verification status
+#### Verification status
 
 This release changes no on-wire descriptor shape, no public ABI, and no
 Node-visible behavior; it is an internal performance and retry-robustness
@@ -599,9 +639,9 @@ release. It neither adds nor retracts any hardware-verification claim. Every
 profile remains **not hardware-verified** (see `TARGET_MATRIX.md`), the same
 status held since each profile was introduced.
 
-## [0.5.0] - 2026-09-16
+### 2026-09-16
 
-### Changed
+#### Changed
 
 - **Breaking:** Renamed `aoahid_touch_options` to `aoahid_touchscreen_options`
   for naming consistency with `aoahid_touchpad_options` and
@@ -610,7 +650,7 @@ status held since each profile was introduced.
   `aoahid_touch_contact` and `aoahid_touch_extra` (used by `aoahid_touch()`,
   which serves both Touchscreen and Touchpad Nodes) are unaffected.
 
-### Verification status
+#### Verification status
 
 This release only renames a struct type; it changes no on-wire descriptor
 shape and no runtime behavior, so it neither adds nor retracts any
@@ -618,9 +658,9 @@ hardware-verification claim. Touchscreen remains **not hardware-verified**
 (a portable candidate; see `TARGET_MATRIX.md`), the same status it has had
 since it was introduced.
 
-## [0.4.0] - 2026-09-15
+### 2026-09-15
 
-### Added
+#### Added
 
 - **Touchpad profile.** `AOAHID_PROFILE_TOUCHPAD`, `aoahid_touchpad_options`,
   `aoahid_spec_create_touchpad`, and `aoahid_touchpad_button` add back a
@@ -659,9 +699,9 @@ since it was introduced.
   claim that this library's generated Touchpad descriptor has been
   exercised on a physical Android target. See `TARGET_MATRIX.md`.
 
-## [0.3.0] - 2026-09-15
+### 2026-09-15
 
-### Removed
+#### Removed
 
 - **Breaking:** Removed the Joystick Application Collection from the Gamepad
   profile. `aoahid_gamepad_options` no longer has an `application` field; the
@@ -723,7 +763,7 @@ since it was introduced.
   The fixed-slot Multi-Touch state machine itself, Contact ID/Count
   handling, and every other Touchscreen behavior are unchanged.
 
-### Changed
+#### Changed
 
 - Simplified the Gamepad Android-status classification and D-pad-manifest
   conditions that previously included a redundant `dpad_representation ==
@@ -731,7 +771,7 @@ since it was introduced.
   adjacent `dpad_representation != AOAHID_DPAD_HAT` check and did not change
   behavior for any of the three `aoahid_dpad_representation` values.
 
-### Verification status
+#### Verification status
 
 This release removes two struct fields, one enum type and its two
 constants, and one public function from the C ABI, and it changes the
@@ -748,9 +788,9 @@ source observations, not a claim that this
 library's own generated descriptors have been exercised through that code
 path on a physical device. See `TARGET_MATRIX.md`.
 
-## [0.2.0] - 2026-09-14
+### 2026-09-14
 
-### Changed
+#### Changed
 
 - **Breaking:** Consolidated the public profile surface from fourteen
   `aoahid_profile_kind` values to eight (`Keyboard`, `Mouse`, `Toggle`,
@@ -810,7 +850,7 @@ path on a physical device. See `TARGET_MATRIX.md`.
   `aoahid_keyboard_rollover` type were removed from the C ABI and every
   language binding.
 
-### Fixed
+#### Fixed
 
 - **License compliance:** stopped publishing a bare `.so`/`.dll` as a
   standalone GitHub Release asset. Those files link libusb dynamically, but
@@ -860,7 +900,7 @@ path on a physical device. See `TARGET_MATRIX.md`.
   they now grant access through udev's `uaccess` tag, which is what Mode A
   (this library's only implemented mode) actually needs.
 
-### Added
+#### Added
 
 - Reduced fixed work on the report-send path. First-report STALL retries are
   the transport's only deferred work and arise solely from the registration
@@ -899,7 +939,7 @@ path on a physical device. See `TARGET_MATRIX.md`.
   documentation were written by an AI coding assistant, with architecture,
   hardware verification, and review done by a human.
 
-### Verification status
+#### Verification status
 
 This release removes a public struct's fields and a public enum, and changes
 the Keyboard profile's on-wire descriptor shape; it is a breaking-ABI change
@@ -912,9 +952,9 @@ four-level physical-device gate (`getevent`, `dumpsys input`, application API,
 and kernel device); Android device/profile behavior remains
 **not hardware-verified** by these host-side CI jobs. See `TARGET_MATRIX.md`.
 
-## [0.1.0] - 2026-08-27
+### 2026-08-27
 
-### Changed
+#### Changed
 
 - Completed the generated-profile state-automation audit and made its boundary
   explicit. Keyboard and barcode-wedge Nodes route modifiers, pack key state,
@@ -963,7 +1003,7 @@ and kernel device); Android device/profile behavior remains
   field widths, Report IDs, descriptor and EP0 policies, and exact-target HID
   parser policies, remain mandatory and receive no fallback.
 
-### Removed
+#### Removed
 
 - Removed the Accessory Mode (Mode B) runtime startup path. The library now
   sends AOA HID requests only on the selected device's current EP0 and never
@@ -971,7 +1011,7 @@ and kernel device); Android device/profile behavior remains
   `ACCESSORY_START`, and never waits for re-enumeration. Mode A remains
   target-conditional rather than a blanket Android compatibility claim.
 
-### Compatibility
+#### Compatibility
 
 - Retained the numeric `AOAHID_START_ACCESSORY_MODE` token, `aoahid_aoa_strings`,
   and the former Mode-B members of `aoahid_device_options` solely as public ABI
@@ -988,7 +1028,7 @@ and kernel device); Android device/profile behavior remains
   keep their prior meaning. The affected zero values previously failed
   validation, so no public unlimited-timeout behavior is being replaced.
 
-### Fixed
+#### Fixed
 
 - Made the installed static CMake target consistently
   `aoahid::aoahid_static` in static-only and combined packages. Static-only
@@ -1049,7 +1089,7 @@ and kernel device); Android device/profile behavior remains
 These build, test, and publication corrections do not change the public C ABI
 or promote any target from its hardware-unverified status.
 
-### Added
+#### Added
 
 - A stable C ABI and a thin C++ wrapper for explicit AOA HID construction,
   registration, state updates, and report submission.
@@ -1074,7 +1114,7 @@ or promote any target from its hardware-unverified status.
   retry-deadline shortening, explicit libusb interruption on teardown, and
   deterministic idle/cancellation/stop-wake tests.
 
-### Verification status
+#### Verification status
 
 The configured release gates exercise unit tests, a deterministic fake USB
 transport, installed-package consumption, ABI export checks, and native

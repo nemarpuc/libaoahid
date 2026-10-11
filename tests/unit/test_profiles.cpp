@@ -1077,7 +1077,6 @@ void test_pen_switch() {
     aoahid_pen_options options{};
     options.struct_size = static_cast<std::uint32_t>(sizeof(options));
     options.report_id = {0U, 0U, {0U, 0U, 0U}};
-    options.mode = AOAHID_PEN_DIRECT_SCREEN;
     options.x = {0, 1000, 16U, {}};
     options.y = {0, 1000, 16U, {}};
     options.enable_pressure = 1U;
@@ -1179,14 +1178,36 @@ void test_pen_switch() {
     AOAHID_CHECK(barrel != nullptr && extract(report.data(), *barrel) == 0U);
     aoahid_spec_release(spec);
 
-    options.mode = AOAHID_PEN_INDIRECT_TABLET;
+    aoahid_digitizer_options digitizer{};
+    digitizer.struct_size = static_cast<std::uint32_t>(sizeof(digitizer));
+    digitizer.report_id = options.report_id;
+    digitizer.x = options.x;
+    digitizer.y = options.y;
+    digitizer.enable_pressure = options.enable_pressure;
+    digitizer.pressure = options.pressure;
+    digitizer.barrel_usages = options.barrel_usages;
+    digitizer.barrel_usage_count = options.barrel_usage_count;
+    digitizer.enable_eraser = options.enable_eraser;
+    digitizer.enable_hover = options.enable_hover;
     spec = nullptr;
-    AOAHID_CHECK(aoahid_spec_create_pen(&options, &spec) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_spec_create_digitizer(&digitizer, &spec) == AOAHID_OK);
     if (spec != nullptr) {
         manifest = {};
         manifest.struct_size = static_cast<std::uint32_t>(sizeof(manifest));
         AOAHID_CHECK(aoahid_spec_manifest(spec, &manifest) == AOAHID_OK);
+        AOAHID_CHECK(manifest.profile_kind == AOAHID_PROFILE_DIGITIZER);
         AOAHID_CHECK(manifest.android_status == AOAHID_ANDROID_CONDITIONAL);
+        aoahid_node digitizer_node{};
+        digitizer_node.spec = spec;
+        digitizer_node.state = aoa::detail::PenState{};
+        digitizer_node.transfer_inflight.store(true);
+        aoa::detail::transfer_complete(&digitizer_node, AOAHID_OK, 0);
+        aoahid_pen_sample digitizer_sample{};
+        digitizer_sample.in_range = 1U;
+        digitizer_sample.x = 10;
+        digitizer_sample.y = 20;
+        AOAHID_CHECK(aoahid_pen_update(&digitizer_node, &digitizer_sample) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_pen_depart(&digitizer_node) != AOAHID_ERR_PARAM);
         aoahid_spec_release(spec);
     }
 }

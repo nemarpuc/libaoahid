@@ -434,7 +434,6 @@ int main(const int argc, char** argv) {
         aoa::hid::usage::barrel_switch, aoa::hid::usage::secondary_barrel_switch};
     aoahid_pen_options pen{};
     pen.struct_size = static_cast<std::uint32_t>(sizeof(pen));
-    pen.mode = AOAHID_PEN_DIRECT_SCREEN;
     pen.x = {0, 32767, 16U, {}};
     pen.y = {0, 32767, 16U, {}};
     pen.enable_pressure = 1U;
@@ -449,9 +448,22 @@ int main(const int argc, char** argv) {
     pen.enable_hover = 1U;
     ok = emit_descriptor(output_directory, "pen", aoahid_spec_create_pen(&pen, &spec), spec) && ok;
     spec = nullptr;
-    pen.mode = AOAHID_PEN_INDIRECT_TABLET;
-    ok = emit_descriptor(output_directory, "pen-indirect", aoahid_spec_create_pen(&pen, &spec),
-                         spec) &&
+    aoahid_digitizer_options digitizer{};
+    digitizer.struct_size = static_cast<std::uint32_t>(sizeof(digitizer));
+    digitizer.x = pen.x;
+    digitizer.y = pen.y;
+    digitizer.enable_pressure = pen.enable_pressure;
+    digitizer.pressure = pen.pressure;
+    digitizer.enable_tilt = pen.enable_tilt;
+    digitizer.tilt_x = pen.tilt_x;
+    digitizer.tilt_y = pen.tilt_y;
+    digitizer.enable_twist_target_specific = pen.enable_twist_target_specific;
+    digitizer.barrel_usages = pen.barrel_usages;
+    digitizer.barrel_usage_count = pen.barrel_usage_count;
+    digitizer.enable_eraser = pen.enable_eraser;
+    digitizer.enable_hover = pen.enable_hover;
+    ok = emit_descriptor(output_directory, "digitizer",
+                         aoahid_spec_create_digitizer(&digitizer, &spec), spec) &&
          ok;
     spec = nullptr;
 

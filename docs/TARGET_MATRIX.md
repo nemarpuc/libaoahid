@@ -9,7 +9,7 @@ been confirmed on real hardware, and which have not.
   mouse, gamepad, and media keys (Consumer Control toggle)**.
 - Devices: Samsung Galaxy Tab S11 and POCO F6 Pro (HyperOS).
 - Hosts: Windows 10 x64 (WinUSB and libusbK) and Arch Linux x86_64 (usbfs).
-- Not yet tested on hardware: pen, touchpad, battery, raw, and the System
+- Not yet tested on hardware: pen, digitizer, touchpad, battery, raw, and the System
   Control, Camera, and Telephony toggle forms.
 
 "Confirmed" means the profile was driven through
@@ -46,7 +46,8 @@ column below is about real devices only.
 | Toggle: System Control | Not tested |
 | Toggle: Camera | Not tested |
 | Toggle: Telephony | Not tested |
-| Pen (direct and indirect) | Not tested |
+| Pen | Not tested |
+| Digitizer | Not tested |
 | Touchpad | Not tested |
 | Battery Strength | Not tested |
 | Raw report | Not tested; the library makes no claim about how Android interprets a raw descriptor |
@@ -118,6 +119,6 @@ Suggested cases per profile:
 | Gamepad | Every button and axis; neutral; minimum and maximum; all eight Hat directions and the null (centered) value, or each raw D-pad bit |
 | Touchscreen | One to the configured maximum contacts; stable Contact IDs; explicit lift; edges and corners; optional pressure/azimuth fields; Scan Time when enabled |
 | Touchpad | Touchscreen cases plus each button; observe the Android motion source |
-| Pen | Hover; tip; eraser in and out; barrel buttons; pressure, tilt, and twist when enabled; four corners; pen with touch |
+| Pen, Digitizer | Hover; tip; eraser in and out; barrel buttons; pressure, tilt, and twist when enabled; four corners; pen with touch |
 | Battery | Kernel `CONFIG_HID_BATTERY_STRENGTH`; minimum, midpoint, maximum; zero; unknown (Null); `/sys/class/power_supply` and `dumpsys battery` |
 | Teardown | Neutral report; close; unplug with a report in flight; reopen; Android reboot |

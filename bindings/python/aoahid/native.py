@@ -15,8 +15,8 @@ from typing import Union
 
 
 # All public enum domains in aoahid.h are exactly int32_t.
-AOAHID_VERSION_MAJOR = 4
-AOAHID_VERSION_MINOR = 2
+AOAHID_VERSION_MAJOR = 1
+AOAHID_VERSION_MINOR = 0
 AOAHID_VERSION_PATCH = 0
 AOAHID_OK = 0
 AOAHID_ERR_PARAM = 1
@@ -55,14 +55,13 @@ AOAHID_PROFILE_PEN = 6
 AOAHID_PROFILE_BATTERY = 7
 AOAHID_PROFILE_RAW = 8
 AOAHID_PROFILE_TOUCHPAD = 9
+AOAHID_PROFILE_DIGITIZER = 10
 
 AOAHID_ANDROID_PORTABLE_CANDIDATE = 1
 AOAHID_ANDROID_CONDITIONAL = 2
 AOAHID_ANDROID_CUSTOM_SYSTEM_ONLY = 3
 AOAHID_ANDROID_UNSUPPORTED = 4
 AOAHID_ANDROID_UNKNOWN = 5
-AOAHID_PEN_DIRECT_SCREEN = 1
-AOAHID_PEN_INDIRECT_TABLET = 2
 
 AOAHID_AXIS_X = 1
 AOAHID_AXIS_Y = 2
@@ -395,7 +394,27 @@ class PenOptions(c.Structure):
         ("struct_size", c.c_uint32),
         ("reserved", c.c_uint32),
         ("report_id", ReportId),
-        ("mode", c.c_int32),
+        ("x", IntegerField),
+        ("y", IntegerField),
+        ("enable_pressure", c.c_uint32),
+        ("pressure", IntegerField),
+        ("enable_tilt", c.c_uint32),
+        ("tilt_x", IntegerField),
+        ("tilt_y", IntegerField),
+        ("enable_twist_target_specific", c.c_uint32),
+        ("twist", IntegerField),
+        ("barrel_usages", c.POINTER(c.c_uint16)),
+        ("barrel_usage_count", c.c_size_t),
+        ("enable_eraser", c.c_uint32),
+        ("enable_hover", c.c_uint32),
+    ]
+
+
+class DigitizerOptions(c.Structure):
+    _fields_ = [
+        ("struct_size", c.c_uint32),
+        ("reserved", c.c_uint32),
+        ("report_id", ReportId),
         ("x", IntegerField),
         ("y", IntegerField),
         ("enable_pressure", c.c_uint32),
@@ -525,6 +544,7 @@ ABI_STRUCTS = {
     "aoahid_touchscreen_options": TouchscreenOptions,
     "aoahid_touchpad_options": TouchpadOptions,
     "aoahid_pen_options": PenOptions,
+    "aoahid_digitizer_options": DigitizerOptions,
     "aoahid_battery_options": BatteryOptions,
     "aoahid_raw_report": RawReport,
     "aoahid_raw_options": RawOptions,
@@ -574,6 +594,7 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
         "aoahid_spec_create_touchscreen": TouchscreenOptions,
         "aoahid_spec_create_touchpad": TouchpadOptions,
         "aoahid_spec_create_pen": PenOptions,
+        "aoahid_spec_create_digitizer": DigitizerOptions,
         "aoahid_spec_create_battery": BatteryOptions,
         "aoahid_spec_create_raw": RawOptions,
     }
@@ -643,6 +664,7 @@ __all__ += [
     "TouchscreenOptions",
     "TouchpadOptions",
     "PenOptions",
+    "DigitizerOptions",
     "BatteryOptions",
     "RawReport",
     "RawOptions",

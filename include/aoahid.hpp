@@ -110,6 +110,10 @@ spec_create_touchscreen(const aoahid_touchscreen_options* options,
                                                    aoahid_spec** out_spec) noexcept {
     return aoahid_spec_create_pen(options, out_spec);
 }
+[[nodiscard]] inline aoahid_result spec_create_digitizer(const aoahid_digitizer_options* options,
+                                                         aoahid_spec** out_spec) noexcept {
+    return aoahid_spec_create_digitizer(options, out_spec);
+}
 [[nodiscard]] inline aoahid_result spec_create_battery(const aoahid_battery_options* options,
                                                        aoahid_spec** out_spec) noexcept {
     return aoahid_spec_create_battery(options, out_spec);

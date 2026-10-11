@@ -39,7 +39,7 @@ Arch Linux:
 | Mouse (move, buttons, wheel) | yes |
 | Gamepad (sticks, buttons, D-pad) | yes |
 | Media keys (volume, play/pause, next/previous) | yes |
-| Pen, touchpad, and other profiles | not yet |
+| Pen, digitizer, touchpad, and other profiles | not yet |
 
 Details per device and OS are in [TARGET_MATRIX.md](docs/TARGET_MATRIX.md).
 
@@ -68,7 +68,7 @@ See [PORTING.md](docs/PORTING.md#windows).
 | Touchscreen, fixed MT | portable candidate | yes | no | no | Audited Linux commit and dated Android documentation; target matrix still required |
 | Touchpad | conditional | yes | no | no | Distinct Linux input property (INPUT_PROP_POINTER); Android converts contacts to mouse-source motion, gesture value-add is OEM/release dependent |
 | Pen, direct screen | portable candidate | yes | no | no | Invert tool transition; target matrix still required |
-| Pen, indirect tablet | conditional | yes | no | no | Target classification and mapping evidence required |
+| Digitizer | conditional | yes | no | no | Target classification and mapping evidence required |
 | Toggle: Camera keys | conditional | yes | no | no | HUT Camera Auto-focus/Shutter subset only |
 | Toggle: Telephony keys | conditional | yes | no | no | Caller allow-list and target mapping required |
 | Battery Strength telemetry | conditional | yes | no | no | Kernel power-supply association and OEM dependent |
@@ -93,7 +93,7 @@ choose every product and target value.
 | Consumer, System, Camera, Telephony | One allow-listed field per press; press/release/tap produce the `1` then `0` sequence each HID control type expects. | Each allowed Usage and its semantics, Report ID. |
 | Gamepad | D-pad directions become the eight Hat values plus Null (`15`); adjacent pairs become diagonals, opposite pairs are rejected. Raw four-bit D-pad and no-D-pad modes are also available. | Axes (role, range, width, neutral), buttons, D-pad form, Report ID. |
 | Touchscreen / touchpad | Contact Count, multi-report frames, Tip=0 release records with stable Contact IDs, Scan Time, packet sequencing. | Coordinate ranges, maximum contacts, contacts per report, optional fields. |
-| Pen (direct and indirect) | Tip/pressure consistency, out-of-range normalization, automatic leave-and-re-enter when switching pen/eraser. | Coordinate and optional-field ranges, hover/eraser/barrel options. |
+| Pen, Digitizer | Tip/pressure consistency, out-of-range normalization, automatic leave-and-re-enter when switching pen/eraser. | Coordinate and optional-field ranges, hover/eraser/barrel options. |
 | Battery Strength | Known and unknown values (Null encoding only when enabled). | Range, width, unknown support, Report ID. |
 | Raw Input | Only length, Report ID, and padding are checked against your descriptor. | Descriptor and report bytes. |
 
@@ -151,7 +151,7 @@ can confirm a real phone reacts before writing product code.
 The complete, fully explicit C session is
 [examples/c/multi_profile.c](examples/c/multi_profile.c). For a single profile
 in isolation, [examples/c/profiles/](examples/c/profiles) has one self-contained
-program per HID profile kind, all nine of which run without a device. In
+program per HID profile kind, all ten of which run without a device. In
 outline:
 
 1. Create a context and explicitly select caller-poll or internal-thread mode.

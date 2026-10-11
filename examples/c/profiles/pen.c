@@ -21,7 +21,6 @@ int main(void) {
     aoahid_result result;
 
     options.struct_size = (uint32_t)sizeof options;
-    options.mode = AOAHID_PEN_DIRECT_SCREEN;
     options.x = coordinate;
     options.y = coordinate;
     options.enable_pressure = 1U;

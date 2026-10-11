@@ -293,7 +293,27 @@ class PenOptions(c.Structure):
         ("struct_size", U32),
         ("reserved", U32),
         ("report_id", ReportIdOption),
-        ("mode", I32),
+        ("x", IntegerField),
+        ("y", IntegerField),
+        ("enable_pressure", U32),
+        ("pressure", IntegerField),
+        ("enable_tilt", U32),
+        ("tilt_x", IntegerField),
+        ("tilt_y", IntegerField),
+        ("enable_twist_target_specific", U32),
+        ("twist", IntegerField),
+        ("barrel_usages", U16_PTR),
+        ("barrel_usage_count", SIZE),
+        ("enable_eraser", U32),
+        ("enable_hover", U32),
+    ]
+
+
+class DigitizerOptions(c.Structure):
+    _fields_ = [
+        ("struct_size", U32),
+        ("reserved", U32),
+        ("report_id", ReportIdOption),
         ("x", IntegerField),
         ("y", IntegerField),
         ("enable_pressure", U32),
@@ -423,6 +443,7 @@ GOLDEN_STRUCTS = {
     "aoahid_touchscreen_options": TouchscreenOptions,
     "aoahid_touchpad_options": TouchpadOptions,
     "aoahid_pen_options": PenOptions,
+    "aoahid_digitizer_options": DigitizerOptions,
     "aoahid_battery_options": BatteryOptions,
     "aoahid_raw_report": RawReport,
     "aoahid_raw_options": RawOptions,
@@ -435,8 +456,8 @@ GOLDEN_STRUCTS = {
 
 
 GOLDEN_CONSTANTS = {
-    "AOAHID_VERSION_MAJOR": 4,
-    "AOAHID_VERSION_MINOR": 2,
+    "AOAHID_VERSION_MAJOR": 1,
+    "AOAHID_VERSION_MINOR": 0,
     "AOAHID_VERSION_PATCH": 0,
     "AOAHID_OK": 0,
     "AOAHID_ERR_PARAM": 1,
@@ -473,13 +494,12 @@ GOLDEN_CONSTANTS = {
     "AOAHID_PROFILE_BATTERY": 7,
     "AOAHID_PROFILE_RAW": 8,
     "AOAHID_PROFILE_TOUCHPAD": 9,
+    "AOAHID_PROFILE_DIGITIZER": 10,
     "AOAHID_ANDROID_PORTABLE_CANDIDATE": 1,
     "AOAHID_ANDROID_CONDITIONAL": 2,
     "AOAHID_ANDROID_CUSTOM_SYSTEM_ONLY": 3,
     "AOAHID_ANDROID_UNSUPPORTED": 4,
     "AOAHID_ANDROID_UNKNOWN": 5,
-    "AOAHID_PEN_DIRECT_SCREEN": 1,
-    "AOAHID_PEN_INDIRECT_TABLET": 2,
     "AOAHID_AXIS_X": 1,
     "AOAHID_AXIS_Y": 2,
     "AOAHID_AXIS_Z": 3,

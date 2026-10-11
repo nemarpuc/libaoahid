@@ -435,6 +435,7 @@ aoahid_result initialize_node_state(aoahid_node* node) {
         break;
     }
     case AOAHID_PROFILE_PEN:
+    case AOAHID_PROFILE_DIGITIZER:
         node->state = aoa::detail::PenState{};
         break;
     case AOAHID_PROFILE_BATTERY:

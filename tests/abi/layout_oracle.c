@@ -53,13 +53,12 @@ int main(void) {
     AOAHID_CONSTANT(AOAHID_PROFILE_BATTERY);
     AOAHID_CONSTANT(AOAHID_PROFILE_RAW);
     AOAHID_CONSTANT(AOAHID_PROFILE_TOUCHPAD);
+    AOAHID_CONSTANT(AOAHID_PROFILE_DIGITIZER);
     AOAHID_CONSTANT(AOAHID_ANDROID_PORTABLE_CANDIDATE);
     AOAHID_CONSTANT(AOAHID_ANDROID_CONDITIONAL);
     AOAHID_CONSTANT(AOAHID_ANDROID_CUSTOM_SYSTEM_ONLY);
     AOAHID_CONSTANT(AOAHID_ANDROID_UNSUPPORTED);
     AOAHID_CONSTANT(AOAHID_ANDROID_UNKNOWN);
-    AOAHID_CONSTANT(AOAHID_PEN_DIRECT_SCREEN);
-    AOAHID_CONSTANT(AOAHID_PEN_INDIRECT_TABLET);
     AOAHID_CONSTANT(AOAHID_AXIS_X);
     AOAHID_CONSTANT(AOAHID_AXIS_Y);
     AOAHID_CONSTANT(AOAHID_AXIS_Z);
@@ -299,7 +298,6 @@ int main(void) {
     AOAHID_FIELD(aoahid_pen_options, struct_size);
     AOAHID_FIELD(aoahid_pen_options, reserved);
     AOAHID_FIELD(aoahid_pen_options, report_id);
-    AOAHID_FIELD(aoahid_pen_options, mode);
     AOAHID_FIELD(aoahid_pen_options, x);
     AOAHID_FIELD(aoahid_pen_options, y);
     AOAHID_FIELD(aoahid_pen_options, enable_pressure);
@@ -313,6 +311,24 @@ int main(void) {
     AOAHID_FIELD(aoahid_pen_options, barrel_usage_count);
     AOAHID_FIELD(aoahid_pen_options, enable_eraser);
     AOAHID_FIELD(aoahid_pen_options, enable_hover);
+
+    AOAHID_BEGIN(aoahid_digitizer_options);
+    AOAHID_FIELD(aoahid_digitizer_options, struct_size);
+    AOAHID_FIELD(aoahid_digitizer_options, reserved);
+    AOAHID_FIELD(aoahid_digitizer_options, report_id);
+    AOAHID_FIELD(aoahid_digitizer_options, x);
+    AOAHID_FIELD(aoahid_digitizer_options, y);
+    AOAHID_FIELD(aoahid_digitizer_options, enable_pressure);
+    AOAHID_FIELD(aoahid_digitizer_options, pressure);
+    AOAHID_FIELD(aoahid_digitizer_options, enable_tilt);
+    AOAHID_FIELD(aoahid_digitizer_options, tilt_x);
+    AOAHID_FIELD(aoahid_digitizer_options, tilt_y);
+    AOAHID_FIELD(aoahid_digitizer_options, enable_twist_target_specific);
+    AOAHID_FIELD(aoahid_digitizer_options, twist);
+    AOAHID_FIELD(aoahid_digitizer_options, barrel_usages);
+    AOAHID_FIELD(aoahid_digitizer_options, barrel_usage_count);
+    AOAHID_FIELD(aoahid_digitizer_options, enable_eraser);
+    AOAHID_FIELD(aoahid_digitizer_options, enable_hover);
 
     AOAHID_BEGIN(aoahid_battery_options);
     AOAHID_FIELD(aoahid_battery_options, struct_size);
