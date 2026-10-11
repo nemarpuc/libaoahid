@@ -601,7 +601,10 @@ void make_neutral(aoahid_node* node) noexcept {
                   node->spec->kind != AOAHID_PROFILE_RAW;
 }
 
-aoahid_result poll_until_idle(aoahid_node* node, const std::uint32_t timeout_ms) {
+// drop_battery is the close path: a battery level has no neutral value, so an
+// unsent one is discarded instead of being sent on the way out.
+aoahid_result poll_until_idle(aoahid_node* node, const std::uint32_t timeout_ms,
+                              const bool drop_battery = false) {
     if (timeout_ms == 0U) {
         set_error(AOAHID_ERR_UNSET_FIELD, "timeout_ms", "A nonzero timeout is required.");
         return AOAHID_ERR_UNSET_FIELD;
@@ -619,7 +622,10 @@ aoahid_result poll_until_idle(aoahid_node* node, const std::uint32_t timeout_ms)
             const aoahid_result completion = consume_completion(node, "node.completion");
             if (completion != AOAHID_OK)
                 return completion;
-            if (!node->dirty)
+            if (drop_battery) {
+                node->battery_dirty = false;
+            }
+            if (!node->dirty && !node->battery_dirty)
                 return AOAHID_OK;
             slot_generation = node->device->slot_generation.load();
             const aoahid_result submit = aoahid_node_submit(node);
@@ -752,7 +758,7 @@ aoahid_result close_live_node_until(aoahid_node* node,
         if (remaining == 0U) {
             return AOAHID_ERR_TIMEOUT;
         }
-        const aoahid_result wait = poll_until_idle(node, remaining);
+        const aoahid_result wait = poll_until_idle(node, remaining, true);
         if (wait != AOAHID_OK) {
             return wait;
         }
@@ -761,6 +767,7 @@ aoahid_result close_live_node_until(aoahid_node* node,
     const aoahid_result terminal = consume_completion(node, "node.completion");
     if (terminal != AOAHID_OK)
         return terminal;
+    node->battery_dirty = false;
 
     aoahid_device* device = node->device;
     if (device->transport->present()) {
@@ -770,7 +777,7 @@ aoahid_result close_live_node_until(aoahid_node* node,
             if (remaining == 0U) {
                 return AOAHID_ERR_TIMEOUT;
             }
-            const aoahid_result neutral = poll_until_idle(node, remaining);
+            const aoahid_result neutral = poll_until_idle(node, remaining, true);
             if (neutral != AOAHID_OK) {
                 return neutral;
             }
@@ -1623,22 +1630,28 @@ aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node) try {
         node->transfer_inflight.store(false, std::memory_order_release);
         return completion;
     }
-    if (!node->dirty) {
+    // Input always goes first; the battery report is sent only by a submit
+    // that has no input report to send.
+    const bool battery_report = !node->dirty && node->battery_dirty;
+    if (!node->dirty && !battery_report) {
         node->transfer_inflight.store(false, std::memory_order_release);
         aoa::detail::clear_error();
         return AOAHID_OK;
     }
+    const aoa::hid::ReportLayout& layout =
+        battery_report ? node->spec->battery_layout : node->spec->layout;
     aoa::transport::PreparedTransfer prepared{};
-    const aoahid_result acquired = node->device->transport->acquire(
-        node->hid_id, node->reservation, node->spec->layout.wire_bytes, node,
-        &aoa::detail::transfer_complete, &prepared);
+    const aoahid_result acquired =
+        node->device->transport->acquire(node->hid_id, node->reservation, layout.wire_bytes, node,
+                                         &aoa::detail::transfer_complete, &prepared);
     if (acquired != AOAHID_OK) {
         node->transfer_inflight.store(false, std::memory_order_release);
         return finish_transport_result(
             acquired, "node.submit", "No transfer slot could be acquired for AOA request 57.", node,
-            57, 0U, static_cast<std::uint32_t>(node->spec->layout.wire_bytes));
+            57, 0U, static_cast<std::uint32_t>(layout.wire_bytes));
     }
-    auto* scan_touch = std::get_if<aoa::detail::TouchState>(&node->state);
+    auto* scan_touch =
+        battery_report ? nullptr : std::get_if<aoa::detail::TouchState>(&node->state);
     const auto* scan_config = std::get_if<aoa::detail::TouchConfig>(&node->spec->config);
     const bool update_scan_time = scan_touch != nullptr && scan_touch->packet_cursor == 0U &&
                                   scan_config != nullptr &&
@@ -1674,7 +1687,10 @@ aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node) try {
     }
     std::size_t report_length = 0U;
     const aoahid_result serialized =
-        aoa::detail::serialize_node(node, prepared.payload, prepared.capacity, &report_length);
+        battery_report ? aoa::detail::serialize_battery(node, prepared.payload, prepared.capacity,
+                                                        &report_length)
+                       : aoa::detail::serialize_node(node, prepared.payload, prepared.capacity,
+                                                     &report_length);
     if (serialized != AOAHID_OK) {
         node->device->transport->abandon(prepared);
         rollback_scan_time();
@@ -1683,7 +1699,8 @@ aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node) try {
     }
     if (node->device->validate_reports) {
         const aoahid_result validated =
-            aoa::detail::validate_serialized_report(node->spec, prepared.payload, report_length);
+            aoa::detail::validate_serialized_report(node->spec, layout, prepared.payload,
+                                                    report_length);
         if (validated != AOAHID_OK) {
             node->device->transport->abandon(prepared);
             rollback_scan_time();
@@ -1691,9 +1708,10 @@ aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node) try {
             return validated;
         }
     }
-    node->submitted_non_neutral = has_non_neutral_state(node);
+    node->submitted_battery = battery_report;
+    node->submitted_non_neutral = !battery_report && has_non_neutral_state(node);
     node->submitted_report_length = report_length;
-    node->submitted_report_id = report_id(node);
+    node->submitted_report_id = battery_report ? layout.report_id : report_id(node);
     const aoahid_result result =
         node->device->transport->submit(prepared, report_length, node->submitted_report_id);
     if (result != AOAHID_OK) {
@@ -1826,7 +1844,8 @@ aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node) try {
         return AOAHID_ERR_PARAM;
     }
     if (node->transfer_inflight.load(std::memory_order_acquire) || touch_frame_in_progress(node)) {
-        const aoahid_result wait = poll_until_idle(node, node->device->close_drain_timeout_ms);
+        const aoahid_result wait =
+            poll_until_idle(node, node->device->close_drain_timeout_ms, true);
         if (wait != AOAHID_OK) {
             if (wait == AOAHID_ERR_TIMEOUT &&
                 node->transfer_inflight.load(std::memory_order_acquire)) {
@@ -1843,9 +1862,11 @@ aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node) try {
     const aoahid_result terminal = consume_completion(node, "node.completion");
     if (terminal != AOAHID_OK)
         return terminal;
+    node->battery_dirty = false;
     if (node->device->transport->present()) {
         make_neutral(node);
-        const aoahid_result neutral = poll_until_idle(node, node->device->close_drain_timeout_ms);
+        const aoahid_result neutral =
+            poll_until_idle(node, node->device->close_drain_timeout_ms, true);
         if (neutral != AOAHID_OK) {
             if (neutral == AOAHID_ERR_TIMEOUT &&
                 node->transfer_inflight.load(std::memory_order_acquire)) {

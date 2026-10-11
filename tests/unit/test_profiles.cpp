@@ -1606,6 +1606,69 @@ void test_battery_options() {
     AOAHID_CHECK(rejects("keyboard.battery.strength"));
 }
 
+void test_battery_state() {
+    aoahid_keyboard_options keyboard = keyboard_options();
+    keyboard.report_id = {1U, 1U, {0U, 0U, 0U}};
+    aoahid_spec* plain = nullptr;
+    AOAHID_CHECK(aoahid_spec_create_keyboard(&keyboard, &plain) == AOAHID_OK);
+    keyboard.enable_battery = 1U;
+    keyboard.battery.report_id = {1U, 2U, {0U, 0U, 0U}};
+    keyboard.battery.strength = {0, 100, 8U, {}};
+    aoahid_spec* spec = nullptr;
+    AOAHID_CHECK(aoahid_spec_create_keyboard(&keyboard, &spec) == AOAHID_OK);
+    if (plain == nullptr || spec == nullptr) {
+        aoahid_spec_release(plain);
+        aoahid_spec_release(spec);
+        return;
+    }
+
+    aoahid_node without{};
+    without.spec = plain;
+    without.state = aoa::detail::KeyboardState{};
+    AOAHID_CHECK(aoahid_battery_update(&without, 50) == AOAHID_ERR_PARAM);
+
+    aoahid_node node{};
+    node.spec = spec;
+    node.state = aoa::detail::KeyboardState{};
+    std::array<std::uint8_t, 8U> report{};
+    std::size_t length = 0U;
+
+    // Nothing was ever set, so there is nothing to send.
+    AOAHID_CHECK(!node.battery_dirty);
+    // The first value is a change even when it is 0, the initial storage.
+    AOAHID_CHECK(aoahid_battery_update(&node, 0) == AOAHID_OK && node.battery_dirty);
+    AOAHID_CHECK(aoa::detail::serialize_battery(&node, report.data(), report.size(), &length) ==
+                 AOAHID_OK);
+    AOAHID_CHECK(length == 2U && report[0] == 2U && report[1] == 0U);
+
+    AOAHID_CHECK(aoahid_battery_update(&node, 80) == AOAHID_OK);
+    AOAHID_CHECK(node.battery_dirty && !node.dirty);
+    AOAHID_CHECK(aoa::detail::serialize_battery(&node, report.data(), report.size(), &length) ==
+                 AOAHID_OK);
+    AOAHID_CHECK(length == 2U && report[0] == 2U && report[1] == 80U);
+    AOAHID_CHECK(aoa::detail::validate_serialized_report(spec, spec->battery_layout, report.data(),
+                                                         length) == AOAHID_OK);
+    report[1] = 101U;
+    AOAHID_CHECK(aoa::detail::validate_serialized_report(spec, spec->battery_layout, report.data(),
+                                                         length) == AOAHID_ERR_INTERNAL);
+
+    // The same value again asks for nothing.
+    node.battery_dirty = false;
+    AOAHID_CHECK(aoahid_battery_update(&node, 80) == AOAHID_OK && !node.battery_dirty);
+    AOAHID_CHECK(aoahid_battery_update(&node, 79) == AOAHID_OK && node.battery_dirty);
+
+    AOAHID_CHECK(aoahid_battery_update(&node, -1) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_battery_update(&node, 101) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_battery_update(nullptr, 50) == AOAHID_ERR_PARAM);
+
+    node.transfer_inflight.store(true);
+    AOAHID_CHECK(aoahid_battery_update(&node, 10) == AOAHID_ERR_BUSY);
+    node.transfer_inflight.store(false);
+
+    aoahid_spec_release(plain);
+    aoahid_spec_release(spec);
+}
+
 void test_profiles() {
     aoahid_keyboard_options zero{};
     auto* spec = reinterpret_cast<aoahid_spec*>(static_cast<std::uintptr_t>(1U));
@@ -1648,6 +1711,7 @@ void test_profiles() {
     test_send_time_report_validation();
     test_battery_builder();
     test_battery_options();
+    test_battery_state();
 
     aoahid_touchscreen_options invalid_touch = touchscreen_options();
     invalid_touch.contact_id = {1, 15, 4U, {}};

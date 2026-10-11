@@ -259,6 +259,12 @@ aoahid_result serialize_node(struct aoahid_node* node, std::uint8_t* report, std
                              std::size_t* report_length) noexcept;
 aoahid_result validate_serialized_report(const struct aoahid_spec* spec, const std::uint8_t* report,
                                          std::size_t report_length) noexcept;
+aoahid_result validate_serialized_report(const struct aoahid_spec* spec,
+                                         const aoa::hid::ReportLayout& layout,
+                                         const std::uint8_t* report,
+                                         std::size_t report_length) noexcept;
+aoahid_result serialize_battery(const struct aoahid_node* node, std::uint8_t* report,
+                                std::size_t capacity, std::size_t* report_length) noexcept;
 void transfer_complete(void* user, aoahid_result result, std::int32_t native_status) noexcept;
 
 } // namespace aoa::detail
@@ -377,5 +383,10 @@ struct aoahid_node {
     bool emitted_non_neutral{};
     // Registration alone sends nothing; only a real mutation marks the Node.
     bool dirty{false};
+    // The battery report of a Spec that has one. It is sent only when there
+    // is no input report to send; has_value says a level was ever set.
+    aoa::detail::BatteryState battery{};
+    bool battery_dirty{false};
+    bool submitted_battery{false};
     bool closed{false};
 };

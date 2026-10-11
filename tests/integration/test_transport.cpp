@@ -2453,7 +2453,8 @@ void submit_delayed_public_report(aoahid_node* node) {
 }
 
 void open_public_touch_session(aoahid_context** context, aoahid_device** device, aoahid_node** node,
-                               const bool enable_scan_time = false) {
+                               const bool enable_scan_time = false,
+                               const bool enable_battery = false) {
     static constexpr std::array<std::uint8_t, 2U> path{5U, 2U};
     const aoahid_fake_libusb_device_config fake{
         2U,      8U, path.data(),         path.size(), 0x18D1U,
@@ -2489,6 +2490,12 @@ void open_public_touch_session(aoahid_context** context, aoahid_device** device,
         touch.scan_time_unit_100us = 1U;
     }
     touch.enable_multi_packet_frames = 1U;
+    if (enable_battery) {
+        touch.report_id = {1U, 1U, {0U, 0U, 0U}};
+        touch.enable_battery = 1U;
+        touch.battery.report_id = {1U, 2U, {0U, 0U, 0U}};
+        touch.battery.strength = {1, 100, 8U, {}};
+    }
     aoahid_spec* spec = nullptr;
     AOAHID_CHECK(aoahid_spec_create_touchscreen(&touch, &spec) == AOAHID_OK);
     const aoahid_node_options node_options{sizeof(aoahid_node_options), 0U, 1U, 0U};
@@ -2683,6 +2690,195 @@ void test_public_touch_scan_time_rejected_first_attempt_stays_zero() {
     aoahid_fake_libusb_reset();
 }
 
+// The battery report shares the Node with the input report: input goes first,
+// one report per submit, and the battery never rides along on close.
+void test_battery_reports() {
+    aoahid_fake_libusb_reset();
+    const Candidate candidate = add_candidate(15U, {5U, 6U});
+    aoahid_context* context = nullptr;
+    aoahid_context_options context_options = public_context_options();
+    AOAHID_CHECK(aoahid_context_create(&context_options, &context) == AOAHID_OK);
+    const aoahid_device_info selected = public_info(candidate);
+    aoahid_device* device = nullptr;
+    aoahid_device_options device_options = public_device_options();
+    device_options.close_drain_timeout_ms = 2000U;
+    device_options.validate_reports = 1U;
+    AOAHID_CHECK(aoahid_device_open(context, &selected, &device_options, &device) == AOAHID_OK);
+
+    aoahid_keyboard_options keyboard{};
+    keyboard.struct_size = sizeof(keyboard);
+    keyboard.report_id = {1U, 1U, {0U, 0U, 0U}};
+    keyboard.usage_minimum = 0x04U;
+    keyboard.usage_maximum = 0x65U;
+    keyboard.enable_battery = 1U;
+    keyboard.battery.report_id = {1U, 2U, {0U, 0U, 0U}};
+    keyboard.battery.strength = {1, 100, 8U, {}};
+    aoahid_spec* spec = nullptr;
+    AOAHID_CHECK(aoahid_spec_create_keyboard(&keyboard, &spec) == AOAHID_OK);
+    const aoahid_node_options node_options{sizeof(aoahid_node_options), 0U, 1U, 0U};
+    aoahid_node* node = nullptr;
+    AOAHID_CHECK(aoahid_node_open(device, spec, &node_options, &node) == AOAHID_OK);
+    aoahid_spec_release(spec);
+
+    using Reports = std::vector<std::vector<std::uint8_t>>;
+    const auto battery = [](const std::uint8_t value) {
+        return std::vector<std::uint8_t>{2U, value};
+    };
+    std::size_t seen = 0U;
+    // The request-57 payloads sent since the last call.
+    const auto fresh = [&] {
+        Reports all = control_payloads_for(57U);
+        Reports added(all.begin() + static_cast<std::ptrdiff_t>(std::min(seen, all.size())),
+                      all.end());
+        seen = all.size();
+        return added;
+    };
+    const auto is_key_report = [](const std::vector<std::uint8_t>& report) {
+        return report.size() == 15U && report[0] == 1U;
+    };
+
+    // Nothing was set: nothing is sent.
+    AOAHID_CHECK(aoahid_node_submit_blocking(node, 500U) == AOAHID_OK);
+    AOAHID_CHECK(fresh().empty());
+
+    // Battery alone.
+    AOAHID_CHECK(aoahid_battery_update(node, 80) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_submit_blocking(node, 500U) == AOAHID_OK);
+    Reports sent = fresh();
+    AOAHID_CHECK(sent.size() == 1U && sent[0] == battery(80U));
+
+    // Input first, then the battery, from one blocking submit.
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_battery_update(node, 79) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_submit_blocking(node, 500U) == AOAHID_OK);
+    sent = fresh();
+    AOAHID_CHECK(sent.size() == 2U && is_key_report(sent[0]) && sent[1] == battery(79U));
+
+    // One report per aoahid_node_submit: input, then battery, then nothing.
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_battery_update(node, 78) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_submit(node) == AOAHID_OK);
+    sent = fresh();
+    AOAHID_CHECK(sent.size() == 1U && is_key_report(sent[0]));
+    AOAHID_CHECK(aoahid_node_submit(node) == AOAHID_OK);
+    sent = fresh();
+    AOAHID_CHECK(sent.size() == 1U && sent[0] == battery(78U));
+    AOAHID_CHECK(aoahid_node_submit(node) == AOAHID_OK);
+    AOAHID_CHECK(fresh().empty());
+
+    // The same value again is not sent.
+    AOAHID_CHECK(aoahid_battery_update(node, 78) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_submit_blocking(node, 500U) == AOAHID_OK);
+    AOAHID_CHECK(fresh().empty());
+
+    // A STALLed battery report stays pending and goes out on the next submit;
+    // no input report is produced by it.
+    aoahid_fake_libusb_queue_async_completion(LIBUSB_TRANSFER_STALL, 0, 0U);
+    AOAHID_CHECK(aoahid_battery_update(node, 77) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_submit_blocking(node, 500U) == AOAHID_ERR_STALL);
+    AOAHID_CHECK(aoahid_node_submit_blocking(node, 500U) == AOAHID_OK);
+    sent = fresh();
+    AOAHID_CHECK(!sent.empty() && sent.back() == battery(77U));
+    AOAHID_CHECK(std::none_of(sent.begin(), sent.end(), is_key_report));
+    AOAHID_CHECK(aoahid_node_submit_blocking(node, 500U) == AOAHID_OK);
+    AOAHID_CHECK(fresh().empty());
+
+    // While the battery report is in flight an input update is refused like
+    // any other, and accepted once it has completed.
+    aoahid_fake_libusb_queue_async_completion(LIBUSB_TRANSFER_COMPLETED, 2, 3U);
+    AOAHID_CHECK(aoahid_battery_update(node, 76) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_submit(node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x05U, 1U) == AOAHID_ERR_BUSY);
+    AOAHID_CHECK(aoahid_battery_update(node, 75) == AOAHID_ERR_BUSY);
+    AOAHID_CHECK(aoahid_node_submit_blocking(node, 500U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x05U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_submit_blocking(node, 500U) == AOAHID_OK);
+    sent = fresh();
+    AOAHID_CHECK(sent.size() == 2U && sent[0] == battery(76U) && is_key_report(sent[1]));
+
+    // Close releases the held key and drops the unsent battery value.
+    AOAHID_CHECK(aoahid_battery_update(node, 74) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(node) == AOAHID_OK);
+    sent = fresh();
+    AOAHID_CHECK(sent.size() == 1U && is_key_report(sent[0]) &&
+                 std::all_of(sent[0].begin() + 1, sent[0].end(),
+                             [](const std::uint8_t byte) { return byte == 0U; }));
+
+    AOAHID_CHECK(aoahid_device_close(device) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_context_destroy(context) == AOAHID_OK);
+    aoahid_fake_libusb_reset();
+}
+
+// A touch frame of two packets is not split by the battery report.
+void test_battery_waits_for_the_touch_frame() {
+    aoahid_fake_libusb_reset();
+    aoahid_context* context = nullptr;
+    aoahid_device* device = nullptr;
+    aoahid_node* node = nullptr;
+    open_public_touch_session(&context, &device, &node, false, true);
+    AOAHID_CHECK(aoahid_battery_update(node, 50) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_submit_blocking(node, 2000U) == AOAHID_OK);
+    const auto sent = control_payloads_for(57U);
+    AOAHID_CHECK(sent.size() == 3U);
+    if (sent.size() == 3U) {
+        AOAHID_CHECK(sent[0][0] == 1U && sent[1][0] == 1U);
+        AOAHID_CHECK(sent[2] == (std::vector<std::uint8_t>{2U, 50U}));
+    }
+    AOAHID_CHECK(aoahid_device_close(device) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_context_destroy(context) == AOAHID_OK);
+    aoahid_fake_libusb_reset();
+}
+
+// The same ordering with completions arriving on the internal event thread.
+void test_battery_reports_internal_thread() {
+    aoahid_fake_libusb_reset();
+    const Candidate candidate = add_candidate(16U, {5U, 7U});
+    aoahid_context_options context_options = public_context_options();
+    context_options.event_mode = AOAHID_EVENT_INTERNAL_THREAD;
+    aoahid_context* context = nullptr;
+    AOAHID_CHECK(aoahid_context_create(&context_options, &context) == AOAHID_OK);
+    const aoahid_device_info selected = public_info(candidate);
+    aoahid_device_options device_options = public_device_options();
+    device_options.close_drain_timeout_ms = 2000U;
+    aoahid_device* device = nullptr;
+    AOAHID_CHECK(aoahid_device_open(context, &selected, &device_options, &device) == AOAHID_OK);
+
+    aoahid_keyboard_options keyboard{};
+    keyboard.struct_size = sizeof(keyboard);
+    keyboard.report_id = {1U, 1U, {0U, 0U, 0U}};
+    keyboard.usage_minimum = 0x04U;
+    keyboard.usage_maximum = 0x65U;
+    keyboard.enable_battery = 1U;
+    keyboard.battery.report_id = {1U, 2U, {0U, 0U, 0U}};
+    keyboard.battery.strength = {1, 100, 8U, {}};
+    aoahid_spec* spec = nullptr;
+    AOAHID_CHECK(aoahid_spec_create_keyboard(&keyboard, &spec) == AOAHID_OK);
+    const aoahid_node_options node_options{sizeof(aoahid_node_options), 0U, 1U, 0U};
+    aoahid_node* node = nullptr;
+    AOAHID_CHECK(aoahid_node_open(device, spec, &node_options, &node) == AOAHID_OK);
+    aoahid_spec_release(spec);
+
+    for (std::int32_t level = 100; level > 80; --level) {
+        AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 1U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_battery_update(node, level) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_node_submit_blocking(node, 2000U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 0U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_node_submit_blocking(node, 2000U) == AOAHID_OK);
+    }
+    const auto sent = control_payloads_for(57U);
+    // Each round: key down, battery, key up.
+    AOAHID_CHECK(sent.size() == 60U);
+    for (std::size_t round = 0U; round < 20U && sent.size() == 60U; ++round) {
+        AOAHID_CHECK(sent[round * 3U][0] == 1U && sent[round * 3U + 2U][0] == 1U);
+        AOAHID_CHECK(sent[round * 3U + 1U] ==
+                     (std::vector<std::uint8_t>{2U, static_cast<std::uint8_t>(100U - round)}));
+    }
+    AOAHID_CHECK(aoahid_node_close(node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_device_close(device) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_context_destroy(context) == AOAHID_OK);
+    aoahid_fake_libusb_reset();
+}
+
 void test_close_drains_touch_frame_before_neutral() {
     aoahid_fake_libusb_reset();
     aoahid_context* context = nullptr;
@@ -2869,6 +3065,9 @@ void test_transport() {
     test_public_touch_scan_time_lifecycle();
     test_public_touch_scan_time_rejected_first_attempt_stays_zero();
     test_close_drains_touch_frame_before_neutral();
+    test_battery_reports();
+    test_battery_waits_for_the_touch_frame();
+    test_battery_reports_internal_thread();
     test_public_error_contract_and_raw_padding();
     test_first_report_stall_is_returned_without_retry();
     test_submit_blocking_waits_for_a_free_slot_without_spinning();

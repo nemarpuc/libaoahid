@@ -262,13 +262,24 @@ namespace aoa::detail {
 
 aoahid_result validate_serialized_report(const aoahid_spec* spec, const std::uint8_t* report,
                                          const std::size_t report_length) noexcept {
-    if (spec == nullptr || report == nullptr || report_length != spec->layout.wire_bytes ||
+    if (spec == nullptr) {
+        set_error(AOAHID_ERR_INTERNAL, "report.length",
+                  "The generated report does not match its immutable wire length.");
+        return AOAHID_ERR_INTERNAL;
+    }
+    return validate_serialized_report(spec, spec->layout, report, report_length);
+}
+
+aoahid_result validate_serialized_report(const aoahid_spec* spec,
+                                         const aoa::hid::ReportLayout& layout,
+                                         const std::uint8_t* report,
+                                         const std::size_t report_length) noexcept {
+    if (spec == nullptr || report == nullptr || report_length != layout.wire_bytes ||
         report_length == 0U) {
         set_error(AOAHID_ERR_INTERNAL, "report.length",
                   "The generated report does not match its immutable wire length.");
         return AOAHID_ERR_INTERNAL;
     }
-    const auto& layout = spec->layout;
     if (layout.has_report_id && report[0] != layout.report_id) {
         set_error(AOAHID_ERR_INTERNAL, "report.report_id",
                   "The generated report prefix does not match its immutable Report ID.", 0, 57, 0,
@@ -310,6 +321,26 @@ aoahid_result validate_serialized_report(const aoahid_spec* spec, const std::uin
             return AOAHID_ERR_INTERNAL;
         }
     }
+    return AOAHID_OK;
+}
+
+aoahid_result serialize_battery(const aoahid_node* node, std::uint8_t* report,
+                                const std::size_t capacity, std::size_t* report_length) noexcept {
+    if (node == nullptr || node->spec == nullptr || !node->spec->has_battery ||
+        report == nullptr || report_length == nullptr ||
+        capacity < node->spec->battery_layout.wire_bytes) {
+        set_error(AOAHID_ERR_PARAM, "report", "The serializer buffer is missing or too small.");
+        return AOAHID_ERR_PARAM;
+    }
+    const auto& layout = node->spec->battery_layout;
+    std::fill_n(report, layout.wire_bytes, std::uint8_t{0});
+    report[0] = layout.report_id;
+    if (!store_bits(report, capacity, layout.fields.front(), node->battery.strength, false)) {
+        set_error(AOAHID_ERR_INTERNAL, "report.field",
+                  "The battery level does not fit its immutable field.");
+        return AOAHID_ERR_INTERNAL;
+    }
+    *report_length = layout.wire_bytes;
     return AOAHID_OK;
 }
 
@@ -544,8 +575,14 @@ void transfer_complete(void* user, const aoahid_result result,
     // submit call that reports the STALL sends nothing itself. Timeouts and
     // cancellations stay consumed because delivery is unknown.
     const bool may_have_applied = accepted_by_libusb && result != AOAHID_ERR_STALL;
+    // The battery report never touches input state. Like input, a refused
+    // transfer stays pending and an uncertain one is not sent again.
+    const bool battery_report = node->submitted_battery;
+    node->submitted_battery = false;
     bool lifecycle_report_complete = true;
-    if (!may_have_applied) {
+    if (battery_report) {
+        node->battery_dirty = !may_have_applied;
+    } else if (!may_have_applied) {
         node->dirty = true;
     } else if (auto* mouse = state<MouseState>(node); mouse != nullptr) {
         // A timed-out/cancelled control transfer may have reached the device.
@@ -608,13 +645,14 @@ void transfer_complete(void* user, const aoahid_result result,
         }
         node->dirty = false;
     }
-    if (may_have_applied && (result != AOAHID_OK || lifecycle_report_complete)) {
+    if (!battery_report && may_have_applied &&
+        (result != AOAHID_OK || lifecycle_report_complete)) {
         // An accepted terminal transfer may have reached the target even when
         // completion is uncertain. Consume its edge baseline so a later
         // opposite transition can release any state the target may hold.
         consume_lifecycle_transitions(node);
     }
-    if (may_have_applied) {
+    if (!battery_report && may_have_applied) {
         if (result == AOAHID_OK) {
             node->emitted_non_neutral = node->submitted_non_neutral;
         } else {
@@ -1167,10 +1205,28 @@ static aoahid_result stylus_update_impl(aoahid_node* node, const aoahid_profile_
 
 static aoahid_result aoahid_battery_update_impl(aoahid_node* node, const std::int32_t strength) {
     aoa::detail::clear_error();
-    static_cast<void>(node);
-    static_cast<void>(strength);
-    set_error(AOAHID_ERR_PARAM, "battery.update", "The node has no battery report.");
-    return AOAHID_ERR_PARAM;
+    if (node == nullptr || node->closed || node->spec == nullptr || !node->spec->has_battery) {
+        set_error(AOAHID_ERR_PARAM, "battery.update", "The node has no battery report.");
+        return AOAHID_ERR_PARAM;
+    }
+    const aoahid_result link = link_available(node, "battery.update");
+    if (link != AOAHID_OK)
+        return link;
+    if (node->transfer_inflight.load(std::memory_order_acquire)) {
+        set_error(AOAHID_ERR_BUSY, "battery.update", "The node has one report in flight.");
+        return AOAHID_ERR_BUSY;
+    }
+    if (!in_range(strength, node->spec->battery.strength)) {
+        set_error(AOAHID_ERR_PARAM, "battery.strength", "The value is outside the declared range.");
+        return AOAHID_ERR_PARAM;
+    }
+    // The first value is always a change, even when it equals the zero the
+    // state starts with.
+    const bool changed = !node->battery.has_value || node->battery.strength != strength;
+    node->battery.has_value = true;
+    node->battery.strength = strength;
+    node->battery_dirty = node->battery_dirty || changed;
+    return AOAHID_OK;
 }
 
 aoahid_result AOAHID_CALL aoahid_keyboard_key(aoahid_node* node, const std::uint16_t usage,
