@@ -383,7 +383,7 @@ def update_then_submit(
             continue
         status = first_failure(
             (
-                library.aoahid_kbd(session.keyboard, KEYBOARD_A_USAGE, 1),
+                library.aoahid_keyboard_key(session.keyboard, KEYBOARD_A_USAGE, 1),
                 library.aoahid_mouse_move(session.mouse, EXAMPLE_MOUSE_DX, EXAMPLE_MOUSE_DY),
                 library.aoahid_touchscreen_contact(
                     session.touchscreen, contact.contact_id, 1, contact.x, contact.y, None
@@ -462,7 +462,7 @@ def continue_without_touch(library: c.CDLL, context: ContextP, sessions: list[Se
             continue
         status = first_failure(
             (
-                library.aoahid_kbd(session.keyboard, KEYBOARD_A_USAGE, 0),
+                library.aoahid_keyboard_key(session.keyboard, KEYBOARD_A_USAGE, 0),
                 library.aoahid_mouse_button(session.mouse, 1, 1),  # Caller selects pointer button 1.
             )
         )

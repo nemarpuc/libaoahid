@@ -461,7 +461,7 @@ fn update_then_submit(
             continue;
         }
         let status = first_failure([
-            unsafe { sys::aoahid_kbd(session.keyboard, KEYBOARD_A_USAGE, 1) },
+            unsafe { sys::aoahid_keyboard_key(session.keyboard, KEYBOARD_A_USAGE, 1) },
             unsafe { sys::aoahid_mouse_move(session.mouse, EXAMPLE_MOUSE_DX, EXAMPLE_MOUSE_DY) },
             unsafe {
                 sys::aoahid_touchscreen_contact(
@@ -572,7 +572,7 @@ fn continue_without_touch(
             continue;
         }
         let status = first_failure([
-            unsafe { sys::aoahid_kbd(session.keyboard, KEYBOARD_A_USAGE, 0) },
+            unsafe { sys::aoahid_keyboard_key(session.keyboard, KEYBOARD_A_USAGE, 0) },
             // This caller selects pointer button 1 and a pressed level of one.
             unsafe { sys::aoahid_mouse_button(session.mouse, 1, 1) },
         ]);

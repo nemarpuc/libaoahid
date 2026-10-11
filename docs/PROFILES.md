@@ -1,7 +1,7 @@
 # HID Input Profiles
 
 libaoahid builds HID report descriptors for ten profile kinds and keeps a
-state machine per Node that turns simple calls (`aoahid_kbd`, `aoahid_touchscreen_contact`,
+state machine per Node that turns simple calls (`aoahid_keyboard_key`, `aoahid_touchscreen_contact`,
 ...) into reports. This page describes each descriptor, what the library
 derives for you, and which values you must choose. The C calls are summarized
 in [API.md](API.md); numeric limits are in [LIMITS.md](LIMITS.md).
@@ -93,7 +93,7 @@ button counts, and optional-field presence are always yours to set.
   allows Selectors as Variable bits.
 - No LED Output report.
 
-`aoahid_kbd(node, usage, down)` routes a modifier to its bit and any other
+`aoahid_keyboard_key(node, usage, down)` routes a modifier to its bit and any other
 Usage to its bitmap bit; a Usage outside the declared range is
 `AOAHID_ERR_PARAM`. Repeating a press or release that is already in effect
 changes nothing. There is no release-all call; release every key you pressed
@@ -217,7 +217,7 @@ and neutral 0. Steering and Rudder require a range from negative to positive
 and neutral 0. For other axes the neutral is whatever you declare; the library
 never computes a midpoint or decides that Z/Rz is a trigger.
 
-`aoahid_dpad(node, up, down, right, left)` works in Hat and Buttons modes
+`aoahid_gamepad_dpad(node, up, down, right, left)` works in Hat and Buttons modes
 (`AOAHID_ERR_PARAM` in None mode). In Hat mode:
 
 | Direction | Up | Down | Right | Left | Hat value |

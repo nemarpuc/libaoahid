@@ -680,17 +680,17 @@ void transfer_complete(void* user, const aoahid_result result,
 
 extern "C" {
 
-// The usage/down order is the fixed, already-shipped aoahid_kbd(node, usage,
+// The usage/down order is the fixed, already-shipped aoahid_keyboard_key(node, usage,
 // down) ABI order and cannot be changed to avoid this warning.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-static aoahid_result aoahid_kbd_impl(aoahid_node* node, const std::uint16_t usage,
-                                     const std::uint32_t down) {
+static aoahid_result keyboard_key_impl(aoahid_node* node, const std::uint16_t usage,
+                                       const std::uint32_t down) {
     aoa::detail::clear_error();
     if (!aoa::detail::valid_boolean(down)) {
-        set_error(AOAHID_ERR_PARAM, "kbd", "down must be exactly zero or one.");
+        set_error(AOAHID_ERR_PARAM, "keyboard.key", "down must be exactly zero or one.");
         return AOAHID_ERR_PARAM;
     }
-    const aoahid_result check = usable(node, AOAHID_PROFILE_KEYBOARD, "kbd");
+    const aoahid_result check = usable(node, AOAHID_PROFILE_KEYBOARD, "keyboard.key");
     if (check != AOAHID_OK)
         return check;
     const bool press = down == 1U;
@@ -703,7 +703,7 @@ static aoahid_result aoahid_kbd_impl(aoahid_node* node, const std::uint16_t usag
             static_cast<std::uint8_t>(1U << (usage - aoa::hid::usage::keyboard_left_control));
         changed = ((keyboard->modifiers & mask) != 0U) != press;
         if (changed && (keyboard->modifier_transitions & mask) != 0U) {
-            return pending_transition("kbd");
+            return pending_transition("keyboard.key");
         }
         if (changed) {
             keyboard->modifiers = press ? static_cast<std::uint8_t>(keyboard->modifiers | mask)
@@ -713,29 +713,29 @@ static aoahid_result aoahid_kbd_impl(aoahid_node* node, const std::uint16_t usag
         }
     } else {
         if (usage < spec->options.usage_minimum || usage > spec->options.usage_maximum) {
-            set_error(AOAHID_ERR_PARAM, "kbd.usage",
+            set_error(AOAHID_ERR_PARAM, "keyboard.usage",
                       "The Usage is outside the caller-declared key range.");
             return AOAHID_ERR_PARAM;
         }
         const std::size_t index = usage - spec->options.usage_minimum;
         if (index >= keyboard->key_transitions.size()) {
-            set_error(AOAHID_ERR_INTERNAL, "kbd",
+            set_error(AOAHID_ERR_INTERNAL, "keyboard.key",
                       "The preallocated keyboard state does not match the declared Usage range.");
             return AOAHID_ERR_INTERNAL;
         }
         if (index >= keyboard->pressed_bitmap.size()) {
-            set_error(AOAHID_ERR_INTERNAL, "kbd",
+            set_error(AOAHID_ERR_INTERNAL, "keyboard.key",
                       "The preallocated bitmap does not match the declared Usage range.");
             return AOAHID_ERR_INTERNAL;
         }
         changed = (keyboard->pressed_bitmap[index] != 0U) != press;
         if (changed && keyboard->key_transitions[index] != 0U) {
-            return pending_transition("kbd");
+            return pending_transition("keyboard.key");
         }
         if (changed) {
             if (press) {
                 if (keyboard->pressed_bitmap_count >= keyboard->pressed_bitmap.size()) {
-                    set_error(AOAHID_ERR_INTERNAL, "kbd",
+                    set_error(AOAHID_ERR_INTERNAL, "keyboard.key",
                               "The bitmap key count is inconsistent with its storage.");
                     return AOAHID_ERR_INTERNAL;
                 }
@@ -743,7 +743,7 @@ static aoahid_result aoahid_kbd_impl(aoahid_node* node, const std::uint16_t usag
                 ++keyboard->pressed_bitmap_count;
             } else {
                 if (keyboard->pressed_bitmap_count == 0U) {
-                    set_error(AOAHID_ERR_INTERNAL, "kbd",
+                    set_error(AOAHID_ERR_INTERNAL, "keyboard.key",
                               "The bitmap key count is inconsistent with its storage.");
                     return AOAHID_ERR_INTERNAL;
                 }
@@ -936,9 +936,9 @@ static aoahid_result aoahid_gamepad_set_axis_impl(aoahid_node* node, const std::
     return AOAHID_OK;
 }
 
-static aoahid_result aoahid_dpad_impl(aoahid_node* node, const std::uint32_t up,
-                                      const std::uint32_t down, const std::uint32_t right,
-                                      const std::uint32_t left) {
+static aoahid_result gamepad_dpad_impl(aoahid_node* node, const std::uint32_t up,
+                                       const std::uint32_t down, const std::uint32_t right,
+                                       const std::uint32_t left) {
     aoa::detail::clear_error();
     const aoahid_result check = usable(node, AOAHID_PROFILE_GAMEPAD, "gamepad.dpad");
     if (check != AOAHID_OK)
@@ -1236,9 +1236,9 @@ static aoahid_result aoahid_battery_update_impl(aoahid_node* node, const std::ui
     return AOAHID_OK;
 }
 
-aoahid_result AOAHID_CALL aoahid_kbd(aoahid_node* node, const std::uint16_t usage,
-                                     const std::uint32_t down) {
-    return abi_state_result("kbd", [&] { return aoahid_kbd_impl(node, usage, down); });
+aoahid_result AOAHID_CALL aoahid_keyboard_key(aoahid_node* node, const std::uint16_t usage,
+                                              const std::uint32_t down) {
+    return abi_state_result("keyboard.key", [&] { return keyboard_key_impl(node, usage, down); });
 }
 
 aoahid_result AOAHID_CALL aoahid_mouse_move(aoahid_node* node, const std::int32_t dx,
@@ -1275,10 +1275,11 @@ aoahid_result AOAHID_CALL aoahid_gamepad_set_axis(aoahid_node* node, const std::
                             [&] { return aoahid_gamepad_set_axis_impl(node, axis_index, value); });
 }
 
-aoahid_result AOAHID_CALL aoahid_dpad(aoahid_node* node, const std::uint32_t up,
-                                      const std::uint32_t down, const std::uint32_t right,
-                                      const std::uint32_t left) {
-    return abi_state_result("dpad", [&] { return aoahid_dpad_impl(node, up, down, right, left); });
+aoahid_result AOAHID_CALL aoahid_gamepad_dpad(aoahid_node* node, const std::uint32_t up,
+                                              const std::uint32_t down, const std::uint32_t right,
+                                              const std::uint32_t left) {
+    return abi_state_result("gamepad.dpad",
+                            [&] { return gamepad_dpad_impl(node, up, down, right, left); });
 }
 
 aoahid_result AOAHID_CALL aoahid_touchscreen_contact(aoahid_node* node,

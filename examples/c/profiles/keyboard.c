@@ -6,9 +6,9 @@
 #include "profile_example.h"
 
 static const char* const k_send_sequence[] = {
-    "aoahid_kbd(node, 0x04, 1)   press Keyboard a/A; the library sets its bitmap bit",
+    "aoahid_keyboard_key(node, 0x04, 1)   press Keyboard a/A; the library sets its bitmap bit",
     "aoahid_node_submit(node)    one accepted edge, one request 57",
-    "aoahid_kbd(node, 0x04, 0)   release it; a held edge must reach one report",
+    "aoahid_keyboard_key(node, 0x04, 0)   release it; a held edge must reach one report",
     "aoahid_node_submit(node)    submitting an opposite edge too early is BUSY", NULL};
 
 int main(void) {

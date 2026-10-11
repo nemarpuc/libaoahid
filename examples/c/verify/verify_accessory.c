@@ -131,8 +131,8 @@ int main(int argc, char** argv) {
         exit_code = verify_fail("keyboard open", result);
     } else {
         verify_sleep_ms(3000); /* time to focus a text field */
-        if (aoahid_kbd(node, 0x04U, 1U) != AOAHID_OK || verify_submit(node) != AOAHID_OK ||
-            aoahid_kbd(node, 0x04U, 0U) != AOAHID_OK || verify_submit(node) != AOAHID_OK) {
+        if (aoahid_keyboard_key(node, 0x04U, 1U) != AOAHID_OK || verify_submit(node) != AOAHID_OK ||
+            aoahid_keyboard_key(node, 0x04U, 0U) != AOAHID_OK || verify_submit(node) != AOAHID_OK) {
             exit_code = verify_fail("type 'a'", aoahid_last_error()->code);
         } else {
             printf("typed 'a' through AOA HID in accessory mode\n");

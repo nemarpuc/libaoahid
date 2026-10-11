@@ -154,8 +154,9 @@ inline void spec_release(aoahid_spec* spec) noexcept { aoahid_spec_release(spec)
                                                         uint32_t deadline_ms) noexcept {
     return aoahid_node_submit_blocking(node, deadline_ms);
 }
-[[nodiscard]] inline aoahid_result kbd(aoahid_node* node, uint16_t usage, uint32_t down) noexcept {
-    return aoahid_kbd(node, usage, down);
+[[nodiscard]] inline aoahid_result keyboard_key(aoahid_node* node, uint16_t usage,
+                                                uint32_t down) noexcept {
+    return aoahid_keyboard_key(node, usage, down);
 }
 [[nodiscard]] inline aoahid_result mouse_move(aoahid_node* node, int32_t dx, int32_t dy) noexcept {
     return aoahid_mouse_move(node, dx, dy);
@@ -180,9 +181,9 @@ inline void spec_release(aoahid_spec* spec) noexcept { aoahid_spec_release(spec)
                                                     int32_t value) noexcept {
     return aoahid_gamepad_set_axis(node, axis_index, value);
 }
-[[nodiscard]] inline aoahid_result dpad(aoahid_node* node, uint32_t up, uint32_t down,
-                                        uint32_t right, uint32_t left) noexcept {
-    return aoahid_dpad(node, up, down, right, left);
+[[nodiscard]] inline aoahid_result gamepad_dpad(aoahid_node* node, uint32_t up, uint32_t down,
+                                                uint32_t right, uint32_t left) noexcept {
+    return aoahid_gamepad_dpad(node, up, down, right, left);
 }
 [[nodiscard]] inline aoahid_result
 touchscreen_contact(aoahid_node* node, uint32_t contact_id, uint32_t down, int32_t x, int32_t y,

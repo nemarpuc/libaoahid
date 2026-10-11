@@ -5,7 +5,7 @@
 
 int main() {
     if (aoahid::version() != aoahid_version() || aoahid::result_name(AOAHID_OK) == nullptr ||
-        aoahid::kbd(nullptr, 0U, 0U) != AOAHID_ERR_PARAM ||
+        aoahid::keyboard_key(nullptr, 0U, 0U) != AOAHID_ERR_PARAM ||
         aoahid::mouse_move(nullptr, 0, 0) != AOAHID_ERR_PARAM ||
         aoahid::node_submit(nullptr) != AOAHID_ERR_PARAM ||
         aoahid::context_create(nullptr, nullptr) != AOAHID_ERR_PARAM ||

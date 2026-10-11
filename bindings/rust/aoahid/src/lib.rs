@@ -197,7 +197,7 @@ node_type!(RawNodeRef);
 
 impl KeyboardNodeRef {
     pub fn key(self, usage: u16, down: bool) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_kbd(self.as_ptr(), usage, u32::from(down)) })
+        result(unsafe { sys::aoahid_keyboard_key(self.as_ptr(), usage, u32::from(down)) })
     }
 }
 
@@ -231,7 +231,7 @@ impl GamepadNodeRef {
     }
     pub fn dpad(self, up: bool, down: bool, right: bool, left: bool) -> Result<(), Error> {
         result(unsafe {
-            sys::aoahid_dpad(
+            sys::aoahid_gamepad_dpad(
                 self.as_ptr(),
                 u32::from(up),
                 u32::from(down),

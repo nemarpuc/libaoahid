@@ -1252,7 +1252,7 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node);
 AOAHID_API aoahid_result AOAHID_CALL aoahid_node_submit_blocking(aoahid_node* node,
                                                                  uint32_t deadline_ms);
 
-/* aoahid_kbd
+/* aoahid_keyboard_key
  * Ownership: Borrows a Keyboard Node; no ownership changes.
  * Blocking: Does not block, allocate after Node open, log, or perform I/O.
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
@@ -1265,7 +1265,8 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_node_submit_blocking(aoahid_node* no
  * AOAHID_ERR_BUSY for an in-flight report or an unsent opposite edge;
  * AOAHID_ERR_NO_DEVICE for sticky device loss; AOAHID_ERR_INTERNAL for an
  * unexpected ABI-boundary failure. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_kbd(aoahid_node* node, uint16_t usage, uint32_t down);
+AOAHID_API aoahid_result AOAHID_CALL aoahid_keyboard_key(aoahid_node* node, uint16_t usage,
+                                                         uint32_t down);
 
 /* aoahid_mouse_move
  * Ownership: Borrows a Mouse Node; no ownership changes.
@@ -1345,7 +1346,7 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_gamepad_button(aoahid_node* node, ui
 AOAHID_API aoahid_result AOAHID_CALL aoahid_gamepad_set_axis(aoahid_node* node, size_t axis_index,
                                                              int32_t value);
 
-/* aoahid_dpad
+/* aoahid_gamepad_dpad
  * Ownership: Borrows a Gamepad Node; no ownership changes.
  * Blocking: Does not block, allocate, log, or perform I/O.
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
@@ -1357,8 +1358,9 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_gamepad_set_axis(aoahid_node* node, 
  * four values form a valid boolean direction; AOAHID_ERR_BUSY for an in-flight
  * report or an unsent opposite edge; AOAHID_ERR_NO_DEVICE for sticky loss;
  * AOAHID_ERR_INTERNAL for an unexpected ABI-boundary failure. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_dpad(aoahid_node* node, uint32_t up, uint32_t down,
-                                                 uint32_t right, uint32_t left);
+AOAHID_API aoahid_result AOAHID_CALL aoahid_gamepad_dpad(aoahid_node* node, uint32_t up,
+                                                         uint32_t down, uint32_t right,
+                                                         uint32_t left);
 
 /* aoahid_touchscreen_contact
  * Ownership: Borrows a Touchscreen Node and extra for the call;

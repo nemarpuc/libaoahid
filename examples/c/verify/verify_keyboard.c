@@ -31,14 +31,14 @@ static int type_char(aoahid_node* node, char c) {
     const uint16_t usage = usage_for_char(c);
     if (usage == 0)
         return 0; /* Silently skip characters this small demo does not map. */
-    aoahid_result result = aoahid_kbd(node, usage, 1U);
+    aoahid_result result = aoahid_keyboard_key(node, usage, 1U);
     if (result != AOAHID_OK)
         return verify_fail("key down", result);
     result = verify_submit(node);
     if (result != AOAHID_OK)
         return verify_fail("submit key down", result);
     verify_sleep_ms(60);
-    result = aoahid_kbd(node, usage, 0U);
+    result = aoahid_keyboard_key(node, usage, 0U);
     if (result != AOAHID_OK)
         return verify_fail("key up", result);
     result = verify_submit(node);

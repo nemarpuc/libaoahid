@@ -420,9 +420,9 @@ internal static class Program
         foreach (var session in sessions.Where(value => value.Device != nint.Zero))
         {
             var status = FirstFailure(
-                Native.Kbd(session.Keyboard, KeyboardAUsage, 1),
+                Native.KeyboardKey(session.Keyboard, KeyboardAUsage, 1),
                 Native.MouseMove(session.Mouse, ExampleMouseDx, ExampleMouseDy),
-                Native.Touch(session.Touchscreen, contact.ContactId, 1, contact.X, contact.Y, default));
+                Native.TouchscreenContact(session.Touchscreen, contact.ContactId, 1, contact.X, contact.Y, default));
             if (status == Result.NoDevice)
             {
                 disappeared.Add(session.Locator);
@@ -518,7 +518,7 @@ internal static class Program
         foreach (var session in sessions.Where(value => value.Device != nint.Zero))
         {
             var status = FirstFailure(
-                Native.Kbd(session.Keyboard, KeyboardAUsage, 0),
+                Native.KeyboardKey(session.Keyboard, KeyboardAUsage, 0),
                 Native.MouseButton(session.Mouse, 1, 1)); // Caller selects pointer button 1.
             if (status == Result.Ok)
                 ready.Add(session);

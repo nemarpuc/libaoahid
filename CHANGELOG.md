@@ -32,6 +32,10 @@ profiles have not been run against a phone, and the `Verified` rows in
   `aoahid_digitizer_depart`, and `aoahid_digitizer_sample`. Each call rejects a
   Node of the other profile with `AOAHID_ERR_PARAM`. The C++ forwarders and the
   three bindings follow.
+- The Keyboard and Gamepad calls take the profile's name too: `aoahid_kbd` is
+  `aoahid_keyboard_key` and `aoahid_dpad` is `aoahid_gamepad_dpad` (C++
+  `aoahid::keyboard_key` and `aoahid::gamepad_dpad`; C# `KeyboardKey` and
+  `GamepadDpad`). Every send call is now `aoahid_<profile>_<operation>`.
 
 ### Added
 

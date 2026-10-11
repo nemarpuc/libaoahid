@@ -510,7 +510,7 @@ extern "C" {
     ) -> aoahid_result;
     pub fn aoahid_node_submit(node: *mut aoahid_node) -> aoahid_result;
     pub fn aoahid_node_submit_blocking(node: *mut aoahid_node, deadline_ms: u32) -> aoahid_result;
-    pub fn aoahid_kbd(node: *mut aoahid_node, usage: u16, down: u32) -> aoahid_result;
+    pub fn aoahid_keyboard_key(node: *mut aoahid_node, usage: u16, down: u32) -> aoahid_result;
     pub fn aoahid_mouse_move(node: *mut aoahid_node, dx: i32, dy: i32) -> aoahid_result;
     pub fn aoahid_mouse_scroll(node: *mut aoahid_node, wheel: i32, pan: i32) -> aoahid_result;
     pub fn aoahid_mouse_button(node: *mut aoahid_node, button: u32, pressed: u32) -> aoahid_result;
@@ -525,7 +525,7 @@ extern "C" {
         axis_index: usize,
         value: i32,
     ) -> aoahid_result;
-    pub fn aoahid_dpad(
+    pub fn aoahid_gamepad_dpad(
         node: *mut aoahid_node,
         up: u32,
         down: u32,

@@ -123,7 +123,7 @@ static int mouse_circle_step(mouse_circle_state* state) {
  * message when it reaches the end. Returns 0 on success. */
 static int keyboard_typing_step(keyboard_typing_state* state) {
     if (state->key_is_down) {
-        aoahid_result result = aoahid_kbd(state->node, state->current_usage, 0U);
+        aoahid_result result = aoahid_keyboard_key(state->node, state->current_usage, 0U);
         if (result != AOAHID_OK)
             return verify_fail("key up", result);
         result = verify_submit(state->node);
@@ -141,7 +141,7 @@ static int keyboard_typing_step(keyboard_typing_state* state) {
     const uint16_t usage = usage_for_char(c);
     if (usage == 0)
         return 0; /* Silently skip characters this small demo does not map. */
-    aoahid_result result = aoahid_kbd(state->node, usage, 1U);
+    aoahid_result result = aoahid_keyboard_key(state->node, usage, 1U);
     if (result != AOAHID_OK)
         return verify_fail("key down", result);
     result = verify_submit(state->node);
@@ -177,7 +177,7 @@ static int phase_keyboard_hello(aoahid_node* keyboard_node, int repeats) {
         verify_sleep_ms(70);
     }
     if (state.key_is_down) {
-        aoahid_result result = aoahid_kbd(keyboard_node, state.current_usage, 0U);
+        aoahid_result result = aoahid_keyboard_key(keyboard_node, state.current_usage, 0U);
         if (result != AOAHID_OK)
             return verify_fail("key up", result);
         result = verify_submit(keyboard_node);
@@ -225,7 +225,7 @@ static int phase_all_at_once(aoahid_node* touch_node, aoahid_node* keyboard_node
         verify_sleep_ms(40);
     }
     if (keyboard_state.key_is_down) {
-        aoahid_result result = aoahid_kbd(keyboard_node, keyboard_state.current_usage, 0U);
+        aoahid_result result = aoahid_keyboard_key(keyboard_node, keyboard_state.current_usage, 0U);
         if (result != AOAHID_OK)
             return verify_fail("key up", result);
         result = verify_submit(keyboard_node);

@@ -682,8 +682,8 @@ public static class Native
     [DllImport(Library, EntryPoint = "aoahid_node_submit_blocking", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result NodeSubmitBlocking(nint node, uint deadlineMs);
 
-    [DllImport(Library, EntryPoint = "aoahid_kbd", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result Kbd(nint node, ushort usage, uint down);
+    [DllImport(Library, EntryPoint = "aoahid_keyboard_key", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result KeyboardKey(nint node, ushort usage, uint down);
     [DllImport(Library, EntryPoint = "aoahid_mouse_move", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result MouseMove(nint node, int dx, int dy);
     [DllImport(Library, EntryPoint = "aoahid_mouse_scroll", ExactSpelling = true, CallingConvention = Call)]
@@ -696,8 +696,8 @@ public static class Native
     public static extern Result GamepadButton(nint node, uint button, uint pressed);
     [DllImport(Library, EntryPoint = "aoahid_gamepad_set_axis", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result GamepadSetAxis(nint node, nuint axisIndex, int value);
-    [DllImport(Library, EntryPoint = "aoahid_dpad", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result Dpad(nint node, uint up, uint down, uint right, uint left);
+    [DllImport(Library, EntryPoint = "aoahid_gamepad_dpad", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result GamepadDpad(nint node, uint up, uint down, uint right, uint left);
     // Pass default(TouchscreenExtra) or default(TouchpadExtra) for "no extra data"; these native
     // functions treat a null pointer and an all-zero struct identically, so no separate nint
     // overload is needed.

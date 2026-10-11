@@ -1009,7 +1009,7 @@ void test_channel_shares_the_device_handle_internal_thread() {
     aoahid_node* node = nullptr;
     AOAHID_CHECK(aoahid_node_open(device, spec, &node_options, &node) == AOAHID_OK);
     aoahid_spec_release(spec);
-    AOAHID_CHECK(aoahid_kbd(node, 0x04U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 1U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(node, 1000U) == AOAHID_OK);
 
     // Unplugging loses the Channel: it reports NO_DEVICE and must be closed.
@@ -1225,9 +1225,9 @@ void test_hid_adb_and_accessory_bulk_run_together() {
     AOAHID_CHECK(aoahid_channel_write(shell, adb_data.data(), adb_data.size(), &written, 1000U) ==
                  AOAHID_OK);
     for (std::uint16_t usage = 0x04U; usage < 0x0CU; ++usage) {
-        AOAHID_CHECK(aoahid_kbd(node, usage, 1U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_keyboard_key(node, usage, 1U) == AOAHID_OK);
         AOAHID_CHECK(aoahid_node_submit_blocking(node, 1000U) == AOAHID_OK);
-        AOAHID_CHECK(aoahid_kbd(node, usage, 0U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_keyboard_key(node, usage, 0U) == AOAHID_OK);
         AOAHID_CHECK(aoahid_node_submit_blocking(node, 1000U) == AOAHID_OK);
     }
     app_reader.join();
@@ -1564,7 +1564,7 @@ void test_zero_tuning_fallbacks_and_zero_reservation() {
             AOAHID_CHECK(record.timeout == 500U);
     }
 
-    AOAHID_CHECK(aoahid_kbd(node, 0x04U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 1U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(node, 100U) == AOAHID_OK);
     const auto reports = controls_for(57U);
     AOAHID_CHECK(!reports.empty() && reports.back().timeout == 500U);
@@ -1889,7 +1889,7 @@ void test_public_controller_close_neutralizes_dpad() {
     const aoahid_node_options node_options{sizeof(aoahid_node_options), 0U, 1U, 0U};
     aoahid_node* raw_node = nullptr;
     AOAHID_CHECK(aoahid_node_open(device, raw_spec, &node_options, &raw_node) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_dpad(raw_node, 1U, 0U, 0U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_gamepad_dpad(raw_node, 1U, 0U, 0U, 0U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(raw_node, 100U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_close(raw_node) == AOAHID_OK);
     auto payloads = control_payloads_for(57U);
@@ -1915,7 +1915,7 @@ void test_public_controller_close_neutralizes_dpad() {
     AOAHID_CHECK(hat != nullptr);
     aoahid_node* hat_node = nullptr;
     AOAHID_CHECK(aoahid_node_open(device, hat_spec, &node_options, &hat_node) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_dpad(hat_node, 1U, 0U, 0U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_gamepad_dpad(hat_node, 1U, 0U, 0U, 0U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(hat_node, 100U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_close(hat_node) == AOAHID_OK);
     payloads = control_payloads_for(57U);
@@ -2006,7 +2006,7 @@ void test_first_report_stall_is_returned_without_retry() {
 
     // A first report that races Android's HID registration and stalls goes
     // out once; the STALL reaches the caller, who decides whether to resend.
-    AOAHID_CHECK(aoahid_kbd(node, 0x04U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 1U) == AOAHID_OK);
     aoahid_fake_libusb_queue_async_completion(LIBUSB_TRANSFER_STALL, 0, 0U);
     AOAHID_CHECK(aoahid_node_submit(node) == AOAHID_OK);
     for (std::size_t attempt = 0U;
@@ -2024,7 +2024,7 @@ void test_first_report_stall_is_returned_without_retry() {
     const auto payloads = control_payloads_for(57U);
     AOAHID_CHECK(payloads.size() == 2U && payloads[0] == payloads[1]);
     // A timeout may have been delivered, so it is not resent automatically.
-    AOAHID_CHECK(aoahid_kbd(node, 0x05U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x05U, 1U) == AOAHID_OK);
     aoahid_fake_libusb_queue_async_completion(LIBUSB_TRANSFER_TIMED_OUT, 0, 0U);
     AOAHID_CHECK(aoahid_node_submit(node) == AOAHID_OK);
     for (std::size_t attempt = 0U;
@@ -2116,7 +2116,7 @@ void test_submit_rejection_retains_state_and_close_releases() {
     aoahid_node* node = nullptr;
     open_public_keyboard_session(&context, &device, &node);
 
-    AOAHID_CHECK(aoahid_kbd(node, 0x04U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 1U) == AOAHID_OK);
     aoahid_fake_libusb_queue_submit_result(LIBUSB_ERROR_BUSY);
     AOAHID_CHECK(aoahid_node_submit(node) == AOAHID_ERR_BUSY);
     AOAHID_CHECK(controls_for(57U).empty());
@@ -2128,7 +2128,7 @@ void test_submit_rejection_retains_state_and_close_releases() {
         AOAHID_CHECK(payloads[0].size() > 1U && payloads[0][1] == 0x01U);
     }
 
-    AOAHID_CHECK(aoahid_kbd(node, 0x04U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 0U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_close(node) == AOAHID_OK);
     payloads = control_payloads_for(57U);
     AOAHID_CHECK(payloads.size() == 2U);
@@ -2190,10 +2190,10 @@ void test_node_close_timeout_distinction_and_loss_freeze() {
 
     aoahid_fake_libusb_reset();
     open_public_keyboard_session(&context, &device, &node);
-    AOAHID_CHECK(aoahid_kbd(node, 0x04U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 1U) == AOAHID_OK);
     aoahid_fake_libusb_queue_async_completion(LIBUSB_TRANSFER_NO_DEVICE, 0, 0U);
     AOAHID_CHECK(aoahid_node_submit(node) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_kbd(node, 0x04U, 0U) == AOAHID_ERR_NO_DEVICE);
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 0U) == AOAHID_ERR_NO_DEVICE);
     AOAHID_CHECK(aoahid_last_error()->code == AOAHID_ERR_NO_DEVICE);
     AOAHID_CHECK(aoahid_last_error()->libusb_status == LIBUSB_TRANSFER_NO_DEVICE);
     AOAHID_CHECK(aoahid_last_error()->aoa_request == 57);
@@ -2252,10 +2252,10 @@ void test_caller_poll_hot_path_is_lock_and_allocation_free() {
     aoahid_fake_libusb_set_control_recording(0);
     const aoahid_fake_libusb_event_stats before = event_stats();
     allocation_probe::begin();
-    const aoahid_result key_down = aoahid_kbd(node, 0x04U, 1U);
+    const aoahid_result key_down = aoahid_keyboard_key(node, 0x04U, 1U);
     const aoahid_result first_submit = aoahid_node_submit(node);
     const bool first_completed = !node->transfer_inflight.load(std::memory_order_acquire);
-    const aoahid_result key_up = aoahid_kbd(node, 0x04U, 0U);
+    const aoahid_result key_up = aoahid_keyboard_key(node, 0x04U, 0U);
     const aoahid_result second_submit = aoahid_node_submit(node);
     const bool second_completed = !node->transfer_inflight.load(std::memory_order_acquire);
     const std::size_t hot_allocations = allocation_probe::finish();
@@ -2340,7 +2340,7 @@ void test_accepted_submit_defers_opportunistic_poll_error() {
     // caller's synchronization domain without acquiring std::mutex.
     AOAHID_CHECK(context->active_state_mutex == nullptr);
     AOAHID_CHECK(node->active_completion_mutex == nullptr);
-    AOAHID_CHECK(aoahid_kbd(node, 0x04U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 1U) == AOAHID_OK);
     aoahid_fake_libusb_queue_event_result(LIBUSB_ERROR_IO);
     AOAHID_CHECK(aoahid_node_submit(node) == AOAHID_OK);
     AOAHID_CHECK(aoahid_last_error()->code == AOAHID_OK);
@@ -2354,7 +2354,7 @@ void test_accepted_submit_defers_opportunistic_poll_error() {
         AOAHID_CHECK(std::string_view(aoahid_last_error()->field) == "context.event_pump");
     }
     AOAHID_CHECK(aoahid_context_poll(context, 0U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_kbd(node, 0x04U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 0U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_close(node) == AOAHID_OK);
     AOAHID_CHECK(aoahid_device_close(device) == AOAHID_OK);
     AOAHID_CHECK(aoahid_context_destroy(context) == AOAHID_OK);
@@ -2799,9 +2799,9 @@ void test_submit_blocking_waits_for_a_free_slot_without_spinning() {
     // The holder's report takes the only slot and stays in flight.
     aoahid_fake_libusb_queue_async_completion(LIBUSB_TRANSFER_COMPLETED, -1,
                                               std::numeric_limits<std::uint32_t>::max());
-    AOAHID_CHECK(aoahid_kbd(holder, 0x04U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(holder, 0x04U, 1U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit(holder) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_kbd(waiter, 0x05U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(waiter, 0x05U, 1U) == AOAHID_OK);
 
     std::atomic<bool> done{false};
     aoahid_result result = AOAHID_ERR_INTERNAL;
@@ -2833,8 +2833,8 @@ void test_submit_blocking_waits_for_a_free_slot_without_spinning() {
     // A spinning wait would burn roughly the whole 200 ms.
     AOAHID_CHECK(cpu_ns >= 0 && cpu_ns < 50000000LL);
 #endif
-    AOAHID_CHECK(aoahid_kbd(holder, 0x04U, 0U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_kbd(waiter, 0x05U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(holder, 0x04U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(waiter, 0x05U, 0U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_device_close(device) == AOAHID_OK);
     AOAHID_CHECK(aoahid_context_destroy(context) == AOAHID_OK);
     aoahid_fake_libusb_reset();

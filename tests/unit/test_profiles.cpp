@@ -108,9 +108,9 @@ void test_keyboard_nkro_concurrent_keys() {
     state_value.pressed_bitmap.resize(key_count);
     state_value.key_transitions.resize(key_count);
     node.state = std::move(state_value);
-    AOAHID_CHECK(aoahid_kbd(&node, 0xE0U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(&node, 0xE0U, 1U) == AOAHID_OK);
     node.dirty = false;
-    AOAHID_CHECK(aoahid_kbd(&node, 0xE0U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(&node, 0xE0U, 1U) == AOAHID_OK);
     AOAHID_CHECK(!node.dirty);
 
     // Twenty simultaneously held non-modifier keys: well beyond the legacy
@@ -118,7 +118,7 @@ void test_keyboard_nkro_concurrent_keys() {
     // so there is no ErrorRollOver overflow to hit.
     constexpr std::uint16_t k_held_keys = 20U;
     for (std::uint16_t usage = 0x04U; usage < 0x04U + k_held_keys; ++usage)
-        AOAHID_CHECK(aoahid_kbd(&node, usage, 1U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_keyboard_key(&node, usage, 1U) == AOAHID_OK);
 
     std::array<std::uint8_t, 64> report{};
     std::size_t length = 0U;
@@ -132,7 +132,7 @@ void test_keyboard_nkro_concurrent_keys() {
     }
     aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
 
-    AOAHID_CHECK(aoahid_kbd(&node, 0x04U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(&node, 0x04U, 0U) == AOAHID_OK);
     report.fill(0U);
     AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(), &length) ==
                  AOAHID_OK);
@@ -143,7 +143,7 @@ void test_keyboard_nkro_concurrent_keys() {
                                 static_cast<std::uint16_t>(usage - options.usage_minimum));
         AOAHID_CHECK(key != nullptr && extract(report.data(), *key) == 1U);
     }
-    AOAHID_CHECK(aoahid_kbd(&node, 0x66U, 0U) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_keyboard_key(&node, 0x66U, 0U) == AOAHID_ERR_PARAM);
     aoahid_spec_release(spec);
 }
 
@@ -164,8 +164,8 @@ void test_keyboard_bitmap_and_lifecycle_transitions() {
     state_value.key_transitions.resize(key_count);
     node.state = std::move(state_value);
 
-    AOAHID_CHECK(aoahid_kbd(&node, 0x06U, 1U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_kbd(&node, 0x06U, 0U) == AOAHID_ERR_BUSY);
+    AOAHID_CHECK(aoahid_keyboard_key(&node, 0x06U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(&node, 0x06U, 0U) == AOAHID_ERR_BUSY);
     std::array<std::uint8_t, 16U> report{};
     std::size_t length = 0U;
     AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(), &length) ==
@@ -174,17 +174,17 @@ void test_keyboard_bitmap_and_lifecycle_transitions() {
     AOAHID_CHECK(key != nullptr && extract(report.data(), *key) == 1U);
     aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
 
-    AOAHID_CHECK(aoahid_kbd(&node, 0x06U, 0U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_kbd(&node, 0x06U, 1U) == AOAHID_ERR_BUSY);
+    AOAHID_CHECK(aoahid_keyboard_key(&node, 0x06U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(&node, 0x06U, 1U) == AOAHID_ERR_BUSY);
     report.fill(0xFFU);
     AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(), &length) ==
                  AOAHID_OK);
     AOAHID_CHECK(key != nullptr && extract(report.data(), *key) == 0U);
     aoa::detail::transfer_complete(&node, AOAHID_ERR_IO, 1);
-    AOAHID_CHECK(aoahid_kbd(&node, 0x06U, 1U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_kbd(&node, 0x06U, 0U) == AOAHID_ERR_BUSY);
+    AOAHID_CHECK(aoahid_keyboard_key(&node, 0x06U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(&node, 0x06U, 0U) == AOAHID_ERR_BUSY);
     aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
-    AOAHID_CHECK(aoahid_kbd(&node, 0x06U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(&node, 0x06U, 0U) == AOAHID_OK);
     aoahid_spec_release(spec);
 }
 
@@ -582,7 +582,7 @@ void test_controller_dpad_and_extended_axes() {
     gamepad.button_transitions.resize(options.button_count);
     node.state = std::move(gamepad);
     node.dirty = false;
-    AOAHID_CHECK(aoahid_dpad(&node, 1U, 0U, 1U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_gamepad_dpad(&node, 1U, 0U, 1U, 0U) == AOAHID_OK);
     AOAHID_CHECK(node.dirty);
     std::array<std::uint8_t, 64U> report{};
     std::size_t length = 0U;
@@ -596,12 +596,12 @@ void test_controller_dpad_and_extended_axes() {
     AOAHID_CHECK(down != nullptr && extract(report.data(), *down) == 0U);
     AOAHID_CHECK(right != nullptr && extract(report.data(), *right) == 1U);
     AOAHID_CHECK(left != nullptr && extract(report.data(), *left) == 0U);
-    AOAHID_CHECK(aoahid_dpad(&node, 0U, 1U, 0U, 1U) == AOAHID_ERR_BUSY);
+    AOAHID_CHECK(aoahid_gamepad_dpad(&node, 0U, 1U, 0U, 1U) == AOAHID_ERR_BUSY);
     node.dirty = false;
-    AOAHID_CHECK(aoahid_dpad(&node, 1U, 0U, 1U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_gamepad_dpad(&node, 1U, 0U, 1U, 0U) == AOAHID_OK);
     AOAHID_CHECK(!node.dirty);
     aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
-    AOAHID_CHECK(aoahid_dpad(&node, 0U, 1U, 0U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_gamepad_dpad(&node, 0U, 1U, 0U, 1U) == AOAHID_OK);
     AOAHID_CHECK(node.dirty);
     node.dirty = false;
     AOAHID_CHECK(aoahid_gamepad_set_axis(&node, 0U, 0) == AOAHID_OK);
@@ -655,8 +655,8 @@ void test_controller_dpad_and_extended_axes() {
             DirectionCase{0U, 1U, 0U, 1U, 5U},  DirectionCase{0U, 0U, 0U, 1U, 6U},
             DirectionCase{1U, 0U, 0U, 1U, 7U}};
         for (const auto& direction : directions) {
-            AOAHID_CHECK(aoahid_dpad(&hat_node, direction.up, direction.down, direction.right,
-                                     direction.left) == AOAHID_OK);
+            AOAHID_CHECK(aoahid_gamepad_dpad(&hat_node, direction.up, direction.down,
+                                             direction.right, direction.left) == AOAHID_OK);
             report.fill(0U);
             AOAHID_CHECK(aoa::detail::serialize_node(&hat_node, report.data(), report.size(),
                                                      &length) == AOAHID_OK);
@@ -664,8 +664,8 @@ void test_controller_dpad_and_extended_axes() {
             aoa::detail::transfer_complete(&hat_node, AOAHID_OK, 0);
             hat_node.dirty = false;
         }
-        AOAHID_CHECK(aoahid_dpad(&hat_node, 1U, 1U, 0U, 0U) == AOAHID_ERR_PARAM);
-        AOAHID_CHECK(aoahid_dpad(&hat_node, 0U, 0U, 1U, 1U) == AOAHID_ERR_PARAM);
+        AOAHID_CHECK(aoahid_gamepad_dpad(&hat_node, 1U, 1U, 0U, 0U) == AOAHID_ERR_PARAM);
+        AOAHID_CHECK(aoahid_gamepad_dpad(&hat_node, 0U, 0U, 1U, 1U) == AOAHID_ERR_PARAM);
         report.fill(0U);
         AOAHID_CHECK(aoa::detail::serialize_node(&hat_node, report.data(), report.size(),
                                                  &length) == AOAHID_OK);
@@ -1297,7 +1297,7 @@ void test_send_time_report_validation() {
     state_value.pressed_bitmap.resize(key_count);
     state_value.key_transitions.resize(key_count);
     node.state = std::move(state_value);
-    AOAHID_CHECK(aoahid_kbd(&node, 0x04U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(&node, 0x04U, 1U) == AOAHID_OK);
     std::array<std::uint8_t, 64U> report{};
     std::size_t length = 0U;
     AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(), &length) ==
