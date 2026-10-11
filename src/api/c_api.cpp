@@ -727,9 +727,7 @@ void release_node_storage(aoahid_node* node) noexcept {
     // Only internal-thread mode can race Node teardown against its callback.
     // Caller-poll callbacks execute inside the caller's synchronization domain,
     // so its null active mutex deliberately keeps teardown lock-free too.
-    {
-        const aoa::detail::ModeMutexGuard callback_exit(node->active_completion_mutex);
-    }
+    { const aoa::detail::ModeMutexGuard callback_exit(node->active_completion_mutex); }
     node->closed = true;
     static_cast<void>(aoa::detail::release_spec(node->spec));
     node->spec = nullptr;
