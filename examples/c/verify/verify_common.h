@@ -72,8 +72,8 @@ static aoahid_device_options verify_device_options(void) {
     device_options.linux_hid_fields_per_report_policy = 256U;
     device_options.linux_hid_global_stack_depth_policy = 4U;
     device_options.linux_hid_usages_policy = 12288U;
-    device_options.linux_hid_report_data_bits_policy = 65528U;
-    device_options.linux_hid_report_size_bits_policy = 256U;
+    device_options.linux_hid_report_data_policy_bits = 65528U;
+    device_options.linux_hid_report_size_policy_bits = 256U;
     device_options.target_ep0_data_policy_bytes = 4096U;
     device_options.host_control_buffer_policy_bytes = 4096U;
     device_options.interface_claim_policy = AOAHID_INTERFACE_CLAIM_NONE;

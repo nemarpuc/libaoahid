@@ -21,9 +21,9 @@ int main(void) {
     options.struct_size = (uint32_t)sizeof options;
     options.maximum_contacts = 1U;
     options.contacts_per_report = 1U;
-    options.contact_identifier.logical_minimum = 0;
-    options.contact_identifier.logical_maximum = 1;
-    options.contact_identifier.bit_width = 1U;
+    options.contact_id.logical_minimum = 0;
+    options.contact_id.logical_maximum = 1;
+    options.contact_id.bit_width = 1U;
     options.x.logical_minimum = 0;
     options.x.logical_maximum = 32767;
     options.x.bit_width = 16U;

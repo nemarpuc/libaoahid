@@ -130,8 +130,8 @@ public struct DeviceOptions
     public uint LinuxHidFieldsPerReportPolicy;
     public uint LinuxHidGlobalStackDepthPolicy;
     public ulong LinuxHidUsagesPolicy;
-    public ulong LinuxHidReportDataBitsPolicy;
-    public uint LinuxHidReportSizeBitsPolicy;
+    public ulong LinuxHidReportDataPolicyBits;
+    public uint LinuxHidReportSizePolicyBits;
     public uint TargetEp0DataPolicyBytes;
     public uint HostControlBufferPolicyBytes;
     public ClaimPolicy InterfaceClaimPolicy;
@@ -243,7 +243,7 @@ public struct ToggleOptions
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct GamepadAxis
+public struct GamepadAxisOption
 {
     public AxisRole Role;
     public ushort UsagePage;
@@ -278,7 +278,7 @@ public struct TouchscreenOptions
     public ReportId ReportId;
     public uint MaximumContacts;
     public uint ContactsPerReport;
-    public IntegerField ContactIdentifier;
+    public IntegerField ContactId;
     public IntegerField X;
     public IntegerField Y;
     public IntegerField ContactCount;
@@ -305,7 +305,7 @@ public struct TouchpadOptions
     public ReportId ReportId;
     public uint MaximumContacts;
     public uint ContactsPerReport;
-    public IntegerField ContactIdentifier;
+    public IntegerField ContactId;
     public IntegerField X;
     public IntegerField Y;
     public IntegerField ContactCount;
@@ -421,7 +421,7 @@ public struct CapabilityManifest
     public ProfileKind ProfileKind;
     public nint Reports;
     public nuint ReportCount;
-    public nuint DescriptorBytes;
+    public nuint DescriptorLength;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -570,7 +570,7 @@ public static class Native
             ["aoahid_keyboard_options"] = typeof(KeyboardOptions),
             ["aoahid_mouse_options"] = typeof(MouseOptions),
             ["aoahid_toggle_options"] = typeof(ToggleOptions),
-            ["aoahid_gamepad_axis"] = typeof(GamepadAxis),
+            ["aoahid_gamepad_axis_option"] = typeof(GamepadAxisOption),
             ["aoahid_gamepad_options"] = typeof(GamepadOptions),
             ["aoahid_touchscreen_options"] = typeof(TouchscreenOptions),
             ["aoahid_touchpad_options"] = typeof(TouchpadOptions),
@@ -681,8 +681,8 @@ public static class Native
     public static extern Result ToggleUsage(nint node, ushort usage, uint down);
     [DllImport(Library, EntryPoint = "aoahid_gamepad_button", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result GamepadButton(nint node, uint button, uint down);
-    [DllImport(Library, EntryPoint = "aoahid_gamepad_set_axis", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result GamepadSetAxis(nint node, nuint axisIndex, int value);
+    [DllImport(Library, EntryPoint = "aoahid_gamepad_axis", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result GamepadAxis(nint node, nuint axisIndex, int value);
     [DllImport(Library, EntryPoint = "aoahid_gamepad_dpad", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result GamepadDpad(nint node, uint up, uint down, uint right, uint left);
     // Pass default(TouchscreenExtra) or default(TouchpadExtra) for "no extra data"; these native

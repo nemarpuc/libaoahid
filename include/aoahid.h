@@ -236,8 +236,8 @@ typedef struct aoahid_device_options {
     uint32_t linux_hid_fields_per_report_policy;
     uint32_t linux_hid_global_stack_depth_policy;
     uint64_t linux_hid_usages_policy;
-    uint64_t linux_hid_report_data_bits_policy;
-    uint32_t linux_hid_report_size_bits_policy;
+    uint64_t linux_hid_report_data_policy_bits;
+    uint32_t linux_hid_report_size_policy_bits;
     uint32_t target_ep0_data_policy_bytes;
     uint32_t host_control_buffer_policy_bytes;
     aoahid_interface_claim_policy interface_claim_policy;
@@ -381,7 +381,7 @@ typedef struct aoahid_toggle_options {
     const char* const* expected_linux_codes;
 } aoahid_toggle_options;
 
-typedef struct aoahid_gamepad_axis {
+typedef struct aoahid_gamepad_axis_option {
     aoahid_axis_role role;
     uint16_t usage_page;
     uint16_t usage;
@@ -389,13 +389,13 @@ typedef struct aoahid_gamepad_axis {
     int32_t neutral_value;
     const char* expected_linux_code;
     const char* expected_android_axis;
-} aoahid_gamepad_axis;
+} aoahid_gamepad_axis_option;
 
 typedef struct aoahid_gamepad_options {
     uint32_t struct_size;
     uint32_t reserved;
     aoahid_report_id_option report_id;
-    const aoahid_gamepad_axis* axes;
+    const aoahid_gamepad_axis_option* axes;
     size_t axis_count;
     uint32_t button_count;
     uint16_t button_usage_minimum;
@@ -418,7 +418,7 @@ typedef struct aoahid_touchscreen_options {
     aoahid_report_id_option report_id;
     uint32_t maximum_contacts;
     uint32_t contacts_per_report;
-    aoahid_integer_field contact_identifier;
+    aoahid_integer_field contact_id;
     aoahid_integer_field x;
     aoahid_integer_field y;
     aoahid_integer_field contact_count;
@@ -452,7 +452,7 @@ typedef struct aoahid_touchpad_options {
     aoahid_report_id_option report_id;
     uint32_t maximum_contacts;
     uint32_t contacts_per_report;
-    aoahid_integer_field contact_identifier;
+    aoahid_integer_field contact_id;
     aoahid_integer_field x;
     aoahid_integer_field y;
     aoahid_integer_field contact_count;
@@ -569,7 +569,7 @@ typedef struct aoahid_capability_manifest {
     aoahid_profile_kind profile_kind;
     const aoahid_report_capability* reports;
     size_t report_count;
-    size_t descriptor_bytes;
+    size_t descriptor_length;
 } aoahid_capability_manifest;
 
 /* Optional fields for aoahid_touchscreen_contact(); pass null to send
@@ -1322,7 +1322,7 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_toggle_usage(aoahid_node* node, uint
 AOAHID_API aoahid_result AOAHID_CALL aoahid_gamepad_button(aoahid_node* node, uint32_t button,
                                                            uint32_t down);
 
-/* aoahid_gamepad_set_axis
+/* aoahid_gamepad_axis
  * Ownership: Borrows a Gamepad Node; no ownership changes.
  * Blocking: Does not block, allocate, log, or perform I/O.
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
@@ -1330,8 +1330,8 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_gamepad_button(aoahid_node* node, ui
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for an invalid Node/profile/index/value;
  * AOAHID_ERR_BUSY for an in-flight report; AOAHID_ERR_NO_DEVICE for sticky loss;
  * AOAHID_ERR_INTERNAL for an unexpected ABI-boundary failure. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_gamepad_set_axis(aoahid_node* node, size_t axis_index,
-                                                             int32_t value);
+AOAHID_API aoahid_result AOAHID_CALL aoahid_gamepad_axis(aoahid_node* node, size_t axis_index,
+                                                         int32_t value);
 
 /* aoahid_gamepad_dpad
  * Ownership: Borrows a Gamepad Node; no ownership changes.

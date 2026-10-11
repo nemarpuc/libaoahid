@@ -96,8 +96,8 @@ class DeviceOptions(c.Structure):
         ("linux_hid_fields_per_report_policy", U32),
         ("linux_hid_global_stack_depth_policy", U32),
         ("linux_hid_usages_policy", U64),
-        ("linux_hid_report_data_bits_policy", U64),
-        ("linux_hid_report_size_bits_policy", U32),
+        ("linux_hid_report_data_policy_bits", U64),
+        ("linux_hid_report_size_policy_bits", U32),
         ("target_ep0_data_policy_bytes", U32),
         ("host_control_buffer_policy_bytes", U32),
         ("interface_claim_policy", I32),
@@ -205,7 +205,7 @@ class ToggleOptions(c.Structure):
     ]
 
 
-class GamepadAxis(c.Structure):
+class GamepadAxisOption(c.Structure):
     _fields_ = [
         ("role", I32),
         ("usage_page", U16),
@@ -222,7 +222,7 @@ class GamepadOptions(c.Structure):
         ("struct_size", U32),
         ("reserved", U32),
         ("report_id", ReportIdOption),
-        ("axes", c.POINTER(GamepadAxis)),
+        ("axes", c.POINTER(GamepadAxisOption)),
         ("axis_count", SIZE),
         ("button_count", U32),
         ("button_usage_minimum", U16),
@@ -240,7 +240,7 @@ class TouchscreenOptions(c.Structure):
         ("report_id", ReportIdOption),
         ("maximum_contacts", U32),
         ("contacts_per_report", U32),
-        ("contact_identifier", IntegerField),
+        ("contact_id", IntegerField),
         ("x", IntegerField),
         ("y", IntegerField),
         ("contact_count", IntegerField),
@@ -267,7 +267,7 @@ class TouchpadOptions(c.Structure):
         ("report_id", ReportIdOption),
         ("maximum_contacts", U32),
         ("contacts_per_report", U32),
-        ("contact_identifier", IntegerField),
+        ("contact_id", IntegerField),
         ("x", IntegerField),
         ("y", IntegerField),
         ("contact_count", IntegerField),
@@ -383,7 +383,7 @@ class CapabilityManifest(c.Structure):
         ("profile_kind", I32),
         ("reports", c.POINTER(ReportCapability)),
         ("report_count", SIZE),
-        ("descriptor_bytes", SIZE),
+        ("descriptor_length", SIZE),
     ]
 
 
@@ -450,7 +450,7 @@ GOLDEN_STRUCTS = {
     "aoahid_keyboard_options": KeyboardOptions,
     "aoahid_mouse_options": MouseOptions,
     "aoahid_toggle_options": ToggleOptions,
-    "aoahid_gamepad_axis": GamepadAxis,
+    "aoahid_gamepad_axis_option": GamepadAxisOption,
     "aoahid_gamepad_options": GamepadOptions,
     "aoahid_touchscreen_options": TouchscreenOptions,
     "aoahid_touchpad_options": TouchpadOptions,

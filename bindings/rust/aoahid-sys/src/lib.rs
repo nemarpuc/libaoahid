@@ -152,8 +152,8 @@ c_struct!(aoahid_device_options {
     linux_hid_fields_per_report_policy: u32,
     linux_hid_global_stack_depth_policy: u32,
     linux_hid_usages_policy: u64,
-    linux_hid_report_data_bits_policy: u64,
-    linux_hid_report_size_bits_policy: u32,
+    linux_hid_report_data_policy_bits: u64,
+    linux_hid_report_size_policy_bits: u32,
     target_ep0_data_policy_bytes: u32,
     host_control_buffer_policy_bytes: u32,
     interface_claim_policy: aoahid_interface_claim_policy,
@@ -230,14 +230,14 @@ c_struct!(aoahid_toggle_options {
     expected_linux_event_types: *const *const c_char,
     expected_linux_codes: *const *const c_char,
 });
-c_struct!(aoahid_gamepad_axis {
+c_struct!(aoahid_gamepad_axis_option {
     role: aoahid_axis_role, usage_page: u16, usage: u16, value: aoahid_integer_field,
     neutral_value: i32, expected_linux_code: *const c_char,
     expected_android_axis: *const c_char,
 });
 c_struct!(aoahid_gamepad_options {
     struct_size: u32, reserved: u32, report_id: aoahid_report_id_option,
-    axes: *const aoahid_gamepad_axis,
+    axes: *const aoahid_gamepad_axis_option,
     axis_count: usize, button_count: u32, button_usage_minimum: u16,
     dpad_representation: aoahid_dpad_representation,
     hat_logical_minimum: i32, hat_logical_maximum: i32, hat_bit_width: u32,
@@ -248,7 +248,7 @@ c_struct!(aoahid_touchscreen_options {
     report_id: aoahid_report_id_option,
     maximum_contacts: u32,
     contacts_per_report: u32,
-    contact_identifier: aoahid_integer_field,
+    contact_id: aoahid_integer_field,
     x: aoahid_integer_field,
     y: aoahid_integer_field,
     contact_count: aoahid_integer_field,
@@ -272,7 +272,7 @@ c_struct!(aoahid_touchpad_options {
     report_id: aoahid_report_id_option,
     maximum_contacts: u32,
     contacts_per_report: u32,
-    contact_identifier: aoahid_integer_field,
+    contact_id: aoahid_integer_field,
     x: aoahid_integer_field,
     y: aoahid_integer_field,
     contact_count: aoahid_integer_field,
@@ -337,7 +337,7 @@ c_struct!(aoahid_capability_manifest {
     feature_transport_supported: u32, android_status: aoahid_android_status,
     profile_kind: aoahid_profile_kind,
     reports: *const aoahid_report_capability, report_count: usize,
-    descriptor_bytes: usize,
+    descriptor_length: usize,
 });
 c_struct!(aoahid_touchscreen_extra {
     pressure: i32,
@@ -511,7 +511,7 @@ extern "C" {
         button: u32,
         down: u32,
     ) -> aoahid_result;
-    pub fn aoahid_gamepad_set_axis(
+    pub fn aoahid_gamepad_axis(
         node: *mut aoahid_node,
         axis_index: usize,
         value: i32,

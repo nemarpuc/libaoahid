@@ -46,6 +46,19 @@ profiles have not been run against a phone, and the `Verified` rows in
 - `aoahid_touch_contact` is no longer public: no public function takes it. The
   library keeps it internally, and the Python, C#, and Rust bindings and the
   examples no longer declare it.
+- Names that did not follow the rest of the API are aligned, with no change in
+  behavior: the gamepad axis call is `aoahid_gamepad_axis` (it was
+  `aoahid_gamepad_set_axis`) and its Spec entry type is
+  `aoahid_gamepad_axis_option` (it was `aoahid_gamepad_axis`, which the call
+  could not share), like `aoahid_report_id_option`; the touch options field is
+  `contact_id` (it was `contact_identifier`), as in the send calls;
+  `aoahid_capability_manifest.descriptor_bytes` is `descriptor_length`, as in
+  `aoahid_raw_options`; the two Linux parser limits in bits are
+  `linux_hid_report_data_policy_bits` and `linux_hid_report_size_policy_bits`,
+  with the unit last like the other `*_policy_bytes` fields. The Python, C#,
+  and Rust bindings follow (C# `GamepadAxis`, `GamepadAxisOption`,
+  `ContactId`, `DescriptorLength`, `LinuxHidReportDataPolicyBits`,
+  `LinuxHidReportSizePolicyBits`).
 - The button calls name their flag `down`, like the other send calls, and
   `aoahid_node_submit_blocking` names its wait `timeout_ms` (it was
   `deadline_ms`). Only parameter names changed.

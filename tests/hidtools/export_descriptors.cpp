@@ -28,7 +28,7 @@ struct manifest_record {
     std::uint32_t input_supported{};
     std::uint32_t output_supported{};
     std::uint32_t feature_transport_supported{};
-    std::size_t descriptor_bytes{};
+    std::size_t descriptor_length{};
     std::string reports;
 };
 
@@ -104,7 +104,7 @@ bool descriptor_layout_matches_manifest(const char* name, const aoahid_spec* spe
     manifest.struct_size = static_cast<std::uint32_t>(sizeof(manifest));
     if (aoahid_spec_manifest(spec, &manifest) != AOAHID_OK || manifest.input_supported != 1U ||
         manifest.reports == nullptr || manifest.report_count != input_bits.size() ||
-        manifest.descriptor_bytes != length) {
+        manifest.descriptor_length != length) {
         std::fprintf(stderr, "%s manifest shape disagrees with descriptor\n", name);
         return false;
     }
@@ -167,7 +167,7 @@ bool emit_descriptor(const std::filesystem::path& directory, const char* name,
     }
     manifest_records.push_back(manifest_record{
         name, static_cast<std::int32_t>(manifest.android_status), manifest.input_supported,
-        manifest.output_supported, manifest.feature_transport_supported, manifest.descriptor_bytes,
+        manifest.output_supported, manifest.feature_transport_supported, manifest.descriptor_length,
         std::move(reports)});
 
     const std::filesystem::path output = directory / (std::string{name} + ".bin");
@@ -216,7 +216,7 @@ aoahid_touchscreen_options fixed_touchscreen_options() noexcept {
     options.struct_size = static_cast<std::uint32_t>(sizeof(options));
     options.maximum_contacts = 3U;
     options.contacts_per_report = 3U;
-    options.contact_identifier = {0, 15, 4U, {}};
+    options.contact_id = {0, 15, 4U, {}};
     options.x = {0, 32767, 16U, {}};
     options.y = {0, 32767, 16U, {}};
     options.contact_count = {0, 3, 2U, {}};
@@ -365,21 +365,21 @@ int main(const int argc, char** argv) {
          ok;
     spec = nullptr;
 
-    static constexpr std::array<aoahid_gamepad_axis, 2U> axes{
-        aoahid_gamepad_axis{AOAHID_AXIS_X,
-                            aoa::hid::usage::page_generic_desktop,
-                            aoa::hid::usage::x,
-                            {-32767, 32767, 16U, {}},
-                            0,
-                            "ABS_X",
-                            "AXIS_X"},
-        aoahid_gamepad_axis{AOAHID_AXIS_Y,
-                            aoa::hid::usage::page_generic_desktop,
-                            aoa::hid::usage::y,
-                            {-32767, 32767, 16U, {}},
-                            0,
-                            "ABS_Y",
-                            "AXIS_Y"}};
+    static constexpr std::array<aoahid_gamepad_axis_option, 2U> axes{
+        aoahid_gamepad_axis_option{AOAHID_AXIS_X,
+                                   aoa::hid::usage::page_generic_desktop,
+                                   aoa::hid::usage::x,
+                                   {-32767, 32767, 16U, {}},
+                                   0,
+                                   "ABS_X",
+                                   "AXIS_X"},
+        aoahid_gamepad_axis_option{AOAHID_AXIS_Y,
+                                   aoa::hid::usage::page_generic_desktop,
+                                   aoa::hid::usage::y,
+                                   {-32767, 32767, 16U, {}},
+                                   0,
+                                   "ABS_Y",
+                                   "AXIS_Y"}};
     aoahid_gamepad_options controller{};
     controller.struct_size = static_cast<std::uint32_t>(sizeof(controller));
     controller.axes = axes.data();
@@ -406,7 +406,7 @@ int main(const int argc, char** argv) {
     touchpad.report_id = touch.report_id;
     touchpad.maximum_contacts = touch.maximum_contacts;
     touchpad.contacts_per_report = touch.contacts_per_report;
-    touchpad.contact_identifier = touch.contact_identifier;
+    touchpad.contact_id = touch.contact_id;
     touchpad.x = touch.x;
     touchpad.y = touch.y;
     touchpad.contact_count = touch.contact_count;
@@ -497,12 +497,12 @@ int main(const int argc, char** argv) {
         if (argv[3] == nullptr || argv[3][0] == '\0')
             return 2;
         std::ofstream catalog(argv[3], std::ios::binary | std::ios::trunc);
-        catalog
-            << "key\tandroid_status\tinput\toutput\tfeature_transport\tdescriptor_bytes\treports\n";
+        catalog << "key\tandroid_status\tinput\toutput\tfeature_transport\tdescriptor_"
+                   "length\treports\n";
         for (const manifest_record& record : manifest_records) {
             catalog << record.key << '\t' << record.android_status << '\t' << record.input_supported
                     << '\t' << record.output_supported << '\t' << record.feature_transport_supported
-                    << '\t' << record.descriptor_bytes << '\t' << record.reports << '\n';
+                    << '\t' << record.descriptor_length << '\t' << record.reports << '\n';
         }
         catalog.close();
         if (!catalog) {

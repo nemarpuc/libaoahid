@@ -139,8 +139,8 @@ int main(void) {
     AOAHID_FIELD(aoahid_device_options, linux_hid_fields_per_report_policy);
     AOAHID_FIELD(aoahid_device_options, linux_hid_global_stack_depth_policy);
     AOAHID_FIELD(aoahid_device_options, linux_hid_usages_policy);
-    AOAHID_FIELD(aoahid_device_options, linux_hid_report_data_bits_policy);
-    AOAHID_FIELD(aoahid_device_options, linux_hid_report_size_bits_policy);
+    AOAHID_FIELD(aoahid_device_options, linux_hid_report_data_policy_bits);
+    AOAHID_FIELD(aoahid_device_options, linux_hid_report_size_policy_bits);
     AOAHID_FIELD(aoahid_device_options, target_ep0_data_policy_bytes);
     AOAHID_FIELD(aoahid_device_options, host_control_buffer_policy_bytes);
     AOAHID_FIELD(aoahid_device_options, interface_claim_policy);
@@ -223,14 +223,14 @@ int main(void) {
     AOAHID_FIELD(aoahid_toggle_options, expected_linux_event_types);
     AOAHID_FIELD(aoahid_toggle_options, expected_linux_codes);
 
-    AOAHID_BEGIN(aoahid_gamepad_axis);
-    AOAHID_FIELD(aoahid_gamepad_axis, role);
-    AOAHID_FIELD(aoahid_gamepad_axis, usage_page);
-    AOAHID_FIELD(aoahid_gamepad_axis, usage);
-    AOAHID_FIELD(aoahid_gamepad_axis, value);
-    AOAHID_FIELD(aoahid_gamepad_axis, neutral_value);
-    AOAHID_FIELD(aoahid_gamepad_axis, expected_linux_code);
-    AOAHID_FIELD(aoahid_gamepad_axis, expected_android_axis);
+    AOAHID_BEGIN(aoahid_gamepad_axis_option);
+    AOAHID_FIELD(aoahid_gamepad_axis_option, role);
+    AOAHID_FIELD(aoahid_gamepad_axis_option, usage_page);
+    AOAHID_FIELD(aoahid_gamepad_axis_option, usage);
+    AOAHID_FIELD(aoahid_gamepad_axis_option, value);
+    AOAHID_FIELD(aoahid_gamepad_axis_option, neutral_value);
+    AOAHID_FIELD(aoahid_gamepad_axis_option, expected_linux_code);
+    AOAHID_FIELD(aoahid_gamepad_axis_option, expected_android_axis);
 
     AOAHID_BEGIN(aoahid_gamepad_options);
     AOAHID_FIELD(aoahid_gamepad_options, struct_size);
@@ -251,7 +251,7 @@ int main(void) {
     AOAHID_FIELD(aoahid_touchscreen_options, report_id);
     AOAHID_FIELD(aoahid_touchscreen_options, maximum_contacts);
     AOAHID_FIELD(aoahid_touchscreen_options, contacts_per_report);
-    AOAHID_FIELD(aoahid_touchscreen_options, contact_identifier);
+    AOAHID_FIELD(aoahid_touchscreen_options, contact_id);
     AOAHID_FIELD(aoahid_touchscreen_options, x);
     AOAHID_FIELD(aoahid_touchscreen_options, y);
     AOAHID_FIELD(aoahid_touchscreen_options, contact_count);
@@ -275,7 +275,7 @@ int main(void) {
     AOAHID_FIELD(aoahid_touchpad_options, report_id);
     AOAHID_FIELD(aoahid_touchpad_options, maximum_contacts);
     AOAHID_FIELD(aoahid_touchpad_options, contacts_per_report);
-    AOAHID_FIELD(aoahid_touchpad_options, contact_identifier);
+    AOAHID_FIELD(aoahid_touchpad_options, contact_id);
     AOAHID_FIELD(aoahid_touchpad_options, x);
     AOAHID_FIELD(aoahid_touchpad_options, y);
     AOAHID_FIELD(aoahid_touchpad_options, contact_count);
@@ -370,7 +370,7 @@ int main(void) {
     AOAHID_FIELD(aoahid_capability_manifest, profile_kind);
     AOAHID_FIELD(aoahid_capability_manifest, reports);
     AOAHID_FIELD(aoahid_capability_manifest, report_count);
-    AOAHID_FIELD(aoahid_capability_manifest, descriptor_bytes);
+    AOAHID_FIELD(aoahid_capability_manifest, descriptor_length);
 
     AOAHID_BEGIN(aoahid_touchscreen_extra);
     AOAHID_FIELD(aoahid_touchscreen_extra, pressure);

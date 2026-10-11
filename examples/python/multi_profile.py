@@ -124,8 +124,8 @@ def device_options(control_timeout_ms: int) -> DeviceOptions:  # noqa: F405
     options.linux_hid_fields_per_report_policy = 256
     options.linux_hid_global_stack_depth_policy = 4
     options.linux_hid_usages_policy = 12288
-    options.linux_hid_report_data_bits_policy = 65528
-    options.linux_hid_report_size_bits_policy = 256
+    options.linux_hid_report_data_policy_bits = 65528
+    options.linux_hid_report_size_policy_bits = 256
     options.target_ep0_data_policy_bytes = DESCRIPTOR_POLICY_BYTES
     options.host_control_buffer_policy_bytes = HOST_REPORT_POLICY_BYTES
     options.interface_claim_policy = AOAHID_INTERFACE_CLAIM_NONE  # noqa: F405
@@ -173,7 +173,7 @@ def create_specs(library: c.CDLL) -> Specs:
     touchscreen_options.report_id = report_id
     touchscreen_options.maximum_contacts = 1
     touchscreen_options.contacts_per_report = 1
-    touchscreen_options.contact_identifier = integer_field(
+    touchscreen_options.contact_id = integer_field(
         0, TOUCH_CONTACT_ID_MAXIMUM, TOUCH_CONTACT_ID_BITS
     )
     touchscreen_options.x = integer_field(0, TOUCH_COORDINATE_MAXIMUM, TOUCH_COORDINATE_BITS)

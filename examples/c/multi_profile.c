@@ -169,8 +169,8 @@ static aoahid_device_options device_options(void) {
     options.linux_hid_fields_per_report_policy = 256U;
     options.linux_hid_global_stack_depth_policy = 4U;
     options.linux_hid_usages_policy = 12288U;
-    options.linux_hid_report_data_bits_policy = 65528U;
-    options.linux_hid_report_size_bits_policy = 256U;
+    options.linux_hid_report_data_policy_bits = 65528U;
+    options.linux_hid_report_size_policy_bits = 256U;
     options.target_ep0_data_policy_bytes = k_descriptor_policy_bytes;
     options.host_control_buffer_policy_bytes = k_host_report_policy_bytes;
     options.interface_claim_policy = AOAHID_INTERFACE_CLAIM_NONE;
@@ -222,8 +222,7 @@ static aoahid_result create_specs(specs* result) {
     touch.report_id = (aoahid_report_id_option){0U, 0U, {0U, 0U, 0U}};
     touch.maximum_contacts = 1U;
     touch.contacts_per_report = 1U;
-    touch.contact_identifier =
-        integer_field(0, k_touch_contact_id_maximum, k_touch_contact_id_bits);
+    touch.contact_id = integer_field(0, k_touch_contact_id_maximum, k_touch_contact_id_bits);
     touch.x = integer_field(0, k_touch_coordinate_maximum, k_touch_coordinate_bits);
     touch.y = integer_field(0, k_touch_coordinate_maximum, k_touch_coordinate_bits);
     touch.contact_count = integer_field(0, 1, k_touch_contact_count_bits);

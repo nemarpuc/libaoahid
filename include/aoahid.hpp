@@ -177,9 +177,9 @@ inline void spec_release(aoahid_spec* spec) noexcept { aoahid_spec_release(spec)
                                                   uint32_t down) noexcept {
     return aoahid_gamepad_button(node, button, down);
 }
-[[nodiscard]] inline aoahid_result gamepad_set_axis(aoahid_node* node, size_t axis_index,
-                                                    int32_t value) noexcept {
-    return aoahid_gamepad_set_axis(node, axis_index, value);
+[[nodiscard]] inline aoahid_result gamepad_axis(aoahid_node* node, size_t axis_index,
+                                                int32_t value) noexcept {
+    return aoahid_gamepad_axis(node, axis_index, value);
 }
 [[nodiscard]] inline aoahid_result gamepad_dpad(aoahid_node* node, uint32_t up, uint32_t down,
                                                 uint32_t right, uint32_t left) noexcept {

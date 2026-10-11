@@ -43,7 +43,7 @@ struct ConsumerConfig {
 };
 
 struct GamepadAxisConfig {
-    aoahid_gamepad_axis axis{};
+    aoahid_gamepad_axis_option axis{};
     std::string expected_linux_code;
     std::string expected_android_axis;
 };
@@ -60,7 +60,7 @@ struct TouchFields {
     aoahid_report_id_option report_id{};
     std::uint32_t maximum_contacts{};
     std::uint32_t contacts_per_report{};
-    aoahid_integer_field contact_identifier{};
+    aoahid_integer_field contact_id{};
     aoahid_integer_field x{};
     aoahid_integer_field y{};
     aoahid_integer_field contact_count{};
@@ -320,8 +320,8 @@ struct aoahid_device {
     std::uint32_t linux_hid_fields_per_report_policy{};
     std::uint32_t linux_hid_global_stack_depth_policy{};
     std::uint64_t linux_hid_usages_policy{};
-    std::uint64_t linux_hid_report_data_bits_policy{};
-    std::uint32_t linux_hid_report_size_bits_policy{};
+    std::uint64_t linux_hid_report_data_policy_bits{};
+    std::uint32_t linux_hid_report_size_policy_bits{};
     std::uint32_t target_ep0_policy_bytes{};
     std::uint32_t host_control_policy_bytes{};
     std::size_t hid_id_domain_index{};

@@ -89,7 +89,7 @@ allows; calls the caller must serialize are still the caller's responsibility.
 | Spec factories | `aoahid_spec_create_keyboard`, `_mouse`, `_toggle`, `_gamepad`, `_touchscreen`, `_touchpad`, `_pen`, `_digitizer`, `_battery`, `_raw` |
 | Spec access | `aoahid_spec_retain`, `aoahid_spec_release`, `aoahid_spec_descriptor`, `aoahid_spec_manifest` |
 | Node | `aoahid_node_open`, `aoahid_node_close`, `aoahid_node_hid_id`, `aoahid_node_manifest`, `aoahid_node_submit`, `aoahid_node_submit_blocking` |
-| Profile state | `aoahid_keyboard_key`, `aoahid_mouse_move`, `aoahid_mouse_scroll`, `aoahid_mouse_button`, `aoahid_toggle_usage`, `aoahid_gamepad_button`, `aoahid_gamepad_set_axis`, `aoahid_gamepad_dpad`, `aoahid_touchscreen_contact`, `aoahid_touchpad_contact`, `aoahid_touchpad_button`, `aoahid_pen_update`, `aoahid_digitizer_update`, `aoahid_battery_update`, `aoahid_raw_submit` |
+| Profile state | `aoahid_keyboard_key`, `aoahid_mouse_move`, `aoahid_mouse_scroll`, `aoahid_mouse_button`, `aoahid_toggle_usage`, `aoahid_gamepad_button`, `aoahid_gamepad_axis`, `aoahid_gamepad_dpad`, `aoahid_touchscreen_contact`, `aoahid_touchpad_contact`, `aoahid_touchpad_button`, `aoahid_pen_update`, `aoahid_digitizer_update`, `aoahid_battery_update`, `aoahid_raw_submit` |
 
 `aoahid_version()` returns `(major << 24) | (minor << 16) | patch`; the header
 also defines `AOAHID_VERSION_MAJOR`, `_MINOR`, and `_PATCH`.
@@ -189,8 +189,8 @@ set an EP0 or host-buffer policy below 1024 bytes, also set
 
 **Target HID parser policies**, all required and nonzero:
 `linux_hid_fields_per_report_policy`, `linux_hid_usages_policy`,
-`linux_hid_global_stack_depth_policy`, `linux_hid_report_size_bits_policy`,
-`linux_hid_report_data_bits_policy`. Every Spec records its own requirements
+`linux_hid_global_stack_depth_policy`, `linux_hid_report_size_policy_bits`,
+`linux_hid_report_data_policy_bits`. Every Spec records its own requirements
 for these while it is built; `aoahid_node_open` compares them with the Device's
 policies and returns `AOAHID_ERR_OVERFLOW` before request 54 if one is
 exceeded. Pick values for the kernel you target; [LIMITS.md](LIMITS.md) lists
@@ -361,7 +361,7 @@ I/O or allocates.
 | Keyboard | `aoahid_keyboard_key(node, usage, down)` |
 | Mouse | `aoahid_mouse_move(node, dx, dy)`, `aoahid_mouse_scroll(node, wheel, pan)`, `aoahid_mouse_button(node, button, down)` |
 | Toggle | `aoahid_toggle_usage(node, usage, down)` |
-| Gamepad | `aoahid_gamepad_button(node, button, down)`, `aoahid_gamepad_set_axis(node, axis_index, value)`, `aoahid_gamepad_dpad(node, up, down, right, left)` |
+| Gamepad | `aoahid_gamepad_button(node, button, down)`, `aoahid_gamepad_axis(node, axis_index, value)`, `aoahid_gamepad_dpad(node, up, down, right, left)` |
 | Touchscreen | `aoahid_touchscreen_contact(node, contact_id, down, x, y, extra)` |
 | Touchpad | `aoahid_touchpad_contact(node, contact_id, down, x, y, extra)`, `aoahid_touchpad_button(node, button, down)` |
 | Pen | `aoahid_pen_update(node, &sample)` |
@@ -428,7 +428,7 @@ header adds no checks or fallbacks of its own.
   tested;
 - `profile_kind`;
 - `reports` / `report_count`: every Input Report ID and its exact wire length;
-- `descriptor_bytes`.
+- `descriptor_length`.
 
 A generated descriptor may contain a Constant Feature item such as Contact
 Count Maximum. It is metadata only; `feature_transport_supported` stays 0 and

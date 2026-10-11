@@ -509,7 +509,7 @@ void test_usage_control_semantics() {
 }
 
 void test_hat_domain() {
-    std::array<aoahid_gamepad_axis, 2> axes{};
+    std::array<aoahid_gamepad_axis_option, 2> axes{};
     axes[0] = {AOAHID_AXIS_X, 0x01U, 0x30U, {-127, 127, 8U, {}}, 0, "ABS_X", "AXIS_X"};
     axes[1] = {AOAHID_AXIS_Y, 0x01U, 0x31U, {-127, 127, 8U, {}}, 0, "ABS_Y", "AXIS_Y"};
     aoahid_gamepad_options options{};
@@ -566,15 +566,18 @@ void test_hat_domain() {
 }
 
 void test_controller_dpad_and_extended_axes() {
-    std::array<aoahid_gamepad_axis, 6U> axes{
-        aoahid_gamepad_axis{AOAHID_AXIS_X, 0x01U, 0x30U, {-127, 127, 8U, {}}, 0, "ABS_X", "AXIS_X"},
-        aoahid_gamepad_axis{AOAHID_AXIS_Y, 0x01U, 0x31U, {-127, 127, 8U, {}}, 0, "ABS_Y", "AXIS_Y"},
-        aoahid_gamepad_axis{AOAHID_AXIS_DIAL, 0x01U, 0x37U, {-127, 127, 8U, {}}, 0, "TEST", "TEST"},
-        aoahid_gamepad_axis{
+    std::array<aoahid_gamepad_axis_option, 6U> axes{
+        aoahid_gamepad_axis_option{
+            AOAHID_AXIS_X, 0x01U, 0x30U, {-127, 127, 8U, {}}, 0, "ABS_X", "AXIS_X"},
+        aoahid_gamepad_axis_option{
+            AOAHID_AXIS_Y, 0x01U, 0x31U, {-127, 127, 8U, {}}, 0, "ABS_Y", "AXIS_Y"},
+        aoahid_gamepad_axis_option{
+            AOAHID_AXIS_DIAL, 0x01U, 0x37U, {-127, 127, 8U, {}}, 0, "TEST", "TEST"},
+        aoahid_gamepad_axis_option{
             AOAHID_AXIS_WHEEL, 0x01U, 0x38U, {-127, 127, 8U, {}}, 0, "TEST", "TEST"},
-        aoahid_gamepad_axis{
+        aoahid_gamepad_axis_option{
             AOAHID_AXIS_SIMULATION_RUDDER, 0x02U, 0xBAU, {-127, 127, 8U, {}}, 0, "TEST", "TEST"},
-        aoahid_gamepad_axis{
+        aoahid_gamepad_axis_option{
             AOAHID_AXIS_SIMULATION_THROTTLE, 0x02U, 0xBBU, {0, 255, 8U, {}}, 0, "TEST", "TEST"}};
     aoahid_gamepad_options options{};
     options.struct_size = static_cast<std::uint32_t>(sizeof(options));
@@ -628,7 +631,7 @@ void test_controller_dpad_and_extended_axes() {
     AOAHID_CHECK(aoahid_gamepad_dpad(&node, 0U, 1U, 0U, 1U) == AOAHID_OK);
     AOAHID_CHECK(node.dirty);
     node.dirty = false;
-    AOAHID_CHECK(aoahid_gamepad_set_axis(&node, 0U, 0) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_gamepad_axis(&node, 0U, 0) == AOAHID_OK);
     AOAHID_CHECK(!node.dirty);
     aoahid_spec_release(spec);
     spec = nullptr;
@@ -761,7 +764,7 @@ aoahid_touchscreen_options touchscreen_options() {
     options.report_id = {0U, 0U, {0U, 0U, 0U}};
     options.maximum_contacts = 3U;
     options.contacts_per_report = 2U;
-    options.contact_identifier = {0, 15, 4U, {}};
+    options.contact_id = {0, 15, 4U, {}};
     options.x = {0, 1000, 16U, {}};
     options.y = {0, 1000, 16U, {}};
     options.contact_count = {0, 3, 2U, {}};
@@ -785,7 +788,7 @@ aoahid_touchpad_options touchpad_options() {
     options.report_id = {0U, 0U, {0U, 0U, 0U}};
     options.maximum_contacts = 3U;
     options.contacts_per_report = 2U;
-    options.contact_identifier = {0, 15, 4U, {}};
+    options.contact_id = {0, 15, 4U, {}};
     options.x = {0, 1000, 16U, {}};
     options.y = {0, 1000, 16U, {}};
     options.contact_count = {0, 3, 2U, {}};
@@ -838,7 +841,7 @@ void test_field_span_padding() {
     touch.struct_size = static_cast<std::uint32_t>(sizeof(touch));
     touch.maximum_contacts = 1U;
     touch.contacts_per_report = 1U;
-    touch.contact_identifier = {0, 15, 4U, {}};
+    touch.contact_id = {0, 15, 4U, {}};
     touch.x = {0, 2147483646, 31U, {}};
     touch.y = {0, 2559, 12U, {}};
     touch.contact_count = {0, 1, 1U, {}};
@@ -1437,7 +1440,7 @@ void test_profiles() {
     test_send_time_report_validation();
 
     aoahid_touchscreen_options invalid_touch = touchscreen_options();
-    invalid_touch.contact_identifier = {1, 15, 4U, {}};
+    invalid_touch.contact_id = {1, 15, 4U, {}};
     AOAHID_CHECK(aoahid_spec_create_touchscreen(&invalid_touch, &spec) == AOAHID_ERR_PARAM);
 
     aoahid_touchpad_options invalid_touchpad = touchpad_options();

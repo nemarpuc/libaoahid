@@ -179,8 +179,8 @@ fn rust_layout() -> BTreeMap<String, usize> {
             linux_hid_fields_per_report_policy,
             linux_hid_global_stack_depth_policy,
             linux_hid_usages_policy,
-            linux_hid_report_data_bits_policy,
-            linux_hid_report_size_bits_policy,
+            linux_hid_report_data_policy_bits,
+            linux_hid_report_size_policy_bits,
             target_ep0_data_policy_bytes,
             host_control_buffer_policy_bytes,
             interface_claim_policy,
@@ -280,8 +280,8 @@ fn rust_layout() -> BTreeMap<String, usize> {
     );
     layout!(
         values,
-        aoahid_gamepad_axis,
-        "aoahid_gamepad_axis",
+        aoahid_gamepad_axis_option,
+        "aoahid_gamepad_axis_option",
         [
             role,
             usage_page,
@@ -320,7 +320,7 @@ fn rust_layout() -> BTreeMap<String, usize> {
             report_id,
             maximum_contacts,
             contacts_per_report,
-            contact_identifier,
+            contact_id,
             x,
             y,
             contact_count,
@@ -349,7 +349,7 @@ fn rust_layout() -> BTreeMap<String, usize> {
             report_id,
             maximum_contacts,
             contacts_per_report,
-            contact_identifier,
+            contact_id,
             x,
             y,
             contact_count,
@@ -469,7 +469,7 @@ fn rust_layout() -> BTreeMap<String, usize> {
             profile_kind,
             reports,
             report_count,
-            descriptor_bytes
+            descriptor_length
         ]
     );
     layout!(

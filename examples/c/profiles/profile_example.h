@@ -58,7 +58,7 @@ static int aoahid_example_run(const char* name, aoahid_profile_kind expected_kin
         aoahid_spec_release(spec);
         return 1;
     }
-    if (manifest.profile_kind != expected_kind || descriptor_length != manifest.descriptor_bytes) {
+    if (manifest.profile_kind != expected_kind || descriptor_length != manifest.descriptor_length) {
         fprintf(stderr, "%s: manifest disagrees with the requested profile\n", name);
         aoahid_spec_release(spec);
         return 1;

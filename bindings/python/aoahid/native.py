@@ -193,8 +193,8 @@ class DeviceOptions(c.Structure):
         ("linux_hid_fields_per_report_policy", c.c_uint32),
         ("linux_hid_global_stack_depth_policy", c.c_uint32),
         ("linux_hid_usages_policy", c.c_uint64),
-        ("linux_hid_report_data_bits_policy", c.c_uint64),
-        ("linux_hid_report_size_bits_policy", c.c_uint32),
+        ("linux_hid_report_data_policy_bits", c.c_uint64),
+        ("linux_hid_report_size_policy_bits", c.c_uint32),
         ("target_ep0_data_policy_bytes", c.c_uint32),
         ("host_control_buffer_policy_bytes", c.c_uint32),
         ("interface_claim_policy", c.c_int32),
@@ -306,7 +306,7 @@ class ToggleOptions(c.Structure):
     ]
 
 
-class GamepadAxis(c.Structure):
+class GamepadAxisOption(c.Structure):
     _fields_ = [
         ("role", c.c_int32),
         ("usage_page", c.c_uint16),
@@ -323,7 +323,7 @@ class GamepadOptions(c.Structure):
         ("struct_size", c.c_uint32),
         ("reserved", c.c_uint32),
         ("report_id", ReportId),
-        ("axes", c.POINTER(GamepadAxis)),
+        ("axes", c.POINTER(GamepadAxisOption)),
         ("axis_count", c.c_size_t),
         ("button_count", c.c_uint32),
         ("button_usage_minimum", c.c_uint16),
@@ -341,7 +341,7 @@ class TouchscreenOptions(c.Structure):
         ("report_id", ReportId),
         ("maximum_contacts", c.c_uint32),
         ("contacts_per_report", c.c_uint32),
-        ("contact_identifier", IntegerField),
+        ("contact_id", IntegerField),
         ("x", IntegerField),
         ("y", IntegerField),
         ("contact_count", IntegerField),
@@ -368,7 +368,7 @@ class TouchpadOptions(c.Structure):
         ("report_id", ReportId),
         ("maximum_contacts", c.c_uint32),
         ("contacts_per_report", c.c_uint32),
-        ("contact_identifier", IntegerField),
+        ("contact_id", IntegerField),
         ("x", IntegerField),
         ("y", IntegerField),
         ("contact_count", IntegerField),
@@ -484,7 +484,7 @@ class CapabilityManifest(c.Structure):
         ("profile_kind", c.c_int32),
         ("reports", c.POINTER(ReportCapability)),
         ("report_count", c.c_size_t),
-        ("descriptor_bytes", c.c_size_t),
+        ("descriptor_length", c.c_size_t),
     ]
 
 
@@ -551,7 +551,7 @@ ABI_STRUCTS = {
     "aoahid_keyboard_options": KeyboardOptions,
     "aoahid_mouse_options": MouseOptions,
     "aoahid_toggle_options": ToggleOptions,
-    "aoahid_gamepad_axis": GamepadAxis,
+    "aoahid_gamepad_axis_option": GamepadAxisOption,
     "aoahid_gamepad_options": GamepadOptions,
     "aoahid_touchscreen_options": TouchscreenOptions,
     "aoahid_touchpad_options": TouchpadOptions,
@@ -630,7 +630,7 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
     declare("aoahid_mouse_button", [NodeP, c.c_uint32, c.c_uint32], result)
     declare("aoahid_toggle_usage", [NodeP, c.c_uint16, c.c_uint32], result)
     declare("aoahid_gamepad_button", [NodeP, c.c_uint32, c.c_uint32], result)
-    declare("aoahid_gamepad_set_axis", [NodeP, c.c_size_t, c.c_int32], result)
+    declare("aoahid_gamepad_axis", [NodeP, c.c_size_t, c.c_int32], result)
     declare("aoahid_gamepad_dpad", [NodeP, c.c_uint32, c.c_uint32, c.c_uint32, c.c_uint32], result)
     declare("aoahid_touchscreen_contact", [NodeP, c.c_uint32, c.c_uint32, c.c_int32, c.c_int32, c.POINTER(TouchscreenExtra)], result)
     declare("aoahid_touchpad_contact", [NodeP, c.c_uint32, c.c_uint32, c.c_int32, c.c_int32, c.POINTER(TouchpadExtra)], result)
@@ -673,7 +673,7 @@ __all__ += [
     "KeyboardOptions",
     "MouseOptions",
     "ToggleOptions",
-    "GamepadAxis",
+    "GamepadAxisOption",
     "GamepadOptions",
     "TouchscreenOptions",
     "TouchpadOptions",

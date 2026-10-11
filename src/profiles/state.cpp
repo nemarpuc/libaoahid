@@ -220,10 +220,8 @@ std::size_t collect_touch(const aoa::detail::TouchState& touch,
 bool validate_contact(const aoa::detail::TouchConfig& config_value,
                       const aoa::detail::TouchContact& contact, const char* operation) noexcept {
     const auto& options = config_value.fields;
-    if (contact.contact_id >
-            static_cast<std::uint32_t>(options.contact_identifier.logical_maximum) ||
-        static_cast<std::int64_t>(contact.contact_id) <
-            options.contact_identifier.logical_minimum ||
+    if (contact.contact_id > static_cast<std::uint32_t>(options.contact_id.logical_maximum) ||
+        static_cast<std::int64_t>(contact.contact_id) < options.contact_id.logical_minimum ||
         !in_range(contact.x, options.x) || !in_range(contact.y, options.y) ||
         (options.enable_pressure == 1U && !in_range(contact.pressure, options.pressure)) ||
         (options.enable_width == 1U && !in_range(contact.width, options.width)) ||
@@ -907,8 +905,8 @@ static aoahid_result aoahid_gamepad_button_impl(aoahid_node* node, const std::ui
     return AOAHID_OK;
 }
 
-static aoahid_result aoahid_gamepad_set_axis_impl(aoahid_node* node, const std::size_t axis_index,
-                                                  const std::int32_t value) {
+static aoahid_result aoahid_gamepad_axis_impl(aoahid_node* node, const std::size_t axis_index,
+                                              const std::int32_t value) {
     aoa::detail::clear_error();
     const aoahid_result check = usable(node, AOAHID_PROFILE_GAMEPAD, "gamepad.axis");
     if (check != AOAHID_OK)
@@ -1234,10 +1232,10 @@ aoahid_result AOAHID_CALL aoahid_gamepad_button(aoahid_node* node, const std::ui
                             [&] { return aoahid_gamepad_button_impl(node, button, down); });
 }
 
-aoahid_result AOAHID_CALL aoahid_gamepad_set_axis(aoahid_node* node, const std::size_t axis_index,
-                                                  const std::int32_t value) {
+aoahid_result AOAHID_CALL aoahid_gamepad_axis(aoahid_node* node, const std::size_t axis_index,
+                                              const std::int32_t value) {
     return abi_state_result("gamepad.axis",
-                            [&] { return aoahid_gamepad_set_axis_impl(node, axis_index, value); });
+                            [&] { return aoahid_gamepad_axis_impl(node, axis_index, value); });
 }
 
 aoahid_result AOAHID_CALL aoahid_gamepad_dpad(aoahid_node* node, const std::uint32_t up,

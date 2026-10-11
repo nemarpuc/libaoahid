@@ -293,7 +293,7 @@ bool controller_axis_usage(const aoahid_axis_role role, std::uint16_t* usage_pag
     }
 }
 
-bool controller_axis_domain_matches_usage(const aoahid_gamepad_axis& axis) noexcept {
+bool controller_axis_domain_matches_usage(const aoahid_gamepad_axis_option& axis) noexcept {
     const auto& value = axis.value;
     switch (axis.role) {
     case AOAHID_AXIS_SIMULATION_ACCELERATOR:
@@ -488,7 +488,7 @@ void touch_fields_from(const Options& options, aoa::detail::TouchFields* out) no
     out->report_id = options.report_id;
     out->maximum_contacts = options.maximum_contacts;
     out->contacts_per_report = options.contacts_per_report;
-    out->contact_identifier = options.contact_identifier;
+    out->contact_id = options.contact_id;
     out->x = options.x;
     out->y = options.y;
     out->contact_count = options.contact_count;
@@ -857,7 +857,7 @@ static aoahid_result create_controller_spec(const aoahid_gamepad_options* option
             // which HID 1.11 section 8.4 forbids for a single field.
             pad_report(builder);
             for (std::size_t index = 0; index < options->axis_count; ++index) {
-                const aoahid_gamepad_axis& axis = options->axes[index];
+                const aoahid_gamepad_axis_option& axis = options->axes[index];
                 if (!builder.variable(
                         axis.usage_page, axis.usage, axis.value.logical_minimum,
                         axis.value.logical_maximum, static_cast<std::uint8_t>(axis.value.bit_width),
@@ -898,7 +898,7 @@ struct TouchFieldNames {
     const char* enable_contact_count_maximum_feature_declaration;
     const char* enable_multi_packet_frames;
     const char* fields;
-    const char* contact_identifier;
+    const char* contact_id;
     const char* contact_count;
     const char* contact_fields;
     const char* contacts_per_report;
@@ -926,7 +926,7 @@ constexpr TouchFieldNames kTouchscreenFieldNames{
     "touch.enable_contact_count_maximum_feature_declaration",
     "touch.enable_multi_packet_frames",
     "touch.fields",
-    "touch.contact_identifier",
+    "touch.contact_id",
     "touch.contact_count",
     "touch.contact_fields",
     "touch.contacts_per_report",
@@ -954,7 +954,7 @@ constexpr TouchFieldNames kTouchpadFieldNames{
     "touchpad.enable_contact_count_maximum_feature_declaration",
     "touchpad.enable_multi_packet_frames",
     "touchpad.fields",
-    "touchpad.contact_identifier",
+    "touchpad.contact_id",
     "touchpad.contact_count",
     "touchpad.contact_fields",
     "touchpad.contacts_per_report",
@@ -1000,7 +1000,7 @@ create_touch_spec_from_fields(const aoa::detail::TouchFields& fields, const Touc
                   "The touch options contain an invalid required field, range, count, or flag.");
         return AOAHID_ERR_PARAM;
     }
-    if (!validate_field(fields.contact_identifier, names.contact_identifier) ||
+    if (!validate_field(fields.contact_id, names.contact_id) ||
         !validate_field(fields.contact_count, names.contact_count)) {
         set_error(AOAHID_ERR_PARAM, names.contact_fields,
                   "Fixed-slot Multi-Touch requires explicit Contact Identifier and Contact Count "
@@ -1014,11 +1014,10 @@ create_touch_spec_from_fields(const aoa::detail::TouchFields& fields, const Touc
                   "fixed-slot output never emits an isolated zero frame.");
         return AOAHID_ERR_PARAM;
     }
-    if (fields.contact_identifier.logical_minimum > 0 ||
-        fields.contact_identifier.logical_maximum < 0 ||
-        static_cast<std::uint64_t>(fields.contact_identifier.logical_maximum) + 1U <
+    if (fields.contact_id.logical_minimum > 0 || fields.contact_id.logical_maximum < 0 ||
+        static_cast<std::uint64_t>(fields.contact_id.logical_maximum) + 1U <
             fields.maximum_contacts) {
-        set_error(AOAHID_ERR_PARAM, names.contact_identifier,
+        set_error(AOAHID_ERR_PARAM, names.contact_id,
                   "The Contact Identifier range must represent zero for inactive slots and at "
                   "least maximum_contacts distinct nonnegative API IDs.");
         return AOAHID_ERR_PARAM;
@@ -1120,11 +1119,10 @@ create_touch_spec_from_fields(const aoa::detail::TouchFields& fields, const Touc
                 pad_report(builder);
                 if (!builder.variable(
                         aoa::hid::usage::page_digitizers, aoa::hid::usage::contact_identifier,
-                        fields.contact_identifier.logical_minimum,
-                        fields.contact_identifier.logical_maximum,
-                        static_cast<std::uint8_t>(fields.contact_identifier.bit_width), false,
-                        false, FieldSemantic::contact_id, static_cast<std::uint16_t>(contact),
-                        false, &fields.contact_identifier.physical) ||
+                        fields.contact_id.logical_minimum, fields.contact_id.logical_maximum,
+                        static_cast<std::uint8_t>(fields.contact_id.bit_width), false, false,
+                        FieldSemantic::contact_id, static_cast<std::uint16_t>(contact), false,
+                        &fields.contact_id.physical) ||
                     !builder.variable(aoa::hid::usage::page_generic_desktop, aoa::hid::usage::x,
                                       fields.x.logical_minimum, fields.x.logical_maximum,
                                       static_cast<std::uint8_t>(fields.x.bit_width), false, false,
@@ -1629,7 +1627,7 @@ static aoahid_result aoahid_spec_manifest_impl(const aoahid_spec* spec,
     manifest->profile_kind = spec->kind;
     manifest->reports = spec->report_capabilities.data();
     manifest->report_count = spec->report_capabilities.size();
-    manifest->descriptor_bytes = spec->descriptor.size();
+    manifest->descriptor_length = spec->descriptor.size();
     aoa::detail::clear_error();
     return AOAHID_OK;
 }

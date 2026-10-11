@@ -245,9 +245,9 @@ int main(void) {
     touchscreen_options.struct_size = (uint32_t)sizeof touchscreen_options;
     touchscreen_options.maximum_contacts = 1U;
     touchscreen_options.contacts_per_report = 1U;
-    touchscreen_options.contact_identifier.logical_minimum = 0;
-    touchscreen_options.contact_identifier.logical_maximum = 1;
-    touchscreen_options.contact_identifier.bit_width = 1U;
+    touchscreen_options.contact_id.logical_minimum = 0;
+    touchscreen_options.contact_id.logical_maximum = 1;
+    touchscreen_options.contact_id.bit_width = 1U;
     touchscreen_options.x.logical_minimum = 0;
     touchscreen_options.x.logical_maximum = 32767;
     touchscreen_options.x.bit_width = 16U;

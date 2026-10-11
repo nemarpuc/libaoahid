@@ -201,7 +201,7 @@ depends on Android's key layout and policy.
 
   Outside Hat mode the three `hat_*` fields must be zero.
 - Axes: `axis_count` (at least 2, including exactly one `AOAHID_AXIS_X` and one
-  `AOAHID_AXIS_Y`) entries of `aoahid_gamepad_axis`. Each has a role, the
+  `AOAHID_AXIS_Y`) entries of `aoahid_gamepad_axis_option`. Each has a role, the
   matching Usage Page and Usage, a value field with its own width, an in-range
   `neutral_value`, and non-empty `expected_linux_code` /
   `expected_android_axis` strings (stored with the Spec, not interpreted).
@@ -246,7 +246,7 @@ game controller mapping (Hat logical 0-7, physical 0-315 degrees, report size
 portable candidate only with the Hat and a Button range starting at 1 with at
 least 5 buttons.
 
-`aoahid_gamepad_set_axis(node, axis_index, value)` takes the index into your
+`aoahid_gamepad_axis(node, axis_index, value)` takes the index into your
 `axes` array. On close, buttons clear, the Hat sends Null, D-pad bits clear,
 and each axis returns to its neutral.
 

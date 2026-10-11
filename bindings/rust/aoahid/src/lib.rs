@@ -227,7 +227,7 @@ impl GamepadNodeRef {
         result(unsafe { sys::aoahid_gamepad_button(self.as_ptr(), button, u32::from(down)) })
     }
     pub fn axis(self, axis_index: usize, value: i32) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_gamepad_set_axis(self.as_ptr(), axis_index, value) })
+        result(unsafe { sys::aoahid_gamepad_axis(self.as_ptr(), axis_index, value) })
     }
     pub fn dpad(self, up: bool, down: bool, right: bool, left: bool) -> Result<(), Error> {
         result(unsafe {

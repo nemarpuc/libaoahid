@@ -77,7 +77,7 @@ Serialization rules, from the header contracts:
 Each Node has at most one report in flight.
 
 1. **Update.** A profile call (`aoahid_keyboard_key`, `aoahid_touchscreen_contact`, `aoahid_mouse_move`,
-   `aoahid_gamepad_set_axis`, …) changes the Node's state. It does not block,
+   `aoahid_gamepad_axis`, …) changes the Node's state. It does not block,
    allocate, log, or do I/O. It returns `AOAHID_ERR_BUSY` while a report (or a
    multi-packet touch frame) is in flight.
 2. **Submit.** `aoahid_node_submit` serializes the dirty state directly into a

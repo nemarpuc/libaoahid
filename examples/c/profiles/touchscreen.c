@@ -21,7 +21,7 @@ int main(void) {
     options.struct_size = (uint32_t)sizeof options;
     options.maximum_contacts = 3U;
     options.contacts_per_report = 3U;
-    options.contact_identifier = (aoahid_integer_field){0, 15, 4U, {0, 0, 0, 0, 0}};
+    options.contact_id = (aoahid_integer_field){0, 15, 4U, {0, 0, 0, 0, 0}};
     options.x = coordinate;
     options.y = coordinate;
     options.contact_count = (aoahid_integer_field){0, 3, 2U, {0, 0, 0, 0, 0}};

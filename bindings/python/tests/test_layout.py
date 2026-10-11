@@ -29,8 +29,8 @@ def test_device_options_exposes_target_parser_policies():
         "linux_hid_fields_per_report_policy",
         "linux_hid_global_stack_depth_policy",
         "linux_hid_usages_policy",
-        "linux_hid_report_data_bits_policy",
-        "linux_hid_report_size_bits_policy",
+        "linux_hid_report_data_policy_bits",
+        "linux_hid_report_size_policy_bits",
     } <= names
 
 

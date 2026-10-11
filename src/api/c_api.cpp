@@ -304,8 +304,8 @@ bool required_product_policies_nonzero(const aoahid_device_options& options) noe
            options.linux_hid_fields_per_report_policy != 0U &&
            options.linux_hid_global_stack_depth_policy != 0U &&
            options.linux_hid_usages_policy != 0U &&
-           options.linux_hid_report_data_bits_policy != 0U &&
-           options.linux_hid_report_size_bits_policy != 0U &&
+           options.linux_hid_report_data_policy_bits != 0U &&
+           options.linux_hid_report_size_policy_bits != 0U &&
            options.target_ep0_data_policy_bytes != 0U &&
            options.host_control_buffer_policy_bytes != 0U;
 }
@@ -1344,10 +1344,10 @@ aoahid_result AOAHID_CALL aoahid_device_open(aoahid_context* context,
         device->linux_hid_global_stack_depth_policy =
             effective_options.linux_hid_global_stack_depth_policy;
         device->linux_hid_usages_policy = effective_options.linux_hid_usages_policy;
-        device->linux_hid_report_data_bits_policy =
-            effective_options.linux_hid_report_data_bits_policy;
-        device->linux_hid_report_size_bits_policy =
-            effective_options.linux_hid_report_size_bits_policy;
+        device->linux_hid_report_data_policy_bits =
+            effective_options.linux_hid_report_data_policy_bits;
+        device->linux_hid_report_size_policy_bits =
+            effective_options.linux_hid_report_size_policy_bits;
         device->target_ep0_policy_bytes = effective_options.target_ep0_data_policy_bytes;
         device->host_control_policy_bytes = effective_options.host_control_buffer_policy_bytes;
         device->validate_reports = effective_options.validate_reports == 1U;
@@ -1458,11 +1458,11 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
                   spec->requirements.maximum_global_stack_depth);
         return AOAHID_ERR_OVERFLOW;
     }
-    if (spec->requirements.maximum_report_size_bits > device->linux_hid_report_size_bits_policy) {
+    if (spec->requirements.maximum_report_size_bits > device->linux_hid_report_size_policy_bits) {
         set_error(AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_report_size_bits",
                   "The descriptor exceeds the caller-selected Report Size declaration policy for "
                   "the exact target HID parser revision.",
-                  0, 0, 0, 0, device->linux_hid_report_size_bits_policy,
+                  0, 0, 0, 0, device->linux_hid_report_size_policy_bits,
                   spec->requirements.maximum_report_size_bits);
         return AOAHID_ERR_OVERFLOW;
     }
@@ -1478,13 +1478,13 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
                 spec->requirements.maximum_usages, std::numeric_limits<std::uint32_t>::max())));
         return AOAHID_ERR_OVERFLOW;
     }
-    if (spec->requirements.maximum_report_data_bits > device->linux_hid_report_data_bits_policy) {
+    if (spec->requirements.maximum_report_data_bits > device->linux_hid_report_data_policy_bits) {
         set_error(AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_report_data_bits",
                   "The descriptor exceeds the caller-selected report data-bit policy for the exact "
                   "target HID parser revision.",
                   0, 0, 0, 0,
                   static_cast<std::uint32_t>(
-                      std::min<std::uint64_t>(device->linux_hid_report_data_bits_policy,
+                      std::min<std::uint64_t>(device->linux_hid_report_data_policy_bits,
                                               std::numeric_limits<std::uint32_t>::max())),
                   static_cast<std::uint32_t>(
                       std::min<std::uint64_t>(spec->requirements.maximum_report_data_bits,

@@ -56,7 +56,7 @@ def load_catalog(path: Path) -> dict[str, dict[str, str]]:
             "input",
             "output",
             "feature_transport",
-            "descriptor_bytes",
+            "descriptor_length",
             "reports",
         }
         if reader.fieldnames is None or set(reader.fieldnames) != required:
@@ -88,7 +88,7 @@ def render(catalog: dict[str, dict[str, str]]) -> str:
             input_supported = int(manifest["input"])
             output_supported = int(manifest["output"])
             feature_transport = int(manifest["feature_transport"])
-            descriptor_bytes = int(manifest["descriptor_bytes"])
+            descriptor_length = int(manifest["descriptor_length"])
         except (KeyError, ValueError) as error:
             raise SystemExit(f"invalid manifest values for {presentation.key}: {error}") from error
         if status != presentation.expected_status:
@@ -98,7 +98,7 @@ def render(catalog: dict[str, dict[str, str]]) -> str:
             )
         if (input_supported, output_supported, feature_transport) != (1, 0, 0):
             raise SystemExit(f"{presentation.key} violates the Input-only transport contract")
-        if descriptor_bytes <= 0 or not manifest["reports"]:
+        if descriptor_length <= 0 or not manifest["reports"]:
             raise SystemExit(f"{presentation.key} has no descriptor/report manifest data")
         lines.append(
             f"| {presentation.name} | {status} | yes | no | no | {presentation.qualification} |"

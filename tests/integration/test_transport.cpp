@@ -1376,13 +1376,13 @@ void test_required_device_policies_precede_usb_io() {
     AOAHID_CHECK(device == nullptr && aoahid_fake_libusb_control_count() == 0U);
 
     options = public_device_options();
-    options.linux_hid_report_data_bits_policy = 0U;
+    options.linux_hid_report_data_policy_bits = 0U;
     AOAHID_CHECK(aoahid_device_open(context, &selected, &options, &device) ==
                  AOAHID_ERR_UNSET_FIELD);
     AOAHID_CHECK(device == nullptr && aoahid_fake_libusb_control_count() == 0U);
 
     options = public_device_options();
-    options.linux_hid_report_size_bits_policy = 0U;
+    options.linux_hid_report_size_policy_bits = 0U;
     AOAHID_CHECK(aoahid_device_open(context, &selected, &options, &device) ==
                  AOAHID_ERR_UNSET_FIELD);
     AOAHID_CHECK(device == nullptr && aoahid_fake_libusb_control_count() == 0U);
@@ -1500,8 +1500,8 @@ aoahid_device_options public_device_options() {
     options.linux_hid_fields_per_report_policy = 256U;
     options.linux_hid_global_stack_depth_policy = 4U;
     options.linux_hid_usages_policy = 12288U;
-    options.linux_hid_report_data_bits_policy = 65528U;
-    options.linux_hid_report_size_bits_policy = 256U;
+    options.linux_hid_report_data_policy_bits = 65528U;
+    options.linux_hid_report_size_policy_bits = 256U;
     options.target_ep0_data_policy_bytes = 4096U;
     options.host_control_buffer_policy_bytes = 4096U;
     options.interface_claim_policy = AOAHID_INTERFACE_CLAIM_NONE;
@@ -1717,8 +1717,8 @@ void test_descriptor_requirements_are_caller_policies() {
             options.linux_hid_fields_per_report_policy = fields_policy;
             options.linux_hid_global_stack_depth_policy = stack_policy;
             options.linux_hid_usages_policy = usages_policy;
-            options.linux_hid_report_data_bits_policy = report_bits_policy;
-            options.linux_hid_report_size_bits_policy = report_size_policy;
+            options.linux_hid_report_data_policy_bits = report_bits_policy;
+            options.linux_hid_report_size_policy_bits = report_size_policy;
             options.maximum_report_bytes = 8192U;
             options.target_ep0_data_policy_bytes = 8192U;
             options.host_control_buffer_policy_bytes = 8192U;
@@ -1730,8 +1730,8 @@ void test_descriptor_requirements_are_caller_policies() {
             AOAHID_CHECK(device->linux_hid_fields_per_report_policy == fields_policy);
             AOAHID_CHECK(device->linux_hid_global_stack_depth_policy == stack_policy);
             AOAHID_CHECK(device->linux_hid_usages_policy == usages_policy);
-            AOAHID_CHECK(device->linux_hid_report_data_bits_policy == report_bits_policy);
-            AOAHID_CHECK(device->linux_hid_report_size_bits_policy == report_size_policy);
+            AOAHID_CHECK(device->linux_hid_report_data_policy_bits == report_bits_policy);
+            AOAHID_CHECK(device->linux_hid_report_size_policy_bits == report_size_policy);
             aoahid_node* node = nullptr;
             AOAHID_CHECK(aoahid_node_open(device, spec, &node_options, &node) ==
                          AOAHID_ERR_OVERFLOW);
@@ -1805,7 +1805,7 @@ void test_public_touchpad_button_only_close() {
     touchpad.struct_size = sizeof(touchpad);
     touchpad.maximum_contacts = 2U;
     touchpad.contacts_per_report = 2U;
-    touchpad.contact_identifier = {0, 15, 4U, {}};
+    touchpad.contact_id = {0, 15, 4U, {}};
     touchpad.x = {0, 1000, 16U, {}};
     touchpad.y = {0, 1000, 16U, {}};
     touchpad.contact_count = {0, 2, 2U, {}};
@@ -1865,9 +1865,10 @@ void test_public_controller_close_neutralizes_dpad() {
     device_options.close_drain_timeout_ms = 100U;
     AOAHID_CHECK(aoahid_device_open(context, &selected, &device_options, &device) == AOAHID_OK);
 
-    const std::array<aoahid_gamepad_axis, 2U> axes{
-        aoahid_gamepad_axis{AOAHID_AXIS_X, 0x01U, 0x30U, {-127, 127, 8U, {}}, 0, "ABS_X", "AXIS_X"},
-        aoahid_gamepad_axis{
+    const std::array<aoahid_gamepad_axis_option, 2U> axes{
+        aoahid_gamepad_axis_option{
+            AOAHID_AXIS_X, 0x01U, 0x30U, {-127, 127, 8U, {}}, 0, "ABS_X", "AXIS_X"},
+        aoahid_gamepad_axis_option{
             AOAHID_AXIS_Y, 0x01U, 0x31U, {-127, 127, 8U, {}}, 0, "ABS_Y", "AXIS_Y"}};
     aoahid_gamepad_options controller{};
     controller.struct_size = sizeof(controller);
@@ -2478,7 +2479,7 @@ void open_public_touch_session(aoahid_context** context, aoahid_device** device,
     touch.struct_size = sizeof(touch);
     touch.maximum_contacts = 2U;
     touch.contacts_per_report = 1U;
-    touch.contact_identifier = {0, 15, 4U, {}};
+    touch.contact_id = {0, 15, 4U, {}};
     touch.x = {0, 1000, 16U, {}};
     touch.y = {0, 1000, 16U, {}};
     touch.contact_count = {0, 2, 2U, {}};
@@ -2625,7 +2626,7 @@ void test_public_touch_scan_time_rejected_first_attempt_stays_zero() {
     touchscreen_options.struct_size = sizeof(touchscreen_options);
     touchscreen_options.maximum_contacts = 1U;
     touchscreen_options.contacts_per_report = 1U;
-    touchscreen_options.contact_identifier = {0, 15, 4U, {}};
+    touchscreen_options.contact_id = {0, 15, 4U, {}};
     touchscreen_options.x = {0, 1000, 16U, {}};
     touchscreen_options.y = {0, 1000, 16U, {}};
     touchscreen_options.contact_count = {0, 1, 1U, {}};

@@ -8,13 +8,13 @@
 static const aoahid_integer_field k_stick = {-32767, 32767, 16U, {0, 0, 0, 0, 0}};
 
 static const char* const k_send_sequence[] = {
-    "aoahid_gamepad_set_axis(node, 0, 0)   axis index 0, caller-declared range",
+    "aoahid_gamepad_axis(node, 0, 0)   axis index 0, caller-declared range",
     "aoahid_gamepad_dpad(node, 1, 0, 0, 0)         booleans become a canonical Hat value",
     "aoahid_gamepad_button(node, 0, 1)     button index 0 is Button 1",
     "aoahid_node_submit(node)              opposite D-pad pairs are rejected", NULL};
 
 int main(void) {
-    const aoahid_gamepad_axis axes[] = {
+    const aoahid_gamepad_axis_option axes[] = {
         {AOAHID_AXIS_X, 0x01U, 0x30U, k_stick, 0, "ABS_X", "AXIS_X"},
         {AOAHID_AXIS_Y, 0x01U, 0x31U, k_stick, 0, "ABS_Y", "AXIS_Y"}};
     aoahid_gamepad_options options = {0};
