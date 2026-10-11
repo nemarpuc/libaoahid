@@ -1646,9 +1646,9 @@ aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node) try {
                                          &aoa::detail::transfer_complete, &prepared);
     if (acquired != AOAHID_OK) {
         node->transfer_inflight.store(false, std::memory_order_release);
-        return finish_transport_result(
-            acquired, "node.submit", "No transfer slot could be acquired for AOA request 57.", node,
-            57, 0U, static_cast<std::uint32_t>(layout.wire_bytes));
+        return finish_transport_result(acquired, "node.submit",
+                                       "No transfer slot could be acquired for AOA request 57.",
+                                       node, 57, 0U, static_cast<std::uint32_t>(layout.wire_bytes));
     }
     auto* scan_touch =
         battery_report ? nullptr : std::get_if<aoa::detail::TouchState>(&node->state);
@@ -1698,9 +1698,8 @@ aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node) try {
         return serialized;
     }
     if (node->device->validate_reports) {
-        const aoahid_result validated =
-            aoa::detail::validate_serialized_report(node->spec, layout, prepared.payload,
-                                                    report_length);
+        const aoahid_result validated = aoa::detail::validate_serialized_report(
+            node->spec, layout, prepared.payload, report_length);
         if (validated != AOAHID_OK) {
             node->device->transport->abandon(prepared);
             rollback_scan_time();

@@ -117,8 +117,7 @@ void check_battery_variant(Options options,
                                 spec->descriptor.begin()));
         AOAHID_CHECK(spec->layout.wire_bytes == plain->layout.wire_bytes);
         AOAHID_CHECK(!plain->has_battery && spec->has_battery &&
-                     spec->battery_layout.report_id == 2U &&
-                     spec->battery_layout.wire_bytes == 2U);
+                     spec->battery_layout.report_id == 2U && spec->battery_layout.wire_bytes == 2U);
         aoahid_capability_manifest manifest{};
         manifest.struct_size = static_cast<std::uint32_t>(sizeof(manifest));
         AOAHID_CHECK(aoahid_spec_manifest(spec, &manifest) == AOAHID_OK);
@@ -1540,8 +1539,9 @@ void test_battery_builder() {
                  std::equal(tail.begin(), tail.end(),
                             bytes.end() - static_cast<std::ptrdiff_t>(tail.size())));
 
-    AOAHID_CHECK(aoa::hid::validate_generated(bytes.data(), bytes.size(), input, &battery_layout)
-                     .result == AOAHID_OK);
+    AOAHID_CHECK(
+        aoa::hid::validate_generated(bytes.data(), bytes.size(), input, &battery_layout).result ==
+        AOAHID_OK);
     // The same bytes checked against a wrong battery layout are refused.
     ReportLayout wrong = battery_layout;
     wrong.report_id = 3U;

@@ -323,7 +323,7 @@ ValidationIssue validate_generated_structure(const std::uint8_t* descriptor,
                                  "The generated battery report carries a Feature item.",
                                  item_offset);
                 }
-                std::size_t& report_bits = tag != kMainInput    ? feature_bits
+                std::size_t& report_bits = tag != kMainInput ? feature_bits
                                            : battery_id_seen ? battery_input_bits
                                                              : input_bits;
                 if (!field_span_is_valid(FieldSpan{report_bits, report_size, report_count})) {
@@ -420,8 +420,7 @@ ValidationIssue layout_bits_of(const ReportLayout& layout, std::size_t* bits) no
 } // namespace
 
 ValidationIssue validate_generated(const std::uint8_t* descriptor,
-                                   const std::size_t descriptor_length,
-                                   const ReportLayout& layout,
+                                   const std::size_t descriptor_length, const ReportLayout& layout,
                                    const ReportLayout* battery_layout) noexcept {
     if (descriptor == nullptr || descriptor_length == 0U) {
         return issue(AOAHID_ERR_UNSET_FIELD, "spec.descriptor",

@@ -158,8 +158,7 @@ constexpr BatteryFieldNames kKeyboardBatteryNames{"keyboard.enable_battery", "ke
                                                   "keyboard.battery.report_id",
                                                   "keyboard.battery.strength"};
 constexpr BatteryFieldNames kMouseBatteryNames{"mouse.enable_battery", "mouse.battery",
-                                               "mouse.battery.report_id",
-                                               "mouse.battery.strength"};
+                                               "mouse.battery.report_id", "mouse.battery.strength"};
 constexpr BatteryFieldNames kToggleBatteryNames{"toggle.enable_battery", "toggle.battery",
                                                 "toggle.battery.report_id",
                                                 "toggle.battery.strength"};
@@ -206,8 +205,7 @@ bool validate_battery(const BatteryRequest& request, const BatteryFieldNames& na
                   "values.");
         return false;
     }
-    if (!validate_field(battery.strength, names.strength) ||
-        battery.strength.logical_minimum < 0 ||
+    if (!validate_field(battery.strength, names.strength) || battery.strength.logical_minimum < 0 ||
         battery.strength.logical_maximum <= battery.strength.logical_minimum) {
         set_error(AOAHID_ERR_PARAM, names.strength,
                   "Battery Strength requires an ordered nonnegative range that fits its width.");
@@ -284,9 +282,9 @@ aoahid_result build_generated_spec(const GeneratedSpecIdentity identity,
     if (has_battery) {
         spec->has_battery = true;
         spec->battery = battery.report;
-        spec->report_capabilities.push_back(aoahid_report_capability{
-            {1U, spec->battery_layout.report_id, {0U, 0U, 0U}},
-            static_cast<std::uint32_t>(spec->battery_layout.wire_bytes)});
+        spec->report_capabilities.push_back(
+            aoahid_report_capability{{1U, spec->battery_layout.report_id, {0U, 0U, 0U}},
+                                     static_cast<std::uint32_t>(spec->battery_layout.wire_bytes)});
     }
     *out_spec = spec.release();
     aoa::detail::clear_error();
@@ -521,8 +519,8 @@ aoahid_result create_usage_control_spec(const aoahid_toggle_options* options,
         return AOAHID_ERR_PARAM;
     }
     return build_generated_spec(
-        GeneratedSpecIdentity{AOAHID_PROFILE_TOGGLE, AOAHID_ANDROID_CONDITIONAL}, std::move(config), battery,
-        [=](DescriptorBuilder& builder) { return emit_usage_controls(builder, *options); },
+        GeneratedSpecIdentity{AOAHID_PROFILE_TOGGLE, AOAHID_ANDROID_CONDITIONAL}, std::move(config),
+        battery, [=](DescriptorBuilder& builder) { return emit_usage_controls(builder, *options); },
         out_spec);
 }
 
@@ -735,7 +733,8 @@ static aoahid_result aoahid_spec_create_mouse_impl(const aoahid_mouse_options* o
         return AOAHID_ERR_PARAM;
     }
     return build_generated_spec(
-        GeneratedSpecIdentity{AOAHID_PROFILE_MOUSE, AOAHID_ANDROID_PORTABLE_CANDIDATE}, config, battery,
+        GeneratedSpecIdentity{AOAHID_PROFILE_MOUSE, AOAHID_ANDROID_PORTABLE_CANDIDATE}, config,
+        battery,
         [=](DescriptorBuilder& builder) {
             if (!builder.begin_application(aoa::hid::usage::page_generic_desktop,
                                            aoa::hid::usage::mouse) ||
@@ -1343,12 +1342,10 @@ static aoahid_result aoahid_spec_create_touchscreen_impl(const aoahid_touchscree
     aoa::detail::TouchFields fields{};
     touch_fields_from(*options, &fields);
     fields.button_count = 0U;
-    return create_touch_spec_from_fields(fields, kTouchscreenFieldNames, AOAHID_PROFILE_TOUCHSCREEN,
-                                         aoa::hid::usage::touch_screen,
-                                         AOAHID_ANDROID_PORTABLE_CANDIDATE,
-                                         BatteryRequest{options->enable_battery, options->battery,
-                                                        options->report_id},
-                                         out_spec);
+    return create_touch_spec_from_fields(
+        fields, kTouchscreenFieldNames, AOAHID_PROFILE_TOUCHSCREEN, aoa::hid::usage::touch_screen,
+        AOAHID_ANDROID_PORTABLE_CANDIDATE,
+        BatteryRequest{options->enable_battery, options->battery, options->report_id}, out_spec);
 }
 
 static aoahid_result aoahid_spec_create_touchpad_impl(const aoahid_touchpad_options* options,
@@ -1368,11 +1365,10 @@ static aoahid_result aoahid_spec_create_touchpad_impl(const aoahid_touchpad_opti
     aoa::detail::TouchFields fields{};
     touch_fields_from(*options, &fields);
     fields.button_count = options->button_count;
-    return create_touch_spec_from_fields(fields, kTouchpadFieldNames, AOAHID_PROFILE_TOUCHPAD,
-                                         aoa::hid::usage::touch_pad, AOAHID_ANDROID_CONDITIONAL,
-                                         BatteryRequest{options->enable_battery, options->battery,
-                                                        options->report_id},
-                                         out_spec);
+    return create_touch_spec_from_fields(
+        fields, kTouchpadFieldNames, AOAHID_PROFILE_TOUCHPAD, aoa::hid::usage::touch_pad,
+        AOAHID_ANDROID_CONDITIONAL,
+        BatteryRequest{options->enable_battery, options->battery, options->report_id}, out_spec);
 }
 
 // Pen and Digitizer share one report shape; only the Application Usage and
@@ -1750,7 +1746,6 @@ aoahid_result AOAHID_CALL aoahid_spec_create_digitizer(const aoahid_digitizer_op
     return abi_spec_factory(out_spec, "spec.create_digitizer",
                             [&] { return aoahid_spec_create_digitizer_impl(options, out_spec); });
 }
-
 
 aoahid_result AOAHID_CALL aoahid_spec_create_raw(const aoahid_raw_options* options,
                                                  aoahid_spec** out_spec) {

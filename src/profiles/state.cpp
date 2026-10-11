@@ -326,9 +326,8 @@ aoahid_result validate_serialized_report(const aoahid_spec* spec,
 
 aoahid_result serialize_battery(const aoahid_node* node, std::uint8_t* report,
                                 const std::size_t capacity, std::size_t* report_length) noexcept {
-    if (node == nullptr || node->spec == nullptr || !node->spec->has_battery ||
-        report == nullptr || report_length == nullptr ||
-        capacity < node->spec->battery_layout.wire_bytes) {
+    if (node == nullptr || node->spec == nullptr || !node->spec->has_battery || report == nullptr ||
+        report_length == nullptr || capacity < node->spec->battery_layout.wire_bytes) {
         set_error(AOAHID_ERR_PARAM, "report", "The serializer buffer is missing or too small.");
         return AOAHID_ERR_PARAM;
     }
@@ -645,8 +644,7 @@ void transfer_complete(void* user, const aoahid_result result,
         }
         node->dirty = false;
     }
-    if (!battery_report && may_have_applied &&
-        (result != AOAHID_OK || lifecycle_report_complete)) {
+    if (!battery_report && may_have_applied && (result != AOAHID_OK || lifecycle_report_complete)) {
         // An accepted terminal transfer may have reached the target even when
         // completion is uncertain. Consume its edge baseline so a later
         // opposite transition can release any state the target may hold.
