@@ -35,11 +35,15 @@ Arch Linux:
 | Input | Tested on hardware |
 |---|---|
 | Touchscreen (multi-touch) | yes |
+| Touchpad (slide, click) | yes |
 | Keyboard (full NKRO) | yes |
 | Mouse (move, buttons, wheel) | yes |
 | Gamepad (sticks, buttons, D-pad) | yes |
 | Media keys (volume, play/pause, next/previous) | yes |
-| Pen, digitizer, touchpad, and other profiles | not yet |
+| Pen (stylus, buttons, eraser, pressure, tilt) | yes |
+| Digitizer (stylus, buttons, eraser, pressure, tilt) | yes |
+| Battery (strength reports) | not yet |
+| Raw report | not yet |
 
 Details per device and OS are in [TARGET_MATRIX.md](docs/TARGET_MATRIX.md).
 

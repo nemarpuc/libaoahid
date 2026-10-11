@@ -5,17 +5,18 @@ been confirmed on real hardware, and which have not.
 
 ## Summary
 
-- Confirmed working on real hardware (2026-09): **touchscreen, keyboard,
-  mouse, gamepad, and media keys (Consumer Control toggle)**.
+- Confirmed working on real hardware (2026-09, 2026-10): **touchscreen,
+  touchpad, keyboard, mouse, gamepad, pen, digitizer, and media keys (Consumer
+  Control toggle)**.
 - Devices: Samsung Galaxy Tab S11 and POCO F6 Pro (HyperOS).
 - Hosts: Windows 10 x64 (WinUSB and libusbK) and Arch Linux x86_64 (usbfs).
-- Not yet tested on hardware: pen, digitizer, touchpad, battery, raw, and the System
-  Control, Camera, and Telephony toggle forms.
+- Not yet tested on hardware: battery, raw, and the System Control, Camera, and
+  Telephony toggle forms.
 
 "Confirmed" means the profile was driven through
-[aoahid_player](https://github.com/nemarpuc/aoahid_player) and the input took
-effect on the device. Kernel `getevent` traces and `dumpsys input` output were
-not captured separately.
+[aoahid_player](https://github.com/nemarpuc/aoahid_player) or `devtest`
+and the input took effect on the device, with kernel `getevent` traces
+captured over the ADB proxy where noted.
 
 ## Hardware-tested combinations
 
@@ -23,6 +24,7 @@ not captured separately.
 |---|---|---|---|
 | Samsung Galaxy Tab S11 | OEM release | Windows 10 x64 / WinUSB, libusbK | 2026-09 |
 | Samsung Galaxy Tab S11 | OEM release | Arch Linux x86_64 / usbfs | 2026-09 |
+| Samsung Galaxy Tab S11 | OEM release (SM-X730) | Arch Linux x86_64 / usbfs | 2026-10 |
 | POCO F6 Pro | HyperOS release | Windows 10 x64 / WinUSB, libusbK | 2026-09 |
 | POCO F6 Pro | HyperOS release | Arch Linux x86_64 / usbfs | 2026-09 |
 
@@ -46,10 +48,10 @@ column below is about real devices only.
 | Toggle: System Control | Not tested |
 | Toggle: Camera | Not tested |
 | Toggle: Telephony | Not tested |
-| Pen | Not tested |
-| Digitizer | Not tested |
-| Touchpad | Not tested |
-| Battery Strength | Not tested |
+| Pen | Confirmed on Samsung Galaxy Tab S11 (Arch Linux; devtest + getevent) |
+| Digitizer | Confirmed on Samsung Galaxy Tab S11 (Arch Linux; devtest + getevent) |
+| Touchpad | Confirmed on Samsung Galaxy Tab S11 (Arch Linux; devtest + getevent) |
+| Battery Strength | Not tested (AOA reports are accepted by the gadget, but no power_supply or dumpsys association was observed on Android) |
 | Raw report | Not tested; the library makes no claim about how Android interprets a raw descriptor |
 
 ## Transport and accessory mode

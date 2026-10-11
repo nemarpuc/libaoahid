@@ -18,14 +18,16 @@ Tested on real hardware (Samsung Galaxy Tab S11 and POCO F6 Pro, from Windows
 10 x64 and Arch Linux hosts):
 
 - Touchscreen
+- Touchpad
 - Keyboard
 - Mouse
 - Gamepad
 - Toggle as Consumer Control media keys
+- Pen
+- Digitizer
 
-Not yet tested on hardware: Pen, Digitizer, Touchpad, Battery, Raw, and Toggle on the
-System Control, Camera Control, and Telephony pages. Their descriptors are
-checked by unit and golden tests only. See [TARGET_MATRIX.md](TARGET_MATRIX.md)
+Not yet tested on hardware: Battery, Raw, and Toggle on the System Control,
+Camera Control, and Telephony pages. See [TARGET_MATRIX.md](TARGET_MATRIX.md)
 for per-target results.
 
 The manifest's `android_status` is a static classification of the descriptor

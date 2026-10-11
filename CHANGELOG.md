@@ -9,9 +9,12 @@ All notable changes to libaoahid are recorded here. This project follows
 
 The first stable release under this version number. The earlier release tags
 and their version numbers were withdrawn; their change history is kept below
-under "Earlier history". It was not hardware-verified: the Pen and Digitizer
-profiles have not been run against a phone, and the `Verified` rows in
-`docs/TARGET_MATRIX.md` are unchanged.
+under "Earlier history". Hardware-verified on a Samsung Galaxy Tab S11 (Arch Linux):
+Keyboard, Mouse, Toggle (media keys), Gamepad, Touchscreen, Touchpad, Pen,
+and Digitizer were verified via devtest and kernel getevent. Battery Strength
+remains not hardware-verified (AOA reports are accepted by the USB gadget,
+but no power_supply or InputManager association was observed on Android).
+
 
 ### Changed (breaking)
 
