@@ -4,6 +4,7 @@
  * memory; it does not claim target-device acceptance. */
 #include "aoahid.h"
 #include "api/internal.hpp"
+#include "hid/descriptor_builder.hpp"
 #include "hid/usages.hpp"
 #include "hid/validator.hpp"
 #include "test.hpp"
@@ -1452,6 +1453,72 @@ void test_send_time_report_validation() {
 }
 } // namespace
 
+void test_battery_builder() {
+    using aoa::hid::BatteryField;
+    using aoa::hid::DescriptorBuilder;
+    using aoa::hid::FieldSemantic;
+    using aoa::hid::ReportLayout;
+
+    const BatteryField battery{2U, 1, 100, 8U, {}};
+    const auto emit = [&](DescriptorBuilder& builder) {
+        return builder.begin_application(0x01U, 0x06U) && builder.set_report_id(true, 1U) &&
+               builder.variable_range(0x07U, 0xE0U, 0xE7U, 1U, FieldSemantic::modifier) &&
+               builder.end_collection();
+    };
+    ReportLayout input;
+    ReportLayout battery_layout;
+    DescriptorBuilder counting(nullptr, 65535U, &input);
+    counting.set_battery(battery, &battery_layout);
+    AOAHID_CHECK(emit(counting));
+    counting.finish();
+    AOAHID_CHECK(counting.good());
+    std::vector<std::uint8_t> bytes(counting.descriptor_size());
+    DescriptorBuilder emitting(bytes.data(), bytes.size(), nullptr);
+    emitting.set_battery(battery, nullptr);
+    AOAHID_CHECK(emit(emitting));
+    emitting.finish();
+    AOAHID_CHECK(emitting.good() && emitting.descriptor_size() == bytes.size());
+
+    // Input layout is untouched by the battery report.
+    AOAHID_CHECK(input.has_report_id && input.report_id == 1U && input.wire_bytes == 2U);
+    AOAHID_CHECK(battery_layout.has_report_id && battery_layout.report_id == 2U &&
+                 battery_layout.wire_bytes == 2U && battery_layout.fields.size() == 1U &&
+                 battery_layout.fields[0].semantic == FieldSemantic::battery_strength &&
+                 battery_layout.fields[0].bit_offset == 8U &&
+                 battery_layout.fields[0].logical_minimum == 1 &&
+                 battery_layout.fields[0].logical_maximum == 100);
+
+    const std::vector<std::uint8_t> tail{0x85U, 0x02U, 0x05U, 0x06U, 0x09U, 0x20U,
+                                         0x15U, 0x01U, 0x25U, 0x64U, 0x75U, 0x08U,
+                                         0x95U, 0x01U, 0x81U, 0x02U, 0xC0U};
+    AOAHID_CHECK(bytes.size() > tail.size() &&
+                 std::equal(tail.begin(), tail.end(),
+                            bytes.end() - static_cast<std::ptrdiff_t>(tail.size())));
+
+    AOAHID_CHECK(aoa::hid::validate_generated(bytes.data(), bytes.size(), input, &battery_layout)
+                     .result == AOAHID_OK);
+    // The same bytes checked against a wrong battery layout are refused.
+    ReportLayout wrong = battery_layout;
+    wrong.report_id = 3U;
+    AOAHID_CHECK(aoa::hid::validate_generated(bytes.data(), bytes.size(), input, &wrong).result ==
+                 AOAHID_ERR_INTERNAL);
+    // Without a battery layout a second Report ID is still refused.
+    AOAHID_CHECK(aoa::hid::validate_generated(bytes.data(), bytes.size(), input).result ==
+                 AOAHID_ERR_INTERNAL);
+
+    // A 7-bit field is padded to a whole byte.
+    const BatteryField narrow{2U, 0, 100, 7U, {}};
+    ReportLayout narrow_input;
+    ReportLayout narrow_layout;
+    DescriptorBuilder narrow_builder(nullptr, 65535U, &narrow_input);
+    narrow_builder.set_battery(narrow, &narrow_layout);
+    AOAHID_CHECK(emit(narrow_builder));
+    narrow_builder.finish();
+    AOAHID_CHECK(narrow_builder.good() && narrow_layout.wire_bytes == 2U &&
+                 narrow_layout.fields.size() == 2U && !narrow_layout.fields[0].has_null_state &&
+                 narrow_layout.fields[1].semantic == FieldSemantic::constant_padding);
+}
+
 void test_profiles() {
     aoahid_keyboard_options zero{};
     auto* spec = reinterpret_cast<aoahid_spec*>(static_cast<std::uintptr_t>(1U));
@@ -1492,6 +1559,7 @@ void test_profiles() {
     test_raw_report_table_report_id_rules();
     test_raw_factory_bounds_before_allocation();
     test_send_time_report_validation();
+    test_battery_builder();
 
     aoahid_touchscreen_options invalid_touch = touchscreen_options();
     invalid_touch.contact_id = {1, 15, 4U, {}};

@@ -7,6 +7,8 @@
 
 #include "hid/descriptor_builder.hpp"
 
+#include "hid/usages.hpp"
+
 #include <algorithm>
 #include <limits>
 
@@ -74,9 +76,12 @@ bool DescriptorBuilder::begin_physical(const std::uint16_t usage_page,
     return good_;
 }
 
-bool DescriptorBuilder::end_collection() noexcept {
+bool DescriptorBuilder::end_collection() {
     if (!good_ || collection_depth_ == 0U) {
         good_ = false;
+        return false;
+    }
+    if (collection_depth_ == 1U && has_battery_ && !emit_battery()) {
         return false;
     }
     good_ = writer_.end_collection();
@@ -113,6 +118,41 @@ bool DescriptorBuilder::set_report_id(const bool enabled, const std::uint8_t rep
     }
     input_bits_ = 8U;
     return good_;
+}
+
+void DescriptorBuilder::set_battery(const BatteryField& field, ReportLayout* layout) noexcept {
+    battery_ = field;
+    battery_layout_ = layout;
+    has_battery_ = true;
+}
+
+// Switches to the battery report: its own Report ID, its own layout, its own
+// bit count. Nothing may follow it but the End Collection.
+bool DescriptorBuilder::emit_battery() {
+    if (!good_ || current_report_id_ == 0U || battery_.report_id == 0U ||
+        battery_.report_id == current_report_id_) {
+        good_ = false;
+        return false;
+    }
+    if (layout_ != nullptr) {
+        layout_->wire_bytes = (input_bits_ + 7U) / 8U;
+    }
+    good_ = writer_.report_id(battery_.report_id);
+    current_report_id_ = battery_.report_id;
+    layout_ = battery_layout_;
+    if (layout_ != nullptr) {
+        layout_->has_report_id = true;
+        layout_->report_id = battery_.report_id;
+    }
+    input_bits_ = 8U;
+    has_battery_ = false;
+    if (!variable(usage::page_generic_device_controls, usage::battery_strength,
+                  battery_.logical_minimum, battery_.logical_maximum, battery_.bit_width, false,
+                  false, FieldSemantic::battery_strength, 0U, false, &battery_.physical)) {
+        return false;
+    }
+    const std::size_t padding = (8U - (input_bits_ & 7U)) & 7U;
+    return padding == 0U || constant_padding(static_cast<std::uint16_t>(padding));
 }
 
 bool DescriptorBuilder::prepare_data_main() noexcept {

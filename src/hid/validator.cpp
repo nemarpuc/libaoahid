@@ -214,7 +214,9 @@ namespace {
 ValidationIssue validate_generated_structure(const std::uint8_t* descriptor,
                                              const std::size_t descriptor_length,
                                              const ReportLayout& layout,
-                                             const std::size_t layout_bits) noexcept {
+                                             const std::size_t layout_bits,
+                                             const ReportLayout* battery_layout,
+                                             const std::size_t battery_bits) noexcept {
     std::uint32_t report_size = 0U;
     std::uint32_t report_count = 0U;
     std::size_t input_bits = 0U;
@@ -225,6 +227,9 @@ ValidationIssue validate_generated_structure(const std::uint8_t* descriptor,
     std::uint8_t report_id = 0U;
     bool report_id_seen = false;
     bool data_main_seen = false;
+    std::size_t battery_input_bits = 0U;
+    std::uint8_t battery_id = 0U;
+    bool battery_id_seen = false;
 
     while (offset < descriptor_length) {
         const std::size_t item_offset = offset;
@@ -248,14 +253,22 @@ ValidationIssue validate_generated_structure(const std::uint8_t* descriptor,
             if (tag == kGlobalReportSize) {
                 report_size = value;
             } else if (tag == kGlobalReportId) {
-                if (value == 0U || value > 255U || report_id_seen || data_main_seen) {
+                const bool second = report_id_seen && battery_layout != nullptr &&
+                                    !battery_id_seen && collection_depth == 1U;
+                if (value == 0U || value > 255U || (report_id_seen && !second) ||
+                    (!report_id_seen && data_main_seen)) {
                     return issue(AOAHID_ERR_INTERNAL, "spec.report_id",
                                  "The generated descriptor changes, repeats, or misorders its "
                                  "Report ID.",
                                  item_offset);
                 }
-                report_id = static_cast<std::uint8_t>(value);
-                report_id_seen = true;
+                if (second) {
+                    battery_id = static_cast<std::uint8_t>(value);
+                    battery_id_seen = true;
+                } else {
+                    report_id = static_cast<std::uint8_t>(value);
+                    report_id_seen = true;
+                }
             } else if (tag == kGlobalReportCount) {
                 report_count = value;
             } else if (tag == kGlobalPush || tag == kGlobalPop) {
@@ -305,7 +318,14 @@ ValidationIssue validate_generated_structure(const std::uint8_t* descriptor,
                                  "A generated field exceeds the HID 32-bit field limit.",
                                  item_offset);
                 }
-                std::size_t& report_bits = tag == kMainInput ? input_bits : feature_bits;
+                if (battery_id_seen && tag == kMainFeature) {
+                    return issue(AOAHID_ERR_INTERNAL, "spec.battery",
+                                 "The generated battery report carries a Feature item.",
+                                 item_offset);
+                }
+                std::size_t& report_bits = tag != kMainInput    ? feature_bits
+                                           : battery_id_seen ? battery_input_bits
+                                                             : input_bits;
                 if (!field_span_is_valid(FieldSpan{report_bits, report_size, report_count})) {
                     return issue(AOAHID_ERR_INTERNAL, "spec.descriptor",
                                  "A generated field spans more than four report bytes.",
@@ -342,21 +362,17 @@ ValidationIssue validate_generated_structure(const std::uint8_t* descriptor,
         return issue(AOAHID_ERR_INTERNAL, "spec.layout",
                      "Descriptor Input bits do not match the generated field layout.");
     }
+    if (battery_layout != nullptr &&
+        (!battery_id_seen || !battery_layout->has_report_id ||
+         battery_id != battery_layout->report_id || battery_id == report_id ||
+         battery_input_bits + 8U != battery_bits)) {
+        return issue(AOAHID_ERR_INTERNAL, "spec.battery",
+                     "The descriptor battery report does not match its generated layout.");
+    }
     return {};
 }
-} // namespace
 
-ValidationIssue validate_generated(const std::uint8_t* descriptor,
-                                   const std::size_t descriptor_length,
-                                   const ReportLayout& layout) noexcept {
-    if (descriptor == nullptr || descriptor_length == 0U) {
-        return issue(AOAHID_ERR_UNSET_FIELD, "spec.descriptor",
-                     "The report descriptor must contain at least one byte.");
-    }
-    if (descriptor_length > std::numeric_limits<std::uint16_t>::max()) {
-        return issue(AOAHID_ERR_OVERFLOW, "spec.descriptor",
-                     "The descriptor exceeds the 16-bit AOA wire-length field.");
-    }
+ValidationIssue layout_bits_of(const ReportLayout& layout, std::size_t* bits) noexcept {
     if (layout.has_report_id && layout.report_id == 0U) {
         return issue(AOAHID_ERR_PARAM, "spec.report_id", "HID 1.11 reserves Report ID zero.");
     }
@@ -398,7 +414,36 @@ ValidationIssue validate_generated(const std::uint8_t* descriptor,
         return issue(AOAHID_ERR_INTERNAL, "spec.layout",
                      "The generated wire length does not match the generated field layout.");
     }
-    return validate_generated_structure(descriptor, descriptor_length, layout, layout_bits);
+    *bits = layout_bits;
+    return {};
+}
+} // namespace
+
+ValidationIssue validate_generated(const std::uint8_t* descriptor,
+                                   const std::size_t descriptor_length,
+                                   const ReportLayout& layout,
+                                   const ReportLayout* battery_layout) noexcept {
+    if (descriptor == nullptr || descriptor_length == 0U) {
+        return issue(AOAHID_ERR_UNSET_FIELD, "spec.descriptor",
+                     "The report descriptor must contain at least one byte.");
+    }
+    if (descriptor_length > std::numeric_limits<std::uint16_t>::max()) {
+        return issue(AOAHID_ERR_OVERFLOW, "spec.descriptor",
+                     "The descriptor exceeds the 16-bit AOA wire-length field.");
+    }
+    std::size_t layout_bits = 0U;
+    if (const ValidationIssue bad = layout_bits_of(layout, &layout_bits); bad.result != AOAHID_OK) {
+        return bad;
+    }
+    std::size_t battery_bits = 0U;
+    if (battery_layout != nullptr) {
+        if (const ValidationIssue bad = layout_bits_of(*battery_layout, &battery_bits);
+            bad.result != AOAHID_OK) {
+            return bad;
+        }
+    }
+    return validate_generated_structure(descriptor, descriptor_length, layout, layout_bits,
+                                        battery_layout, battery_bits);
 }
 
 const char* report_id_option_violation(const aoahid_report_id_option& option) noexcept {

@@ -26,8 +26,10 @@ class DescriptorBuilder final {
     bool begin_application(std::uint16_t usage_page, std::uint16_t usage) noexcept;
     bool begin_logical(std::uint16_t usage_page, std::uint16_t usage) noexcept;
     bool begin_physical(std::uint16_t usage_page, std::uint16_t usage) noexcept;
-    bool end_collection() noexcept;
+    bool end_collection();
     bool set_report_id(bool enabled, std::uint8_t report_id) noexcept;
+    // Makes the top-level End Collection write the battery report first.
+    void set_battery(const BatteryField& field, ReportLayout* layout) noexcept;
 
     bool variable(std::uint16_t usage_page, std::uint16_t usage, std::int32_t logical_minimum,
                   std::int32_t logical_maximum, std::uint8_t bit_width, bool relative,
@@ -56,9 +58,13 @@ class DescriptorBuilder final {
                      std::uint64_t report_size) noexcept;
     void observe_usages(std::uint64_t count) noexcept;
     bool prepare_data_main() noexcept;
+    bool emit_battery();
 
     ItemWriter writer_;
     ReportLayout* layout_{};
+    BatteryField battery_{};
+    ReportLayout* battery_layout_{};
+    bool has_battery_{};
     std::size_t input_bits_{};
     std::uint8_t current_report_id_{};
     std::array<std::uint32_t, 256U> input_fields_{};

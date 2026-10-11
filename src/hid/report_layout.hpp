@@ -64,4 +64,14 @@ struct ReportLayout {
     std::vector<FieldLayout> fields;
 };
 
+// A Battery Strength Input report that shares the profile's Application
+// Collection under its own Report ID.
+struct BatteryField {
+    std::uint8_t report_id{};
+    std::int32_t logical_minimum{};
+    std::int32_t logical_maximum{};
+    std::uint8_t bit_width{};
+    aoahid_physical_properties physical{};
+};
+
 } // namespace aoa::hid

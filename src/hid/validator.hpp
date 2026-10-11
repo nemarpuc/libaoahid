@@ -36,8 +36,11 @@ struct DescriptorRequirements {
     std::uint64_t maximum_report_data_bits{};
 };
 
+// battery_layout, when given, is the second Input report the descriptor must
+// carry at the end of its Application Collection.
 ValidationIssue validate_generated(const std::uint8_t* descriptor, std::size_t descriptor_length,
-                                   const ReportLayout& layout) noexcept;
+                                   const ReportLayout& layout,
+                                   const ReportLayout* battery_layout = nullptr) noexcept;
 
 ValidationIssue validate_raw(const std::uint8_t* descriptor, std::size_t descriptor_length,
                              const aoahid_raw_report* reports, std::size_t report_count,
