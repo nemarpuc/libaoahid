@@ -534,9 +534,7 @@ typedef struct aoahid_battery_options {
 } aoahid_battery_options;
 
 typedef struct aoahid_raw_report {
-    uint8_t report_id;
-    uint8_t has_report_id;
-    uint16_t reserved16;
+    aoahid_report_id_option report_id;
     uint32_t wire_length;
 } aoahid_raw_report;
 
@@ -553,9 +551,7 @@ typedef struct aoahid_raw_options {
 } aoahid_raw_options;
 
 typedef struct aoahid_report_capability {
-    uint8_t report_id;
-    uint8_t has_report_id;
-    uint16_t reserved16;
+    aoahid_report_id_option report_id;
     uint32_t wire_length;
 } aoahid_report_capability;
 

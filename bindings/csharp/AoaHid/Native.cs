@@ -380,9 +380,7 @@ public struct BatteryOptions
 [StructLayout(LayoutKind.Sequential)]
 public struct RawReport
 {
-    public byte ReportId;
-    public byte HasReportId;
-    public ushort Reserved16;
+    public ReportId ReportId;
     public uint WireLength;
 }
 
@@ -403,9 +401,7 @@ public struct RawOptions
 [StructLayout(LayoutKind.Sequential)]
 public struct ReportCapability
 {
-    public byte ReportId;
-    public byte HasReportId;
-    public ushort Reserved16;
+    public ReportId ReportId;
     public uint WireLength;
 }
 

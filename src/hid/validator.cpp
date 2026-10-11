@@ -401,6 +401,20 @@ ValidationIssue validate_generated(const std::uint8_t* descriptor,
     return validate_generated_structure(descriptor, descriptor_length, layout, layout_bits);
 }
 
+const char* report_id_option_violation(const aoahid_report_id_option& option) noexcept {
+    if (option.enabled > 1U) {
+        return "enabled must be exactly zero or one.";
+    }
+    if (option.reserved8[0] != 0U || option.reserved8[1] != 0U || option.reserved8[2] != 0U) {
+        return "reserved8 must be all zero.";
+    }
+    if ((option.enabled == 1U && option.value == 0U) ||
+        (option.enabled == 0U && option.value != 0U)) {
+        return "A declared Report ID must be 1 through 255, and a disabled ID must be zero.";
+    }
+    return nullptr;
+}
+
 namespace {
 ValidationIssue validate_report_table(const aoahid_raw_report* reports,
                                       const std::size_t report_count) noexcept {
@@ -414,16 +428,16 @@ ValidationIssue validate_report_table(const aoahid_raw_report* reports,
     }
     for (std::size_t index = 0U; index < report_count; ++index) {
         const aoahid_raw_report& report = reports[index];
-        if (report.reserved16 != 0U || report.has_report_id > 1U ||
-            (report.has_report_id == 1U && report.report_id == 0U) ||
-            (report.has_report_id == 0U && report.report_id != 0U) || report.wire_length == 0U) {
+        if (const char* reason = report_id_option_violation(report.report_id)) {
+            return issue(AOAHID_ERR_PARAM, "raw.reports", reason);
+        }
+        if (report.wire_length == 0U) {
             return issue(AOAHID_ERR_PARAM, "raw.reports",
-                         "Every raw report entry needs canonical ID state, nonzero length, and "
-                         "zero reserved fields.");
+                         "Every raw report entry needs a nonzero length.");
         }
         for (std::size_t previous = 0U; previous < index; ++previous) {
-            if (reports[previous].report_id == report.report_id &&
-                reports[previous].has_report_id == report.has_report_id) {
+            if (reports[previous].report_id.value == report.report_id.value &&
+                reports[previous].report_id.enabled == report.report_id.enabled) {
                 return issue(
                     AOAHID_ERR_PARAM, "raw.reports",
                     "The accepted-report table contains a duplicate Input report identity.");
@@ -825,9 +839,8 @@ ValidationIssue RawParser::match_report_table(const aoahid_raw_report* reports,
         bool found = false;
         for (std::size_t index = 0U; index < report_count; ++index) {
             const std::uint8_t expected_id = static_cast<std::uint8_t>(id);
-            if (reports[index].report_id == expected_id &&
-                reports[index].has_report_id ==
-                    static_cast<std::uint8_t>(has_report_ids ? 1U : 0U)) {
+            if (reports[index].report_id.value == expected_id &&
+                reports[index].report_id.enabled == (has_report_ids ? 1U : 0U)) {
                 found = true;
                 if (reports[index].wire_length != expected) {
                     return issue(AOAHID_ERR_PARAM, "raw.reports",

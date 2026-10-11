@@ -47,6 +47,12 @@ ValidationIssue validate_raw(const std::uint8_t* descriptor, std::size_t descrip
 bool value_fits(std::int32_t logical_minimum, std::int32_t logical_maximum,
                 std::uint8_t bit_width) noexcept;
 
+/* Null when the Report ID option is canonical, else the reason it is not: the
+ * flag is exactly zero or one, the reserved bytes are zero, a declared ID is
+ * 1 through 255, and a disabled ID is zero. Every Report ID in the public API
+ * (options, raw reports, manifests) follows this rule. */
+const char* report_id_option_violation(const aoahid_report_id_option& option) noexcept;
+
 /* HID 1.11 section 6.2.2.7 Unit item encoding, independent of dimensions. */
 bool unit_is_valid(std::uint32_t unit) noexcept;
 

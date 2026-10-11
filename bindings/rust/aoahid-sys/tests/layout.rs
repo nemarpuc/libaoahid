@@ -431,7 +431,7 @@ fn rust_layout() -> BTreeMap<String, usize> {
         values,
         aoahid_raw_report,
         "aoahid_raw_report",
-        [report_id, has_report_id, reserved16, wire_length]
+        [report_id, wire_length]
     );
     layout!(
         values,
@@ -453,7 +453,7 @@ fn rust_layout() -> BTreeMap<String, usize> {
         values,
         aoahid_report_capability,
         "aoahid_report_capability",
-        [report_id, has_report_id, reserved16, wire_length]
+        [report_id, wire_length]
     );
     layout!(
         values,

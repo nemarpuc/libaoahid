@@ -417,8 +417,9 @@ Android shows the battery depends on the device.
 ## Raw
 
 `aoahid_spec_create_raw(&aoahid_raw_options)` accepts your own descriptor plus a
-table of accepted Input reports (`aoahid_raw_report`: Report ID, whether it is
-present, and exact wire length). You must set
+table of accepted Input reports (`aoahid_raw_report`: a `report_id`
+(`aoahid_report_id_option`: whether it is present, and the ID) and the exact
+`wire_length`). You must set
 `acknowledges_no_android_support = 1` and `requires_output =
 requires_feature_response = 0` (else `AOAHID_ERR_UNSUPPORTED`).
 

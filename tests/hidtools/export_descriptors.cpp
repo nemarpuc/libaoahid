@@ -111,7 +111,7 @@ bool descriptor_layout_matches_manifest(const char* name, const aoahid_spec* spe
     auto remaining = input_bits;
     for (std::size_t report_index = 0U; report_index < manifest.report_count; ++report_index) {
         const aoahid_report_capability& report = manifest.reports[report_index];
-        const auto key = std::make_pair(report.has_report_id != 0U, report.report_id);
+        const auto key = std::make_pair(report.report_id.enabled != 0U, report.report_id.value);
         const auto found = remaining.find(key);
         if (found == remaining.end())
             return false;
@@ -160,8 +160,8 @@ bool emit_descriptor(const std::filesystem::path& directory, const char* name,
         if (!reports.empty())
             reports.push_back(',');
         const aoahid_report_capability& report = manifest.reports[index];
-        reports += report.has_report_id != 0U ? "id:" : "idless:";
-        reports += std::to_string(report.report_id);
+        reports += report.report_id.enabled != 0U ? "id:" : "idless:";
+        reports += std::to_string(report.report_id.value);
         reports.push_back(':');
         reports += std::to_string(report.wire_length);
     }
@@ -479,7 +479,7 @@ int main(const int argc, char** argv) {
     static constexpr std::array<std::uint8_t, 21U> raw_descriptor{
         0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U, 0x85U, 0x01U, 0x15U, 0x00U, 0x25U,
         0x01U, 0x75U, 0x01U, 0x95U, 0x01U, 0x09U, 0x01U, 0x81U, 0x02U, 0xC0U};
-    static constexpr aoahid_raw_report raw_report{1U, 1U, 0U, 2U};
+    static constexpr aoahid_raw_report raw_report{{1U, 1U, {}}, 2U};
     const aoahid_raw_options raw{static_cast<std::uint32_t>(sizeof(aoahid_raw_options)),
                                  0U,
                                  raw_descriptor.data(),

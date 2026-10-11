@@ -339,8 +339,6 @@ int main(void) {
 
     AOAHID_BEGIN(aoahid_raw_report);
     AOAHID_FIELD(aoahid_raw_report, report_id);
-    AOAHID_FIELD(aoahid_raw_report, has_report_id);
-    AOAHID_FIELD(aoahid_raw_report, reserved16);
     AOAHID_FIELD(aoahid_raw_report, wire_length);
 
     AOAHID_BEGIN(aoahid_raw_options);
@@ -356,8 +354,6 @@ int main(void) {
 
     AOAHID_BEGIN(aoahid_report_capability);
     AOAHID_FIELD(aoahid_report_capability, report_id);
-    AOAHID_FIELD(aoahid_report_capability, has_report_id);
-    AOAHID_FIELD(aoahid_report_capability, reserved16);
     AOAHID_FIELD(aoahid_report_capability, wire_length);
 
     AOAHID_BEGIN(aoahid_capability_manifest);

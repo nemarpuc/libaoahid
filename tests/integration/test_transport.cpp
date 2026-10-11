@@ -1620,7 +1620,7 @@ void test_descriptor_requirements_are_caller_policies() {
         raw_descriptor.push_back(0x02U);
     }
     raw_descriptor.push_back(0xC0U);
-    const aoahid_raw_report raw_report{0U, 0U, 0U, 33U};
+    const aoahid_raw_report raw_report{{0U, 0U, {}}, 33U};
     const aoahid_raw_options raw_options{sizeof(aoahid_raw_options),
                                          0U,
                                          raw_descriptor.data(),
@@ -1645,7 +1645,7 @@ void test_descriptor_requirements_are_caller_policies() {
         0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U, 0xA4U, 0xA4U, 0xA4U, 0xA4U,
         0xA4U, 0xB4U, 0xB4U, 0xB4U, 0xB4U, 0xB4U, 0x15U, 0x00U, 0x25U, 0x01U,
         0x75U, 0x01U, 0x95U, 0x01U, 0x09U, 0x01U, 0x81U, 0x02U, 0xC0U};
-    const aoahid_raw_report stack_report{0U, 0U, 0U, 1U};
+    const aoahid_raw_report stack_report{{0U, 0U, {}}, 1U};
     const aoahid_raw_options stack_options{sizeof(aoahid_raw_options),
                                            0U,
                                            stack_descriptor.data(),
@@ -1667,7 +1667,7 @@ void test_descriptor_requirements_are_caller_policies() {
     const std::array<std::uint8_t, 24U> report_size_descriptor{
         0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U, 0x77U, 0x01U, 0x01U, 0x00U, 0x00U, 0x15U,
         0x00U, 0x25U, 0x01U, 0x75U, 0x01U, 0x95U, 0x01U, 0x09U, 0x01U, 0x81U, 0x02U, 0xC0U};
-    const aoahid_raw_report report_size_report{0U, 0U, 0U, 1U};
+    const aoahid_raw_report report_size_report{{0U, 0U, {}}, 1U};
     const aoahid_raw_options report_size_options{sizeof(aoahid_raw_options),
                                                  0U,
                                                  report_size_descriptor.data(),
@@ -1688,7 +1688,7 @@ void test_descriptor_requirements_are_caller_policies() {
     const std::array<std::uint8_t, 20U> large_report_descriptor{
         0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U, 0x15U, 0x00U, 0x25U, 0x01U,
         0x75U, 0x20U, 0x96U, 0x00U, 0x08U, 0x09U, 0x01U, 0x81U, 0x02U, 0xC0U};
-    const aoahid_raw_report large_report{0U, 0U, 0U, 8192U};
+    const aoahid_raw_report large_report{{0U, 0U, {}}, 8192U};
     const aoahid_raw_options large_report_options{sizeof(aoahid_raw_options),
                                                   0U,
                                                   large_report_descriptor.data(),
@@ -1952,7 +1952,7 @@ void open_public_raw_session(aoahid_context** context, aoahid_device** device, a
     static constexpr std::array<std::uint8_t, 21U> descriptor{
         0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U, 0x85U, 0x01U, 0x15U, 0x00U, 0x25U,
         0x01U, 0x75U, 0x01U, 0x95U, 0x01U, 0x09U, 0x01U, 0x81U, 0x02U, 0xC0U};
-    const aoahid_raw_report report{1U, 1U, 0U, 2U};
+    const aoahid_raw_report report{{1U, 1U, {}}, 2U};
     const aoahid_raw_options raw_options{sizeof(aoahid_raw_options),
                                          0U,
                                          descriptor.data(),
@@ -2611,7 +2611,7 @@ void test_public_touch_scan_time_rejected_first_attempt_stays_zero() {
     static constexpr std::array<std::uint8_t, 21U> raw_descriptor{
         0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U, 0x85U, 0x01U, 0x15U, 0x00U, 0x25U,
         0x01U, 0x75U, 0x01U, 0x95U, 0x01U, 0x09U, 0x01U, 0x81U, 0x02U, 0xC0U};
-    const aoahid_raw_report raw_report{1U, 1U, 0U, 2U};
+    const aoahid_raw_report raw_report{{1U, 1U, {}}, 2U};
     aoahid_raw_options raw_options{};
     raw_options.struct_size = sizeof(raw_options);
     raw_options.descriptor = raw_descriptor.data();

@@ -443,9 +443,7 @@ class BatteryOptions(c.Structure):
 
 class RawReport(c.Structure):
     _fields_ = [
-        ("report_id", c.c_uint8),
-        ("has_report_id", c.c_uint8),
-        ("reserved16", c.c_uint16),
+        ("report_id", ReportId),
         ("wire_length", c.c_uint32),
     ]
 
@@ -466,9 +464,7 @@ class RawOptions(c.Structure):
 
 class ReportCapability(c.Structure):
     _fields_ = [
-        ("report_id", c.c_uint8),
-        ("has_report_id", c.c_uint8),
-        ("reserved16", c.c_uint16),
+        ("report_id", ReportId),
         ("wire_length", c.c_uint32),
     ]
 

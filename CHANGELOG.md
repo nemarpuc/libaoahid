@@ -59,6 +59,14 @@ profiles have not been run against a phone, and the `Verified` rows in
   and Rust bindings follow (C# `GamepadAxis`, `GamepadAxisOption`,
   `ContactId`, `DescriptorLength`, `LinuxHidReportDataPolicyBits`,
   `LinuxHidReportSizePolicyBits`).
+- A Report ID has one shape everywhere: `aoahid_raw_report` and
+  `aoahid_report_capability` hold an `aoahid_report_id_option report_id` (its
+  `enabled` and `value`) and `wire_length`, like the options of every profile.
+  They had `report_id`, `has_report_id`, and `reserved16`. The two structures
+  are 12 bytes now, not 8. The raw report table and the options share one
+  check of the ID (`aoa::hid::report_id_option_violation`); a table entry with
+  a nonzero reserved byte is `AOAHID_ERR_PARAM` as before, and the unit tests
+  now cover each rule.
 - The button calls name their flag `down`, like the other send calls, and
   `aoahid_node_submit_blocking` names its wait `timeout_ms` (it was
   `deadline_ms`). Only parameter names changed.

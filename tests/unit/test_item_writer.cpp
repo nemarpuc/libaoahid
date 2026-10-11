@@ -130,8 +130,8 @@ void test_target_neutral_raw_requirements() {
             descriptor.insert(descriptor.end(), {0x09U, 0x01U, 0x81U, 0x02U});
         }
         descriptor.push_back(0xC0U);
-        const std::array<aoahid_raw_report, 2U> reports{aoahid_raw_report{1U, 1U, 0U, 2U},
-                                                        aoahid_raw_report{2U, 1U, 0U, 2U}};
+        const std::array<aoahid_raw_report, 2U> reports{aoahid_raw_report{{1U, 1U, {}}, 2U},
+                                                        aoahid_raw_report{{1U, 2U, {}}, 2U}};
         aoa::hid::DescriptorRequirements requirements{};
         const aoa::hid::ValidationIssue result =
             aoa::hid::validate_raw(descriptor.data(), descriptor.size(), reports.data(),

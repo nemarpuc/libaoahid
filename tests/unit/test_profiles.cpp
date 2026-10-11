@@ -1300,7 +1300,7 @@ void test_raw_report_id_order() {
                                                 0x01U, 0x15U, 0x00U, 0x25U, 0x01U, 0x75U, 0x01U,
                                                 0x95U, 0x01U, 0x09U, 0x01U, 0x81U, 0x02U, 0xC0U};
     (void)valid;
-    const aoahid_raw_report report{1U, 1U, 0U, 2U};
+    const aoahid_raw_report report{{1U, 1U, {}}, 2U};
     AOAHID_CHECK(aoa::hid::validate_raw(accepted.data(), accepted.size(), &report, 1U).result ==
                  AOAHID_OK);
     const std::array<std::uint8_t, 19> rejected{0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U, 0x15U,
@@ -1309,7 +1309,7 @@ void test_raw_report_id_order() {
     AOAHID_CHECK(aoa::hid::validate_raw(rejected.data(), rejected.size(), &report, 1U).result !=
                  AOAHID_OK);
 
-    const aoahid_raw_report no_id_report{0U, 0U, 0U, 1U};
+    const aoahid_raw_report no_id_report{{0U, 0U, {}}, 1U};
     const std::array<std::uint8_t, 17> output_item{0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U,
                                                    0x15U, 0x00U, 0x25U, 0x01U, 0x75U, 0x01U,
                                                    0x95U, 0x01U, 0x91U, 0x02U, 0xC0U};
@@ -1337,6 +1337,59 @@ void test_raw_report_id_order() {
     AOAHID_CHECK(
         aoa::hid::validate_raw(range_exceeds_size.data(), range_exceeds_size.size(), &report, 1U)
             .result == AOAHID_ERR_PARAM);
+}
+
+void test_raw_report_table_report_id_rules() {
+    const std::array<std::uint8_t, 21> descriptor{0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U, 0x85U,
+                                                  0x01U, 0x15U, 0x00U, 0x25U, 0x01U, 0x75U, 0x01U,
+                                                  0x95U, 0x01U, 0x09U, 0x01U, 0x81U, 0x02U, 0xC0U};
+    const auto result_for = [&](const aoahid_raw_report& report) {
+        return aoa::hid::validate_raw(descriptor.data(), descriptor.size(), &report, 1U).result;
+    };
+    AOAHID_CHECK(result_for({{1U, 1U, {}}, 2U}) == AOAHID_OK);
+    // The flag is exactly zero or one.
+    AOAHID_CHECK(result_for({{2U, 1U, {}}, 2U}) == AOAHID_ERR_PARAM);
+    // A declared ID is 1 through 255, and a disabled ID is zero.
+    AOAHID_CHECK(result_for({{1U, 0U, {}}, 2U}) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(result_for({{0U, 1U, {}}, 2U}) == AOAHID_ERR_PARAM);
+    // The reserved bytes are zero.
+    AOAHID_CHECK(result_for({{1U, 1U, {1U, 0U, 0U}}, 2U}) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(result_for({{1U, 1U, {0U, 0U, 1U}}, 2U}) == AOAHID_ERR_PARAM);
+    // The wire length is not zero.
+    AOAHID_CHECK(result_for({{1U, 1U, {}}, 0U}) == AOAHID_ERR_PARAM);
+
+    // The same ID twice is one report identity listed twice.
+    const std::array<aoahid_raw_report, 2> duplicate{aoahid_raw_report{{1U, 1U, {}}, 2U},
+                                                     aoahid_raw_report{{1U, 1U, {}}, 2U}};
+    AOAHID_CHECK(aoa::hid::validate_raw(descriptor.data(), descriptor.size(), duplicate.data(),
+                                        duplicate.size())
+                     .result == AOAHID_ERR_PARAM);
+
+    // The raw spec reports the table back through the manifest unchanged.
+    const aoahid_raw_report report{{1U, 1U, {}}, 2U};
+    const aoahid_raw_options options{sizeof(aoahid_raw_options),
+                                     0U,
+                                     descriptor.data(),
+                                     descriptor.size(),
+                                     &report,
+                                     1U,
+                                     1U,
+                                     0U,
+                                     0U};
+    aoahid_spec* spec = nullptr;
+    AOAHID_CHECK(aoahid_spec_create_raw(&options, &spec) == AOAHID_OK);
+    if (spec != nullptr) {
+        aoahid_capability_manifest manifest{};
+        manifest.struct_size = static_cast<std::uint32_t>(sizeof(manifest));
+        AOAHID_CHECK(aoahid_spec_manifest(spec, &manifest) == AOAHID_OK);
+        AOAHID_CHECK(manifest.report_count == 1U);
+        if (manifest.report_count == 1U) {
+            AOAHID_CHECK(manifest.reports[0].report_id.enabled == 1U);
+            AOAHID_CHECK(manifest.reports[0].report_id.value == 1U);
+            AOAHID_CHECK(manifest.reports[0].wire_length == 2U);
+        }
+        aoahid_spec_release(spec);
+    }
 }
 
 void test_raw_factory_bounds_before_allocation() {
@@ -1436,6 +1489,7 @@ void test_profiles() {
     test_pen_away_coordinates();
     test_pen_switch();
     test_raw_report_id_order();
+    test_raw_report_table_report_id_rules();
     test_raw_factory_bounds_before_allocation();
     test_send_time_report_validation();
 

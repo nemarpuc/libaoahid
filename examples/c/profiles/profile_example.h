@@ -69,8 +69,8 @@ static int aoahid_example_run(const char* name, aoahid_profile_kind expected_kin
            aoahid_example_status_name(manifest.android_status));
     for (index = 0U; index < manifest.report_count; ++index) {
         const aoahid_report_capability report = manifest.reports[index];
-        if (report.has_report_id != 0U)
-            printf("  report id %u: %u wire bytes\n", (unsigned)report.report_id,
+        if (report.report_id.enabled != 0U)
+            printf("  report id %u: %u wire bytes\n", (unsigned)report.report_id.value,
                    (unsigned)report.wire_length);
         else
             printf("  no report id: %u wire bytes\n", (unsigned)report.wire_length);

@@ -103,11 +103,11 @@ void fuzz_raw_validator(const std::uint8_t* data, const std::size_t size) {
         const std::uint8_t report_id = cursor < size ? data[cursor++] : 0U;
         const std::uint8_t flags = cursor < size ? data[cursor++] : 0U;
         const std::uint8_t length = cursor < size ? data[cursor++] : 0U;
-        reports[index].has_report_id = static_cast<std::uint8_t>(flags & 1U);
-        reports[index].report_id = reports[index].has_report_id == 1U
-                                       ? static_cast<std::uint8_t>(report_id == 0U ? 1U : report_id)
-                                       : 0U;
-        reports[index].reserved16 = 0U;
+        reports[index].report_id.enabled = flags & 1U;
+        reports[index].report_id.value =
+            reports[index].report_id.enabled == 1U
+                ? static_cast<std::uint8_t>(report_id == 0U ? 1U : report_id)
+                : 0U;
         reports[index].wire_length = static_cast<std::uint32_t>(length) + 1U;
     }
     const std::uint8_t* descriptor = cursor < size ? data + cursor : data;

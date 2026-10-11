@@ -1770,7 +1770,8 @@ aoahid_result AOAHID_CALL aoahid_raw_submit(aoahid_node* node, const std::uint8_
     const auto accepted =
         std::find_if(raw->reports.begin(), raw->reports.end(), [=](const auto& item) {
             return item.wire_length == length &&
-                   ((item.has_report_id == 0U) || (length != 0U && report[0] == item.report_id));
+                   ((item.report_id.enabled == 0U) ||
+                    (length != 0U && report[0] == item.report_id.value));
         });
     if (accepted == raw->reports.end()) {
         node->transfer_inflight.store(false, std::memory_order_release);
@@ -1784,7 +1785,7 @@ aoahid_result AOAHID_CALL aoahid_raw_submit(aoahid_node* node, const std::uint8_
         node->transfer_inflight.store(false, std::memory_order_release);
         set_error(AOAHID_ERR_PARAM, "raw.report.trailing_padding",
                   "Unused trailing Input-report bits must be zero.", 0, 57, node->hid_id,
-                  accepted->has_report_id == 1U ? accepted->report_id : 0U,
+                  accepted->report_id.enabled == 1U ? accepted->report_id.value : 0U,
                   static_cast<std::uint32_t>(length - 1U), 1U);
         return AOAHID_ERR_PARAM;
     }
@@ -1803,7 +1804,7 @@ aoahid_result AOAHID_CALL aoahid_raw_submit(aoahid_node* node, const std::uint8_
     node->dirty = true;
     node->submitted_non_neutral = false;
     node->submitted_report_length = length;
-    node->submitted_report_id = accepted->has_report_id == 1U ? accepted->report_id : 0U;
+    node->submitted_report_id = accepted->report_id.enabled == 1U ? accepted->report_id.value : 0U;
     result = node->device->transport->submit(prepared, length, node->submitted_report_id);
     if (result != AOAHID_OK) {
         const aoahid_result completion_failure = consume_completion(node, "raw.submit");

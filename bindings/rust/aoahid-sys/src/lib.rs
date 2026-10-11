@@ -315,9 +315,7 @@ c_struct!(aoahid_battery_options {
     enable_unknown_null_state: u32,
 });
 c_struct!(aoahid_raw_report {
-    report_id: u8,
-    has_report_id: u8,
-    reserved16: u16,
+    report_id: aoahid_report_id_option,
     wire_length: u32,
 });
 c_struct!(aoahid_raw_options {
@@ -327,9 +325,7 @@ c_struct!(aoahid_raw_options {
     requires_feature_response: u32,
 });
 c_struct!(aoahid_report_capability {
-    report_id: u8,
-    has_report_id: u8,
-    reserved16: u16,
+    report_id: aoahid_report_id_option,
     wire_length: u32,
 });
 c_struct!(aoahid_capability_manifest {

@@ -24,18 +24,8 @@ using aoa::hid::FieldSemantic;
 constexpr std::size_t kAoaDescriptorWireMaximum = 65535U;
 
 bool validate_report_id(const aoahid_report_id_option& option, const char* field) noexcept {
-    if (!aoa::detail::valid_boolean(option.enabled)) {
-        set_error(AOAHID_ERR_PARAM, field, "enabled must be exactly zero or one.");
-        return false;
-    }
-    if (option.reserved8[0] != 0U || option.reserved8[1] != 0U || option.reserved8[2] != 0U) {
-        set_error(AOAHID_ERR_PARAM, field, "reserved8 must be all zero.");
-        return false;
-    }
-    if ((option.enabled == 1U && option.value == 0U) ||
-        (option.enabled == 0U && option.value != 0U)) {
-        set_error(AOAHID_ERR_PARAM, field,
-                  "A declared Report ID must be 1 through 255, and a disabled ID must be zero.");
+    if (const char* reason = aoa::hid::report_id_option_violation(option)) {
+        set_error(AOAHID_ERR_PARAM, field, reason);
         return false;
     }
     return true;
@@ -201,7 +191,7 @@ aoahid_result build_generated_spec(const GeneratedSpecIdentity identity,
     spec->descriptor = std::move(construction);
     spec->config = std::move(config);
     spec->report_capabilities.push_back(aoahid_report_capability{
-        spec->layout.report_id, static_cast<std::uint8_t>(spec->layout.has_report_id ? 1U : 0U), 0U,
+        {spec->layout.has_report_id ? 1U : 0U, spec->layout.report_id, {0U, 0U, 0U}},
         static_cast<std::uint32_t>(spec->layout.wire_bytes)});
     *out_spec = spec.release();
     aoa::detail::clear_error();
@@ -1566,8 +1556,8 @@ static aoahid_result aoahid_spec_create_raw_impl(const aoahid_raw_options* optio
     config.reports.assign(options->reports, options->reports + options->report_count);
     config.trailing_valid_masks = std::move(trailing_valid_masks);
     for (const aoahid_raw_report& report : config.reports) {
-        spec->report_capabilities.push_back(aoahid_report_capability{
-            report.report_id, report.has_report_id, 0U, report.wire_length});
+        spec->report_capabilities.push_back(
+            aoahid_report_capability{report.report_id, report.wire_length});
     }
     spec->config = std::move(config);
     *out_spec = spec.release();
