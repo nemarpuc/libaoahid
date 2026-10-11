@@ -409,7 +409,8 @@ static aoahid_result update_session(session* value) {
     const aoahid_result statuses[] = {
         aoahid_kbd(value->keyboard, k_keyboard_a_usage, 1U),
         aoahid_mouse_move(value->mouse, k_example_mouse_dx, k_example_mouse_dy),
-        aoahid_touch(value->touchscreen, contact.contact_id, 1U, contact.x, contact.y, NULL),
+        aoahid_touchscreen_contact(value->touchscreen, contact.contact_id, 1U, contact.x, contact.y,
+                                   NULL),
     };
     return first_failure(statuses, sizeof(statuses) / sizeof(statuses[0]));
 }

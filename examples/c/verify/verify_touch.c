@@ -63,7 +63,7 @@ int main(void) {
         const int32_t start_x = (cycle % 2 == 0) ? 3000 : 29000;
         const int32_t end_x = (cycle % 2 == 0) ? 29000 : 3000;
 
-        result = aoahid_touch(node, 0U, 1U, start_x, y, NULL);
+        result = aoahid_touchscreen_contact(node, 0U, 1U, start_x, y, NULL);
         if (result != AOAHID_OK) {
             aoahid_node_close(node);
             aoahid_device_close(device);
@@ -80,7 +80,7 @@ int main(void) {
 
         for (int i = 1; i <= steps; ++i) {
             const int32_t x = start_x + (int32_t)((int64_t)(end_x - start_x) * i / steps);
-            result = aoahid_touch(node, 0U, 1U, x, y, NULL);
+            result = aoahid_touchscreen_contact(node, 0U, 1U, x, y, NULL);
             if (result != AOAHID_OK) {
                 aoahid_node_close(node);
                 aoahid_device_close(device);
@@ -97,7 +97,7 @@ int main(void) {
             verify_sleep_ms(30);
         }
 
-        result = aoahid_touch(node, 0U, 0U, end_x, y, NULL);
+        result = aoahid_touchscreen_contact(node, 0U, 0U, end_x, y, NULL);
         if (result != AOAHID_OK) {
             aoahid_node_close(node);
             aoahid_device_close(device);

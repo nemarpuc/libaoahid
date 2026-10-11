@@ -184,10 +184,15 @@ inline void spec_release(aoahid_spec* spec) noexcept { aoahid_spec_release(spec)
                                         uint32_t right, uint32_t left) noexcept {
     return aoahid_dpad(node, up, down, right, left);
 }
-[[nodiscard]] inline aoahid_result touch(aoahid_node* node, uint32_t contact_id, uint32_t down,
-                                         int32_t x, int32_t y,
-                                         const aoahid_touch_extra* extra) noexcept {
-    return aoahid_touch(node, contact_id, down, x, y, extra);
+[[nodiscard]] inline aoahid_result
+touchscreen_contact(aoahid_node* node, uint32_t contact_id, uint32_t down, int32_t x, int32_t y,
+                    const aoahid_touchscreen_extra* extra) noexcept {
+    return aoahid_touchscreen_contact(node, contact_id, down, x, y, extra);
+}
+[[nodiscard]] inline aoahid_result touchpad_contact(aoahid_node* node, uint32_t contact_id,
+                                                    uint32_t down, int32_t x, int32_t y,
+                                                    const aoahid_touchpad_extra* extra) noexcept {
+    return aoahid_touchpad_contact(node, contact_id, down, x, y, extra);
 }
 [[nodiscard]] inline aoahid_result touchpad_button(aoahid_node* node, uint32_t button,
                                                    uint32_t pressed) noexcept {
@@ -199,6 +204,13 @@ inline void spec_release(aoahid_spec* spec) noexcept { aoahid_spec_release(spec)
 }
 [[nodiscard]] inline aoahid_result pen_depart(aoahid_node* node) noexcept {
     return aoahid_pen_depart(node);
+}
+[[nodiscard]] inline aoahid_result
+digitizer_update(aoahid_node* node, const aoahid_digitizer_sample* sample) noexcept {
+    return aoahid_digitizer_update(node, sample);
+}
+[[nodiscard]] inline aoahid_result digitizer_depart(aoahid_node* node) noexcept {
+    return aoahid_digitizer_depart(node);
 }
 [[nodiscard]] inline aoahid_result battery_update(aoahid_node* node, uint32_t has_value,
                                                   int32_t strength) noexcept {

@@ -348,13 +348,31 @@ c_struct!(aoahid_touch_contact {
     height: i32,
     azimuth: i32,
 });
-c_struct!(aoahid_touch_extra {
+c_struct!(aoahid_touchscreen_extra {
+    pressure: i32,
+    width: i32,
+    height: i32,
+    azimuth: i32,
+});
+c_struct!(aoahid_touchpad_extra {
     pressure: i32,
     width: i32,
     height: i32,
     azimuth: i32,
 });
 c_struct!(aoahid_pen_sample {
+    in_range: u32,
+    tip: u32,
+    eraser: u32,
+    barrel_buttons: u32,
+    x: i32,
+    y: i32,
+    pressure: i32,
+    tilt_x: i32,
+    tilt_y: i32,
+    twist: i32,
+});
+c_struct!(aoahid_digitizer_sample {
     in_range: u32,
     tip: u32,
     eraser: u32,
@@ -514,13 +532,21 @@ extern "C" {
         right: u32,
         left: u32,
     ) -> aoahid_result;
-    pub fn aoahid_touch(
+    pub fn aoahid_touchscreen_contact(
         node: *mut aoahid_node,
         contact_id: u32,
         down: u32,
         x: i32,
         y: i32,
-        extra: *const aoahid_touch_extra,
+        extra: *const aoahid_touchscreen_extra,
+    ) -> aoahid_result;
+    pub fn aoahid_touchpad_contact(
+        node: *mut aoahid_node,
+        contact_id: u32,
+        down: u32,
+        x: i32,
+        y: i32,
+        extra: *const aoahid_touchpad_extra,
     ) -> aoahid_result;
     pub fn aoahid_touchpad_button(node: *mut aoahid_node, button: u32, pressed: u32)
         -> aoahid_result;
@@ -529,6 +555,11 @@ extern "C" {
         sample: *const aoahid_pen_sample,
     ) -> aoahid_result;
     pub fn aoahid_pen_depart(node: *mut aoahid_node) -> aoahid_result;
+    pub fn aoahid_digitizer_update(
+        node: *mut aoahid_node,
+        sample: *const aoahid_digitizer_sample,
+    ) -> aoahid_result;
+    pub fn aoahid_digitizer_depart(node: *mut aoahid_node) -> aoahid_result;
     pub fn aoahid_battery_update(
         node: *mut aoahid_node,
         has_value: u32,

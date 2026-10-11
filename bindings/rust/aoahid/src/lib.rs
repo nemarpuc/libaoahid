@@ -244,16 +244,16 @@ impl GamepadNodeRef {
 
 /// Always fixed-slot Multi-Touch.
 impl TouchscreenNodeRef {
-    pub fn touch(
+    pub fn contact(
         self,
         contact_id: u32,
         down: bool,
         x: i32,
         y: i32,
-        extra: Option<&sys::aoahid_touch_extra>,
+        extra: Option<&sys::aoahid_touchscreen_extra>,
     ) -> Result<(), Error> {
         result(unsafe {
-            sys::aoahid_touch(
+            sys::aoahid_touchscreen_contact(
                 self.as_ptr(),
                 contact_id,
                 u32::from(down),
@@ -267,16 +267,16 @@ impl TouchscreenNodeRef {
 
 /// Always fixed-slot Multi-Touch under the Touch Pad Application Collection.
 impl TouchpadNodeRef {
-    pub fn touch(
+    pub fn contact(
         self,
         contact_id: u32,
         down: bool,
         x: i32,
         y: i32,
-        extra: Option<&sys::aoahid_touch_extra>,
+        extra: Option<&sys::aoahid_touchpad_extra>,
     ) -> Result<(), Error> {
         result(unsafe {
-            sys::aoahid_touch(
+            sys::aoahid_touchpad_contact(
                 self.as_ptr(),
                 contact_id,
                 u32::from(down),
@@ -304,11 +304,11 @@ impl PenNodeRef {
 /// Same stylus report shape as `PenNodeRef`, under the Digitizer Application
 /// Collection.
 impl DigitizerNodeRef {
-    pub fn update(self, sample: &sys::aoahid_pen_sample) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_pen_update(self.as_ptr(), sample) })
+    pub fn update(self, sample: &sys::aoahid_digitizer_sample) -> Result<(), Error> {
+        result(unsafe { sys::aoahid_digitizer_update(self.as_ptr(), sample) })
     }
     pub fn depart(self) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_pen_depart(self.as_ptr()) })
+        result(unsafe { sys::aoahid_digitizer_depart(self.as_ptr()) })
     }
 }
 

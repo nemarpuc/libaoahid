@@ -500,7 +500,16 @@ class TouchContact(c.Structure):
     ]
 
 
-class TouchExtra(c.Structure):
+class TouchscreenExtra(c.Structure):
+    _fields_ = [
+        ("pressure", c.c_int32),
+        ("width", c.c_int32),
+        ("height", c.c_int32),
+        ("azimuth", c.c_int32),
+    ]
+
+
+class TouchpadExtra(c.Structure):
     _fields_ = [
         ("pressure", c.c_int32),
         ("width", c.c_int32),
@@ -510,6 +519,21 @@ class TouchExtra(c.Structure):
 
 
 class PenSample(c.Structure):
+    _fields_ = [
+        ("in_range", c.c_uint32),
+        ("tip", c.c_uint32),
+        ("eraser", c.c_uint32),
+        ("barrel_buttons", c.c_uint32),
+        ("x", c.c_int32),
+        ("y", c.c_int32),
+        ("pressure", c.c_int32),
+        ("tilt_x", c.c_int32),
+        ("tilt_y", c.c_int32),
+        ("twist", c.c_int32),
+    ]
+
+
+class DigitizerSample(c.Structure):
     _fields_ = [
         ("in_range", c.c_uint32),
         ("tip", c.c_uint32),
@@ -551,8 +575,10 @@ ABI_STRUCTS = {
     "aoahid_report_capability": ReportCapability,
     "aoahid_capability_manifest": CapabilityManifest,
     "aoahid_touch_contact": TouchContact,
-    "aoahid_touch_extra": TouchExtra,
+    "aoahid_touchscreen_extra": TouchscreenExtra,
+    "aoahid_touchpad_extra": TouchpadExtra,
     "aoahid_pen_sample": PenSample,
+    "aoahid_digitizer_sample": DigitizerSample,
 }
 
 
@@ -619,10 +645,13 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
     declare("aoahid_gamepad_button", [NodeP, c.c_uint32, c.c_uint32], result)
     declare("aoahid_gamepad_set_axis", [NodeP, c.c_size_t, c.c_int32], result)
     declare("aoahid_dpad", [NodeP, c.c_uint32, c.c_uint32, c.c_uint32, c.c_uint32], result)
-    declare("aoahid_touch", [NodeP, c.c_uint32, c.c_uint32, c.c_int32, c.c_int32, c.POINTER(TouchExtra)], result)
+    declare("aoahid_touchscreen_contact", [NodeP, c.c_uint32, c.c_uint32, c.c_int32, c.c_int32, c.POINTER(TouchscreenExtra)], result)
+    declare("aoahid_touchpad_contact", [NodeP, c.c_uint32, c.c_uint32, c.c_int32, c.c_int32, c.POINTER(TouchpadExtra)], result)
     declare("aoahid_touchpad_button", [NodeP, c.c_uint32, c.c_uint32], result)
     declare("aoahid_pen_update", [NodeP, c.POINTER(PenSample)], result)
     declare("aoahid_pen_depart", [NodeP], result)
+    declare("aoahid_digitizer_update", [NodeP, c.POINTER(DigitizerSample)], result)
+    declare("aoahid_digitizer_depart", [NodeP], result)
     declare("aoahid_battery_update", [NodeP, c.c_uint32, c.c_int32], result)
     declare("aoahid_raw_submit", [NodeP, c.POINTER(c.c_uint8), c.c_size_t], result)
     return library
@@ -671,8 +700,10 @@ __all__ += [
     "ReportCapability",
     "CapabilityManifest",
     "TouchContact",
-    "TouchExtra",
+    "TouchscreenExtra",
+    "TouchpadExtra",
     "PenSample",
+    "DigitizerSample",
     "ABI_STRUCTS",
     "load",
 ]

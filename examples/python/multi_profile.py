@@ -385,7 +385,7 @@ def update_then_submit(
             (
                 library.aoahid_kbd(session.keyboard, KEYBOARD_A_USAGE, 1),
                 library.aoahid_mouse_move(session.mouse, EXAMPLE_MOUSE_DX, EXAMPLE_MOUSE_DY),
-                library.aoahid_touch(
+                library.aoahid_touchscreen_contact(
                     session.touchscreen, contact.contact_id, 1, contact.x, contact.y, None
                 ),
             )

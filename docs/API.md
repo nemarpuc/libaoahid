@@ -89,7 +89,7 @@ allows; calls the caller must serialize are still the caller's responsibility.
 | Spec factories | `aoahid_spec_create_keyboard`, `_mouse`, `_toggle`, `_gamepad`, `_touchscreen`, `_touchpad`, `_pen`, `_digitizer`, `_battery`, `_raw` |
 | Spec access | `aoahid_spec_retain`, `aoahid_spec_release`, `aoahid_spec_descriptor`, `aoahid_spec_manifest` |
 | Node | `aoahid_node_open`, `aoahid_node_close`, `aoahid_node_hid_id`, `aoahid_node_manifest`, `aoahid_node_submit`, `aoahid_node_submit_blocking` |
-| Profile state | `aoahid_kbd`, `aoahid_mouse_move`, `aoahid_mouse_scroll`, `aoahid_mouse_button`, `aoahid_toggle`, `aoahid_gamepad_button`, `aoahid_gamepad_set_axis`, `aoahid_dpad`, `aoahid_touch`, `aoahid_touchpad_button`, `aoahid_pen_update`, `aoahid_pen_depart`, `aoahid_battery_update`, `aoahid_raw_submit` |
+| Profile state | `aoahid_kbd`, `aoahid_mouse_move`, `aoahid_mouse_scroll`, `aoahid_mouse_button`, `aoahid_toggle`, `aoahid_gamepad_button`, `aoahid_gamepad_set_axis`, `aoahid_dpad`, `aoahid_touchscreen_contact`, `aoahid_touchpad_contact`, `aoahid_touchpad_button`, `aoahid_pen_update`, `aoahid_pen_depart`, `aoahid_digitizer_update`, `aoahid_digitizer_depart`, `aoahid_battery_update`, `aoahid_raw_submit` |
 
 `aoahid_version()` returns `(major << 24) | (minor << 16) | patch`; the header
 also defines `AOAHID_VERSION_MAJOR`, `_MINOR`, and `_PATCH`.
@@ -362,9 +362,10 @@ I/O or allocates.
 | Mouse | `aoahid_mouse_move(node, dx, dy)`, `aoahid_mouse_scroll(node, wheel, pan)`, `aoahid_mouse_button(node, button, pressed)` |
 | Toggle | `aoahid_toggle(node, usage, down)` |
 | Gamepad | `aoahid_gamepad_button(node, button, pressed)`, `aoahid_gamepad_set_axis(node, axis_index, value)`, `aoahid_dpad(node, up, down, right, left)` |
-| Touchscreen | `aoahid_touch(node, contact_id, down, x, y, extra)` |
-| Touchpad | `aoahid_touch(...)`, `aoahid_touchpad_button(node, button, pressed)` |
-| Pen, Digitizer | `aoahid_pen_update(node, &sample)`, `aoahid_pen_depart(node)` |
+| Touchscreen | `aoahid_touchscreen_contact(node, contact_id, down, x, y, extra)` |
+| Touchpad | `aoahid_touchpad_contact(node, contact_id, down, x, y, extra)`, `aoahid_touchpad_button(node, button, pressed)` |
+| Pen | `aoahid_pen_update(node, &sample)`, `aoahid_pen_depart(node)` |
+| Digitizer | `aoahid_digitizer_update(node, &sample)`, `aoahid_digitizer_depart(node)` |
 | Battery | `aoahid_battery_update(node, has_value, strength)` |
 | Raw | `aoahid_raw_submit(node, report, length)` (validates, copies, and queues request 57 directly) |
 

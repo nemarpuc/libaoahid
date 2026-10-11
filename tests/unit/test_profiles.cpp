@@ -873,22 +873,23 @@ void test_touch_azimuth() {
     node.spec = spec;
     node.state = aoa::detail::TouchState{};
     const aoahid_touch_contact contact{1U, 100, 200, 10, 0, 0, 35999};
-    aoahid_touch_extra extra{contact.pressure, contact.width, contact.height, contact.azimuth};
-    AOAHID_CHECK(aoahid_touch(&node, contact.contact_id, 1U, contact.x, contact.y, &extra) ==
-                 AOAHID_OK);
+    aoahid_touchscreen_extra extra{contact.pressure, contact.width, contact.height,
+                                   contact.azimuth};
+    AOAHID_CHECK(aoahid_touchscreen_contact(&node, contact.contact_id, 1U, contact.x, contact.y,
+                                            &extra) == AOAHID_OK);
     std::array<std::uint8_t, 128U> report{};
     std::size_t length = 0U;
     AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(), &length) ==
                  AOAHID_OK);
     AOAHID_CHECK(azimuth != nullptr && extract(report.data(), *azimuth) == 35999U);
     node.dirty = false;
-    AOAHID_CHECK(aoahid_touch(&node, contact.contact_id, 1U, contact.x, contact.y, &extra) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_touchscreen_contact(&node, contact.contact_id, 1U, contact.x, contact.y,
+                                            &extra) == AOAHID_OK);
     AOAHID_CHECK(!node.dirty);
-    aoahid_touch_extra invalid_extra = extra;
+    aoahid_touchscreen_extra invalid_extra = extra;
     invalid_extra.azimuth = 36000;
-    AOAHID_CHECK(aoahid_touch(&node, contact.contact_id, 1U, contact.x, contact.y,
-                              &invalid_extra) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_touchscreen_contact(&node, contact.contact_id, 1U, contact.x, contact.y,
+                                            &invalid_extra) == AOAHID_ERR_PARAM);
     aoahid_spec_release(spec);
 
     options.azimuth.logical_minimum = 1;
@@ -901,9 +902,9 @@ void test_touch_azimuth() {
         aoahid_node disabled_node{};
         disabled_node.spec = spec;
         disabled_node.state = aoa::detail::TouchState{};
-        aoahid_touch_extra disabled_extra{10, 0, 0, 1};
-        AOAHID_CHECK(aoahid_touch(&disabled_node, 1U, 1U, 100, 200, &disabled_extra) ==
-                     AOAHID_ERR_PARAM);
+        aoahid_touchscreen_extra disabled_extra{10, 0, 0, 1};
+        AOAHID_CHECK(aoahid_touchscreen_contact(&disabled_node, 1U, 1U, 100, 200,
+                                                &disabled_extra) == AOAHID_ERR_PARAM);
     }
     aoahid_spec_release(spec);
 }
@@ -925,9 +926,10 @@ void test_touch_packets() {
                                            0,
                                            0,
                                            0};
-        aoahid_touch_extra extra{contact.pressure, contact.width, contact.height, contact.azimuth};
-        AOAHID_CHECK(aoahid_touch(&node, contact.contact_id, 1U, contact.x, contact.y, &extra) ==
-                     AOAHID_OK);
+        aoahid_touchscreen_extra extra{contact.pressure, contact.width, contact.height,
+                                       contact.azimuth};
+        AOAHID_CHECK(aoahid_touchscreen_contact(&node, contact.contact_id, 1U, contact.x, contact.y,
+                                                &extra) == AOAHID_OK);
     }
     std::array<std::uint8_t, 128> report{};
     std::size_t length = 0U;
@@ -942,10 +944,10 @@ void test_touch_packets() {
     node.transfer_inflight.store(true);
     aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
     const aoahid_touch_contact changed{0U, 300, 400, 10, 0, 0, 0};
-    aoahid_touch_extra changed_extra{changed.pressure, changed.width, changed.height,
-                                     changed.azimuth};
-    AOAHID_CHECK(aoahid_touch(&node, changed.contact_id, 1U, changed.x, changed.y,
-                              &changed_extra) == AOAHID_ERR_BUSY);
+    aoahid_touchscreen_extra changed_extra{changed.pressure, changed.width, changed.height,
+                                           changed.azimuth};
+    AOAHID_CHECK(aoahid_touchscreen_contact(&node, changed.contact_id, 1U, changed.x, changed.y,
+                                            &changed_extra) == AOAHID_ERR_BUSY);
     AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(), &length) ==
                  AOAHID_OK);
     AOAHID_CHECK(count != nullptr && extract(report.data(), *count) == 0U);
@@ -964,9 +966,9 @@ void test_touch_lift_frame_and_idle_suppression() {
     node.spec = spec;
     node.state = aoa::detail::TouchState{};
     const aoahid_touch_contact contact{7U, 100, 200, 0, 0, 0, 0};
-    AOAHID_CHECK(aoahid_touch(&node, contact.contact_id, 1U, contact.x, contact.y, nullptr) ==
-                 AOAHID_OK);
-    AOAHID_CHECK(aoahid_touch(&node, 7U, 0U, 300, 400, nullptr) == AOAHID_ERR_BUSY);
+    AOAHID_CHECK(aoahid_touchscreen_contact(&node, contact.contact_id, 1U, contact.x, contact.y,
+                                            nullptr) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_touchscreen_contact(&node, 7U, 0U, 300, 400, nullptr) == AOAHID_ERR_BUSY);
 
     const auto* count = field(spec, aoa::hid::FieldSemantic::contact_count);
     const auto* tip = field(spec, aoa::hid::FieldSemantic::tip);
@@ -989,7 +991,7 @@ void test_touch_lift_frame_and_idle_suppression() {
     aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
     AOAHID_CHECK(!node.dirty);
 
-    AOAHID_CHECK(aoahid_touch(&node, 7U, 0U, 300, 400, nullptr) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_touchscreen_contact(&node, 7U, 0U, 300, 400, nullptr) == AOAHID_OK);
     report.fill(0U);
     AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(), &length) ==
                  AOAHID_OK);
@@ -1014,12 +1016,12 @@ void test_touch_lift_frame_and_idle_suppression() {
     // Idle touch state is clean, so the public submit path suppresses a
     // zero-count report instead of sending one and reusing the previous count.
     AOAHID_CHECK(!node.dirty);
-    AOAHID_CHECK(aoahid_touch(&node, 7U, 0U, 300, 400, nullptr) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_touchscreen_contact(&node, 7U, 0U, 300, 400, nullptr) == AOAHID_ERR_PARAM);
     const aoahid_touch_contact next_contact{8U, 500, 600, 10, 0, 0, 0};
-    aoahid_touch_extra next_extra{next_contact.pressure, next_contact.width, next_contact.height,
-                                  next_contact.azimuth};
-    AOAHID_CHECK(aoahid_touch(&node, next_contact.contact_id, 1U, next_contact.x, next_contact.y,
-                              &next_extra) == AOAHID_OK);
+    aoahid_touchscreen_extra next_extra{next_contact.pressure, next_contact.width,
+                                        next_contact.height, next_contact.azimuth};
+    AOAHID_CHECK(aoahid_touchscreen_contact(&node, next_contact.contact_id, 1U, next_contact.x,
+                                            next_contact.y, &next_extra) == AOAHID_OK);
     report.fill(0U);
     AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(), &length) ==
                  AOAHID_OK);
@@ -1202,12 +1204,12 @@ void test_pen_switch() {
         digitizer_node.state = aoa::detail::PenState{};
         digitizer_node.transfer_inflight.store(true);
         aoa::detail::transfer_complete(&digitizer_node, AOAHID_OK, 0);
-        aoahid_pen_sample digitizer_sample{};
+        aoahid_digitizer_sample digitizer_sample{};
         digitizer_sample.in_range = 1U;
         digitizer_sample.x = 10;
         digitizer_sample.y = 20;
-        AOAHID_CHECK(aoahid_pen_update(&digitizer_node, &digitizer_sample) == AOAHID_OK);
-        AOAHID_CHECK(aoahid_pen_depart(&digitizer_node) != AOAHID_ERR_PARAM);
+        AOAHID_CHECK(aoahid_digitizer_update(&digitizer_node, &digitizer_sample) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_digitizer_depart(&digitizer_node) != AOAHID_ERR_PARAM);
         aoahid_spec_release(spec);
     }
 }

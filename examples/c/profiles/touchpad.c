@@ -6,13 +6,13 @@
 #include "profile_example.h"
 
 static const char* const k_send_sequence[] = {
-    "aoahid_touch(node, 0, 1, 500, 500, NULL)     contact id 0, tip down",
-    "aoahid_node_submit(node)                     Contact Count and Scan Time are derived",
-    "aoahid_touchpad_button(node, 1, 1)            physical click button pressed",
-    "aoahid_node_submit(node)                      button report",
-    "aoahid_touchpad_button(node, 1, 0)            button released",
-    "aoahid_touch(node, 0, 0, 500, 500, NULL)      tip up keeps the same stable id",
-    "aoahid_node_submit(node)                      closes the frame",
+    "aoahid_touchpad_contact(node, 0, 1, 500, 500, NULL)   contact id 0, tip down",
+    "aoahid_node_submit(node)                              Contact Count and Scan Time are derived",
+    "aoahid_touchpad_button(node, 1, 1)                    physical click button pressed",
+    "aoahid_node_submit(node)                              button report",
+    "aoahid_touchpad_button(node, 1, 0)                    button released",
+    "aoahid_touchpad_contact(node, 0, 0, 500, 500, NULL)   tip up keeps the same stable id",
+    "aoahid_node_submit(node)                              closes the frame",
     NULL};
 
 int main(void) {

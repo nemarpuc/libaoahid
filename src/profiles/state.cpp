@@ -51,10 +51,9 @@ aoahid_result link_available(const aoahid_node* node, const char* field) noexcep
     return AOAHID_ERR_NO_DEVICE;
 }
 
-aoahid_result usable(const aoahid_node* node, const aoahid_profile_kind kind, const char* field,
-                     const aoahid_profile_kind alternate = 0) noexcept {
-    if (node == nullptr || node->closed || node->spec == nullptr ||
-        (node->spec->kind != kind && node->spec->kind != alternate)) {
+aoahid_result usable(const aoahid_node* node, const aoahid_profile_kind kind,
+                     const char* field) noexcept {
+    if (node == nullptr || node->closed || node->spec == nullptr || node->spec->kind != kind) {
         set_error(AOAHID_ERR_PARAM, field, "The operation does not match the node profile.");
         return AOAHID_ERR_PARAM;
     }
@@ -988,16 +987,24 @@ static aoahid_result aoahid_dpad_impl(aoahid_node* node, const std::uint32_t up,
     return AOAHID_OK;
 }
 
-// The contact_id/down/x/y order is the fixed, already-shipped aoahid_touch(node,
-// contact_id, down, x, y, extra) ABI order and cannot be changed to avoid this warning.
+// The optional fields of aoahid_touchscreen_extra and aoahid_touchpad_extra, which have the
+// same layout, so the two public entry points share one implementation.
+struct TouchExtra {
+    std::int32_t pressure;
+    std::int32_t width;
+    std::int32_t height;
+    std::int32_t azimuth;
+};
+
+// The contact_id/down/x/y order is the fixed aoahid_touchscreen_contact and
+// aoahid_touchpad_contact ABI order and cannot be changed to avoid this warning.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-static aoahid_result aoahid_touch_impl(aoahid_node* node, const std::uint32_t contact_id,
-                                       const std::uint32_t down, const std::int32_t x,
-                                       const std::int32_t y, const aoahid_touch_extra* extra) {
+static aoahid_result touch_contact_impl(aoahid_node* node, const aoahid_profile_kind kind,
+                                        const std::uint32_t contact_id, const std::uint32_t down,
+                                        const std::int32_t x, const std::int32_t y,
+                                        const TouchExtra* extra) {
     aoa::detail::clear_error();
-    const bool right_kind = node != nullptr && node->spec != nullptr &&
-                            (node->spec->kind == AOAHID_PROFILE_TOUCHSCREEN ||
-                             node->spec->kind == AOAHID_PROFILE_TOUCHPAD);
+    const bool right_kind = node != nullptr && node->spec != nullptr && node->spec->kind == kind;
     if (!right_kind || node->closed || !aoa::detail::valid_boolean(down)) {
         set_error(AOAHID_ERR_PARAM, "touch", "A live touch node and boolean down are required.");
         return AOAHID_ERR_PARAM;
@@ -1123,10 +1130,11 @@ static aoahid_result aoahid_touchpad_button_impl(aoahid_node* node, const std::u
     return AOAHID_OK;
 }
 
-static aoahid_result aoahid_pen_update_impl(aoahid_node* node, const aoahid_pen_sample* sample) {
+static aoahid_result stylus_update_impl(aoahid_node* node, const aoahid_profile_kind kind,
+                                        const aoahid_pen_sample* sample) {
     aoa::detail::clear_error();
     const aoahid_result check =
-        usable(node, AOAHID_PROFILE_PEN, "pen.update", AOAHID_PROFILE_DIGITIZER);
+        usable(node, kind, kind == AOAHID_PROFILE_PEN ? "pen.update" : "digitizer.update");
     if (check != AOAHID_OK)
         return check;
     if (sample == nullptr) {
@@ -1176,10 +1184,10 @@ static aoahid_result aoahid_pen_update_impl(aoahid_node* node, const aoahid_pen_
     return AOAHID_OK;
 }
 
-static aoahid_result aoahid_pen_depart_impl(aoahid_node* node) {
+static aoahid_result stylus_depart_impl(aoahid_node* node, const aoahid_profile_kind kind) {
     aoa::detail::clear_error();
     const aoahid_result check =
-        usable(node, AOAHID_PROFILE_PEN, "pen.depart", AOAHID_PROFILE_DIGITIZER);
+        usable(node, kind, kind == AOAHID_PROFILE_PEN ? "pen.depart" : "digitizer.depart");
     if (check != AOAHID_OK)
         return check;
     auto* pen = state<aoa::detail::PenState>(node);
@@ -1273,11 +1281,31 @@ aoahid_result AOAHID_CALL aoahid_dpad(aoahid_node* node, const std::uint32_t up,
     return abi_state_result("dpad", [&] { return aoahid_dpad_impl(node, up, down, right, left); });
 }
 
-aoahid_result AOAHID_CALL aoahid_touch(aoahid_node* node, const std::uint32_t contact_id,
-                                       const std::uint32_t down, const std::int32_t x,
-                                       const std::int32_t y, const aoahid_touch_extra* extra) {
-    return abi_state_result("touch",
-                            [&] { return aoahid_touch_impl(node, contact_id, down, x, y, extra); });
+aoahid_result AOAHID_CALL aoahid_touchscreen_contact(aoahid_node* node,
+                                                     const std::uint32_t contact_id,
+                                                     const std::uint32_t down, const std::int32_t x,
+                                                     const std::int32_t y,
+                                                     const aoahid_touchscreen_extra* extra) {
+    return abi_state_result("touchscreen.contact", [&] {
+        const TouchExtra values = extra == nullptr ? TouchExtra{}
+                                                   : TouchExtra{extra->pressure, extra->width,
+                                                                extra->height, extra->azimuth};
+        return touch_contact_impl(node, AOAHID_PROFILE_TOUCHSCREEN, contact_id, down, x, y,
+                                  extra == nullptr ? nullptr : &values);
+    });
+}
+
+aoahid_result AOAHID_CALL aoahid_touchpad_contact(aoahid_node* node, const std::uint32_t contact_id,
+                                                  const std::uint32_t down, const std::int32_t x,
+                                                  const std::int32_t y,
+                                                  const aoahid_touchpad_extra* extra) {
+    return abi_state_result("touchpad.contact", [&] {
+        const TouchExtra values = extra == nullptr ? TouchExtra{}
+                                                   : TouchExtra{extra->pressure, extra->width,
+                                                                extra->height, extra->azimuth};
+        return touch_contact_impl(node, AOAHID_PROFILE_TOUCHPAD, contact_id, down, x, y,
+                                  extra == nullptr ? nullptr : &values);
+    });
 }
 
 aoahid_result AOAHID_CALL aoahid_touchpad_button(aoahid_node* node, const std::uint32_t button,
@@ -1287,11 +1315,33 @@ aoahid_result AOAHID_CALL aoahid_touchpad_button(aoahid_node* node, const std::u
 }
 
 aoahid_result AOAHID_CALL aoahid_pen_update(aoahid_node* node, const aoahid_pen_sample* sample) {
-    return abi_state_result("pen.update", [&] { return aoahid_pen_update_impl(node, sample); });
+    return abi_state_result("pen.update",
+                            [&] { return stylus_update_impl(node, AOAHID_PROFILE_PEN, sample); });
 }
 
 aoahid_result AOAHID_CALL aoahid_pen_depart(aoahid_node* node) {
-    return abi_state_result("pen.depart", [&] { return aoahid_pen_depart_impl(node); });
+    return abi_state_result("pen.depart",
+                            [&] { return stylus_depart_impl(node, AOAHID_PROFILE_PEN); });
+}
+
+aoahid_result AOAHID_CALL aoahid_digitizer_update(aoahid_node* node,
+                                                  const aoahid_digitizer_sample* sample) {
+    return abi_state_result("digitizer.update", [&] {
+        const aoahid_pen_sample values =
+            sample == nullptr
+                ? aoahid_pen_sample{}
+                : aoahid_pen_sample{sample->in_range,       sample->tip,    sample->eraser,
+                                    sample->barrel_buttons, sample->x,      sample->y,
+                                    sample->pressure,       sample->tilt_x, sample->tilt_y,
+                                    sample->twist};
+        return stylus_update_impl(node, AOAHID_PROFILE_DIGITIZER,
+                                  sample == nullptr ? nullptr : &values);
+    });
+}
+
+aoahid_result AOAHID_CALL aoahid_digitizer_depart(aoahid_node* node) {
+    return abi_state_result("digitizer.depart",
+                            [&] { return stylus_depart_impl(node, AOAHID_PROFILE_DIGITIZER); });
 }
 
 aoahid_result AOAHID_CALL aoahid_battery_update(aoahid_node* node, const std::uint32_t has_value,

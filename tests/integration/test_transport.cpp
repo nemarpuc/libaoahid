@@ -2496,9 +2496,10 @@ void open_public_touch_session(aoahid_context** context, aoahid_device** device,
 
     const aoahid_touch_contact first{1U, 100, 200, 0, 0, 0, 0};
     const aoahid_touch_contact second{2U, 300, 400, 0, 0, 0, 0};
-    AOAHID_CHECK(aoahid_touch(*node, first.contact_id, 1U, first.x, first.y, nullptr) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_touch(*node, second.contact_id, 1U, second.x, second.y, nullptr) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_touchscreen_contact(*node, first.contact_id, 1U, first.x, first.y,
+                                            nullptr) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_touchscreen_contact(*node, second.contact_id, 1U, second.x, second.y,
+                                            nullptr) == AOAHID_OK);
 }
 
 void test_public_touch_scan_time_lifecycle() {
@@ -2561,15 +2562,16 @@ void test_public_touch_scan_time_lifecycle() {
         AOAHID_CHECK(in_modulo_window(first, first_possible_tick, last_possible_tick));
     }
 
-    AOAHID_CHECK(aoahid_touch(node, 1U, 0U, 100, 200, nullptr) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_touch(node, 2U, 0U, 300, 400, nullptr) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_touchscreen_contact(node, 1U, 0U, 100, 200, nullptr) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_touchscreen_contact(node, 2U, 0U, 300, 400, nullptr) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(node, 100U) == AOAHID_OK);
     AOAHID_CHECK(!touch->scan_epoch_active);
     payloads = control_payloads_for(57U);
     AOAHID_CHECK(payloads.size() == 4U);
 
     const aoahid_touch_contact next{3U, 500, 600, 0, 0, 0, 0};
-    AOAHID_CHECK(aoahid_touch(node, next.contact_id, 1U, next.x, next.y, nullptr) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_touchscreen_contact(node, next.contact_id, 1U, next.x, next.y, nullptr) ==
+                 AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(node, 100U) == AOAHID_OK);
     payloads = control_payloads_for(57U);
     AOAHID_CHECK(payloads.size() == 5U);
@@ -2641,8 +2643,8 @@ void test_public_touch_scan_time_rejected_first_attempt_stays_zero() {
     AOAHID_CHECK(aoahid_node_open(device, raw_spec, &node_options, &raw_node) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_open(device, touch_spec, &node_options, &touch_node) == AOAHID_OK);
     const aoahid_touch_contact contact{1U, 100, 200, 0, 0, 0, 0};
-    AOAHID_CHECK(aoahid_touch(touch_node, contact.contact_id, 1U, contact.x, contact.y, nullptr) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_touchscreen_contact(touch_node, contact.contact_id, 1U, contact.x,
+                                            contact.y, nullptr) == AOAHID_OK);
     auto* touch = std::get_if<aoa::detail::TouchState>(&touch_node->state);
     AOAHID_CHECK(touch != nullptr && !touch->scan_epoch_active && touch->scan_time == 0U);
 
@@ -2693,8 +2695,8 @@ void test_close_drains_touch_frame_before_neutral() {
     AOAHID_CHECK(aoahid_node_submit(node) == AOAHID_OK);
     AOAHID_CHECK(aoahid_fake_libusb_pending_transfer_count() == 0U);
     const aoahid_touch_contact blocked_change{1U, 101, 201, 0, 0, 0, 0};
-    AOAHID_CHECK(aoahid_touch(node, blocked_change.contact_id, 1U, blocked_change.x,
-                              blocked_change.y, nullptr) == AOAHID_ERR_BUSY);
+    AOAHID_CHECK(aoahid_touchscreen_contact(node, blocked_change.contact_id, 1U, blocked_change.x,
+                                            blocked_change.y, nullptr) == AOAHID_ERR_BUSY);
     AOAHID_CHECK(controls_for(57U).size() == 1U);
 
     AOAHID_CHECK(aoahid_device_close(device) == AOAHID_OK);

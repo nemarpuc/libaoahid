@@ -70,8 +70,8 @@ complete call sequence that would send the profile to a real device -
 `aoahid_node_open`, the profile's own mutation calls, `aoahid_node_close`, and
 `aoahid_device_close`. Each example supplies its own mutation steps, so
 `keyboard.c` shows the `aoahid_kbd` press/submit/release/submit cycle while
-`touchscreen.c` shows the `aoahid_touch` tip-down/tip-up frame, and
-`touchpad.c` shows the same `aoahid_touch` frame plus an
+`touchscreen.c` shows the `aoahid_touchscreen_contact` tip-down/tip-up frame, and
+`touchpad.c` shows the same frame with `aoahid_touchpad_contact` plus an
 `aoahid_touchpad_button` press/submit/release/submit cycle. The sequence is
 printed rather than executed because these programs open no device; run
 `examples/c/verify/` against a phone to watch the same calls take effect.

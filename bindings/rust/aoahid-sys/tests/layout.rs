@@ -480,14 +480,37 @@ fn rust_layout() -> BTreeMap<String, usize> {
     );
     layout!(
         values,
-        aoahid_touch_extra,
-        "aoahid_touch_extra",
+        aoahid_touchscreen_extra,
+        "aoahid_touchscreen_extra",
+        [pressure, width, height, azimuth]
+    );
+    layout!(
+        values,
+        aoahid_touchpad_extra,
+        "aoahid_touchpad_extra",
         [pressure, width, height, azimuth]
     );
     layout!(
         values,
         aoahid_pen_sample,
         "aoahid_pen_sample",
+        [
+            in_range,
+            tip,
+            eraser,
+            barrel_buttons,
+            x,
+            y,
+            pressure,
+            tilt_x,
+            tilt_y,
+            twist
+        ]
+    );
+    layout!(
+        values,
+        aoahid_digitizer_sample,
+        "aoahid_digitizer_sample",
         [
             in_range,
             tip,

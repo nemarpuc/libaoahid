@@ -399,7 +399,16 @@ class TouchContact(c.Structure):
     ]
 
 
-class TouchExtra(c.Structure):
+class TouchscreenExtra(c.Structure):
+    _fields_ = [
+        ("pressure", I32),
+        ("width", I32),
+        ("height", I32),
+        ("azimuth", I32),
+    ]
+
+
+class TouchpadExtra(c.Structure):
     _fields_ = [
         ("pressure", I32),
         ("width", I32),
@@ -409,6 +418,21 @@ class TouchExtra(c.Structure):
 
 
 class PenSample(c.Structure):
+    _fields_ = [
+        ("in_range", U32),
+        ("tip", U32),
+        ("eraser", U32),
+        ("barrel_buttons", U32),
+        ("x", I32),
+        ("y", I32),
+        ("pressure", I32),
+        ("tilt_x", I32),
+        ("tilt_y", I32),
+        ("twist", I32),
+    ]
+
+
+class DigitizerSample(c.Structure):
     _fields_ = [
         ("in_range", U32),
         ("tip", U32),
@@ -450,8 +474,10 @@ GOLDEN_STRUCTS = {
     "aoahid_report_capability": ReportCapability,
     "aoahid_capability_manifest": CapabilityManifest,
     "aoahid_touch_contact": TouchContact,
-    "aoahid_touch_extra": TouchExtra,
+    "aoahid_touchscreen_extra": TouchscreenExtra,
+    "aoahid_touchpad_extra": TouchpadExtra,
     "aoahid_pen_sample": PenSample,
+    "aoahid_digitizer_sample": DigitizerSample,
 }
 
 

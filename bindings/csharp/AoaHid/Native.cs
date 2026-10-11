@@ -437,7 +437,16 @@ public struct TouchContact
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct TouchExtra
+public struct TouchscreenExtra
+{
+    public int Pressure;
+    public int Width;
+    public int Height;
+    public int Azimuth;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct TouchpadExtra
 {
     public int Pressure;
     public int Width;
@@ -447,6 +456,21 @@ public struct TouchExtra
 
 [StructLayout(LayoutKind.Sequential)]
 public struct PenSample
+{
+    public uint InRange;
+    public uint Tip;
+    public uint Eraser;
+    public uint BarrelButtons;
+    public int X;
+    public int Y;
+    public int Pressure;
+    public int TiltX;
+    public int TiltY;
+    public int Twist;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct DigitizerSample
 {
     public uint InRange;
     public uint Tip;
@@ -570,8 +594,10 @@ public static class Native
             ["aoahid_report_capability"] = typeof(ReportCapability),
             ["aoahid_capability_manifest"] = typeof(CapabilityManifest),
             ["aoahid_touch_contact"] = typeof(TouchContact),
-            ["aoahid_touch_extra"] = typeof(TouchExtra),
+            ["aoahid_touchscreen_extra"] = typeof(TouchscreenExtra),
+            ["aoahid_touchpad_extra"] = typeof(TouchpadExtra),
             ["aoahid_pen_sample"] = typeof(PenSample),
+            ["aoahid_digitizer_sample"] = typeof(DigitizerSample),
         };
 
     [DllImport(Library, EntryPoint = "aoahid_last_error", ExactSpelling = true, CallingConvention = Call)]
@@ -672,16 +698,23 @@ public static class Native
     public static extern Result GamepadSetAxis(nint node, nuint axisIndex, int value);
     [DllImport(Library, EntryPoint = "aoahid_dpad", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result Dpad(nint node, uint up, uint down, uint right, uint left);
-    // Pass default(TouchExtra) for "no extra data"; this native function treats a null
-    // pointer and an all-zero struct identically, so no separate nint overload is needed.
-    [DllImport(Library, EntryPoint = "aoahid_touch", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result Touch(nint node, uint contactId, uint down, int x, int y, in TouchExtra extra);
+    // Pass default(TouchscreenExtra) or default(TouchpadExtra) for "no extra data"; these native
+    // functions treat a null pointer and an all-zero struct identically, so no separate nint
+    // overload is needed.
+    [DllImport(Library, EntryPoint = "aoahid_touchscreen_contact", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result TouchscreenContact(nint node, uint contactId, uint down, int x, int y, in TouchscreenExtra extra);
+    [DllImport(Library, EntryPoint = "aoahid_touchpad_contact", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result TouchpadContact(nint node, uint contactId, uint down, int x, int y, in TouchpadExtra extra);
     [DllImport(Library, EntryPoint = "aoahid_touchpad_button", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result TouchpadButton(nint node, uint button, uint pressed);
     [DllImport(Library, EntryPoint = "aoahid_pen_update", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result PenUpdate(nint node, in PenSample sample);
     [DllImport(Library, EntryPoint = "aoahid_pen_depart", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result PenDepart(nint node);
+    [DllImport(Library, EntryPoint = "aoahid_digitizer_update", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result DigitizerUpdate(nint node, in DigitizerSample sample);
+    [DllImport(Library, EntryPoint = "aoahid_digitizer_depart", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result DigitizerDepart(nint node);
     [DllImport(Library, EntryPoint = "aoahid_battery_update", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result BatteryUpdate(nint node, uint hasValue, int strength);
     [DllImport(Library, EntryPoint = "aoahid_raw_submit", ExactSpelling = true, CallingConvention = Call)]

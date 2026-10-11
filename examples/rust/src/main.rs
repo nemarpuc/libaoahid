@@ -464,7 +464,7 @@ fn update_then_submit(
             unsafe { sys::aoahid_kbd(session.keyboard, KEYBOARD_A_USAGE, 1) },
             unsafe { sys::aoahid_mouse_move(session.mouse, EXAMPLE_MOUSE_DX, EXAMPLE_MOUSE_DY) },
             unsafe {
-                sys::aoahid_touch(
+                sys::aoahid_touchscreen_contact(
                     session.touchscreen,
                     contact.contact_id,
                     1,

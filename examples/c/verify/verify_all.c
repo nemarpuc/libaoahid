@@ -73,7 +73,8 @@ static int touch_circle_step(touch_circle_state* state) {
     state->angle += state->step_angle;
     const int32_t x = state->center_x + (int32_t)(state->radius * cos(state->angle));
     const int32_t y = state->center_y + (int32_t)(state->radius * sin(state->angle));
-    aoahid_result result = aoahid_touch(state->node, state->contact_id, 1U, x, y, NULL);
+    aoahid_result result =
+        aoahid_touchscreen_contact(state->node, state->contact_id, 1U, x, y, NULL);
     if (result != AOAHID_OK)
         return verify_fail("touch move", result);
     result = verify_submit(state->node);
@@ -86,8 +87,8 @@ static int touch_circle_step(touch_circle_state* state) {
 static int touch_circle_lift(touch_circle_state* state) {
     if (!state->down)
         return 0;
-    aoahid_result result =
-        aoahid_touch(state->node, state->contact_id, 0U, state->center_x, state->center_y, NULL);
+    aoahid_result result = aoahid_touchscreen_contact(state->node, state->contact_id, 0U,
+                                                      state->center_x, state->center_y, NULL);
     if (result != AOAHID_OK)
         return verify_fail("touch up", result);
     result = verify_submit(state->node);

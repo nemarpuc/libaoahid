@@ -22,9 +22,16 @@ profiles have not been run against a phone, and the `Verified` rows in
   Digitizer (`0x0D/0x01`).
 - `aoahid_pen_options` no longer has a `mode` field. `aoahid_pen_mode`,
   `AOAHID_PEN_DIRECT_SCREEN`, and `AOAHID_PEN_INDIRECT_TABLET` are removed.
-- `aoahid_pen_update` and `aoahid_pen_depart` accept Nodes of both profiles.
-  The descriptors are byte-identical to the former `mode` forms; the golden
+- The descriptors are byte-identical to the former `mode` forms; the golden
   file `pen-indirect.hex` is now `digitizer.hex`.
+- Every profile that Android recognizes differently has its own send calls and
+  structures. `aoahid_touch` is replaced by `aoahid_touchscreen_contact` and
+  `aoahid_touchpad_contact`, and `aoahid_touch_extra` by `aoahid_touchscreen_extra`
+  and `aoahid_touchpad_extra`. `aoahid_pen_update` and `aoahid_pen_depart` take
+  Pen Nodes only; Digitizer Nodes use `aoahid_digitizer_update`,
+  `aoahid_digitizer_depart`, and `aoahid_digitizer_sample`. Each call rejects a
+  Node of the other profile with `AOAHID_ERR_PARAM`. The C++ forwarders and the
+  three bindings follow.
 
 ### Added
 

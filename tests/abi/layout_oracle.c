@@ -381,11 +381,17 @@ int main(void) {
     AOAHID_FIELD(aoahid_touch_contact, height);
     AOAHID_FIELD(aoahid_touch_contact, azimuth);
 
-    AOAHID_BEGIN(aoahid_touch_extra);
-    AOAHID_FIELD(aoahid_touch_extra, pressure);
-    AOAHID_FIELD(aoahid_touch_extra, width);
-    AOAHID_FIELD(aoahid_touch_extra, height);
-    AOAHID_FIELD(aoahid_touch_extra, azimuth);
+    AOAHID_BEGIN(aoahid_touchscreen_extra);
+    AOAHID_FIELD(aoahid_touchscreen_extra, pressure);
+    AOAHID_FIELD(aoahid_touchscreen_extra, width);
+    AOAHID_FIELD(aoahid_touchscreen_extra, height);
+    AOAHID_FIELD(aoahid_touchscreen_extra, azimuth);
+
+    AOAHID_BEGIN(aoahid_touchpad_extra);
+    AOAHID_FIELD(aoahid_touchpad_extra, pressure);
+    AOAHID_FIELD(aoahid_touchpad_extra, width);
+    AOAHID_FIELD(aoahid_touchpad_extra, height);
+    AOAHID_FIELD(aoahid_touchpad_extra, azimuth);
 
     AOAHID_BEGIN(aoahid_pen_sample);
     AOAHID_FIELD(aoahid_pen_sample, in_range);
@@ -398,5 +404,17 @@ int main(void) {
     AOAHID_FIELD(aoahid_pen_sample, tilt_x);
     AOAHID_FIELD(aoahid_pen_sample, tilt_y);
     AOAHID_FIELD(aoahid_pen_sample, twist);
+
+    AOAHID_BEGIN(aoahid_digitizer_sample);
+    AOAHID_FIELD(aoahid_digitizer_sample, in_range);
+    AOAHID_FIELD(aoahid_digitizer_sample, tip);
+    AOAHID_FIELD(aoahid_digitizer_sample, eraser);
+    AOAHID_FIELD(aoahid_digitizer_sample, barrel_buttons);
+    AOAHID_FIELD(aoahid_digitizer_sample, x);
+    AOAHID_FIELD(aoahid_digitizer_sample, y);
+    AOAHID_FIELD(aoahid_digitizer_sample, pressure);
+    AOAHID_FIELD(aoahid_digitizer_sample, tilt_x);
+    AOAHID_FIELD(aoahid_digitizer_sample, tilt_y);
+    AOAHID_FIELD(aoahid_digitizer_sample, twist);
     return 0;
 }

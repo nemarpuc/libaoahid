@@ -10,10 +10,10 @@
 static const uint16_t k_barrel_usages[] = {0x44U, 0x5AU};
 
 static const char* const k_send_sequence[] = {
-    "aoahid_pen_update(node, &sample)   tip, pressure, and in-range stay consistent",
-    "aoahid_node_submit(node)           Away state is normalized on the wire",
-    "aoahid_pen_depart(node)            explicit departure before a tool switch",
-    "aoahid_node_submit(node)           an in-range pen/eraser switch departs first", NULL};
+    "aoahid_digitizer_update(node, &sample)   tip, pressure, and in-range stay consistent",
+    "aoahid_node_submit(node)                 Away state is normalized on the wire",
+    "aoahid_digitizer_depart(node)            explicit departure before a tool switch",
+    "aoahid_node_submit(node)                 an in-range pen/eraser switch departs first", NULL};
 
 int main(void) {
     aoahid_digitizer_options options = {0};

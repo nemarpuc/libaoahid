@@ -1,7 +1,7 @@
 # HID Input Profiles
 
 libaoahid builds HID report descriptors for ten profile kinds and keeps a
-state machine per Node that turns simple calls (`aoahid_kbd`, `aoahid_touch`,
+state machine per Node that turns simple calls (`aoahid_kbd`, `aoahid_touchscreen_contact`,
 ...) into reports. This page describes each descriptor, what the library
 derives for you, and which values you must choose. The C calls are summarized
 in [API.md](API.md); numeric limits are in [LIMITS.md](LIMITS.md).
@@ -278,7 +278,9 @@ Constraints (all `AOAHID_ERR_PARAM`):
 
 ### Contacts
 
-`aoahid_touch(node, contact_id, down, x, y, extra)`:
+`aoahid_touchscreen_contact(node, contact_id, down, x, y, extra)` for a Touchscreen
+Node and `aoahid_touchpad_contact(node, contact_id, down, x, y, extra)` for a
+Touchpad Node (each rejects the other profile's Node):
 
 - `down = 1` with an inactive `contact_id` places a new contact (Tip = 1);
   with an active one it moves it.
@@ -325,7 +327,8 @@ Touchscreen, with every field and constraint identical, except:
   touchpad input into mouse-style pointer motion, and gesture support varies
   by release and OEM.
 
-`aoahid_touch` accepts Touchpad Nodes. `aoahid_touchpad_button(node, button,
+`aoahid_touchpad_contact` takes the same arguments as `aoahid_touchscreen_contact`,
+with `aoahid_touchpad_extra`. `aoahid_touchpad_button(node, button,
 pressed)` sets a one-based button; it is rejected with `AOAHID_ERR_BUSY` while
 a multi-packet contact frame is being sent. With `button_count = 0` every
 button index is out of range. Close clears buttons and lifts all contacts.
@@ -345,8 +348,11 @@ Collection Usage and in how Linux and Android classify the device:
 | Linux input property | `INPUT_PROP_DIRECT` | `INPUT_PROP_POINTER` |
 | `android_status` | `AOAHID_ANDROID_PORTABLE_CANDIDATE` | `AOAHID_ANDROID_CONDITIONAL` |
 
-Both use a Stylus (`0x20`) Physical Collection, and `aoahid_pen_update` and
-`aoahid_pen_depart` accept a Node of either profile.
+Both use a Stylus (`0x20`) Physical Collection. A Pen Node is driven with
+`aoahid_pen_update` and `aoahid_pen_depart` (`aoahid_pen_sample`), a Digitizer
+Node with `aoahid_digitizer_update` and `aoahid_digitizer_depart`
+(`aoahid_digitizer_sample`, the same fields); each rejects the other profile's
+Node.
 
 - Bits, in this order: Invert (`0x3C`, only with `enable_eraser`), Tip Switch
   (`0x42`), In Range (`0x32`), then one bit per barrel Usage.
@@ -361,7 +367,7 @@ The eraser end is signaled with Invert, not with the separate Eraser Usage
 comes before Tip Switch and In Range because Linux reads the Invert state when
 In Range turns on to choose the pen or rubber tool.
 
-`aoahid_pen_update(node, &sample)`:
+`aoahid_pen_update(node, &sample)` and `aoahid_digitizer_update(node, &sample)`:
 
 - `tip = 1` requires `in_range = 1`. Without `enable_hover`, `in_range` must
   equal `tip`.
@@ -372,7 +378,7 @@ In Range turns on to choose the pen or rubber tool.
 - Switching between pen and eraser while in range first sends an
   out-of-range report, then re-enters with the new tool.
 
-`aoahid_pen_depart(node)`, close, or a sample with `in_range = 0` sends In
+`aoahid_pen_depart(node)` or `aoahid_digitizer_depart(node)`, close, or a sample with `in_range = 0` sends In
 Range, Tip, pressure, Invert, and barrel bits as 0. X/Y, tilt, and twist keep
 their last values. The eraser selection is remembered for the next entry.
 
