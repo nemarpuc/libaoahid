@@ -537,6 +537,7 @@ if(AOAHID_BUILD_EXAMPLES)
       touchpad
       pen
       digitizer
+      keyboard_battery
       raw)
   foreach(aoahid_profile_example IN LISTS AOAHID_PROFILE_EXAMPLES)
     add_executable(aoahid_example_${aoahid_profile_example}

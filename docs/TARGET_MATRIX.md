@@ -10,7 +10,7 @@ been confirmed on real hardware, and which have not.
   Control toggle)**.
 - Devices: Samsung Galaxy Tab S11 and POCO F6 Pro (HyperOS).
 - Hosts: Windows 10 x64 (WinUSB and libusbK) and Arch Linux x86_64 (usbfs).
-- Not yet tested on hardware: battery, raw, and the System Control, Camera, and
+- Not yet tested on hardware: raw, and the System Control, Camera, and
   Telephony toggle forms.
 
 "Confirmed" means the profile was driven through
@@ -51,7 +51,7 @@ column below is about real devices only.
 | Pen | Confirmed on Samsung Galaxy Tab S11 (Arch Linux; devtest + getevent) |
 | Digitizer | Confirmed on Samsung Galaxy Tab S11 (Arch Linux; devtest + getevent) |
 | Touchpad | Confirmed on Samsung Galaxy Tab S11 (Arch Linux; devtest + getevent) |
-| Battery Strength | Not tested (AOA reports are accepted by the gadget, but no power_supply or dumpsys association was observed on Android) |
+| Battery report (on a Keyboard) | Registered on Samsung Galaxy Tab S11 (Arch Linux; kernel 6.6.102-android15, Android 16, 2026-10-11): the kernel creates the power supply and `dumpsys input` lists the device with class `BATTERY` and one battery. The reported level was not read back: sysfs is not readable from the adb shell. A battery-only descriptor got no power supply on the same device. |
 | Raw report | Not tested; the library makes no claim about how Android interprets a raw descriptor |
 
 ## Transport and accessory mode
@@ -122,5 +122,5 @@ Suggested cases per profile:
 | Touchscreen | One to the configured maximum contacts; stable Contact IDs; explicit lift; edges and corners; optional pressure/azimuth fields; Scan Time when enabled |
 | Touchpad | Touchscreen cases plus each button; observe the Android motion source |
 | Pen, Digitizer | Hover; tip; eraser in and out; barrel buttons; pressure, tilt, and twist when enabled; four corners; pen with touch |
-| Battery | Kernel `CONFIG_HID_BATTERY_STRENGTH`; minimum, midpoint, maximum; zero; unknown (Null); `/sys/class/power_supply` and `dumpsys battery` |
+| Battery report | Kernel `CONFIG_HID_BATTERY_STRENGTH`; minimum, midpoint, maximum; the device's `power_supply` directory, class `BATTERY` in `dumpsys input`, and `InputDevice.getBatteryState()` from an app |
 | Teardown | Neutral report; close; unplug with a report in flight; reopen; Android reboot |

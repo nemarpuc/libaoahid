@@ -26,7 +26,7 @@ Tested on real hardware (Samsung Galaxy Tab S11 and POCO F6 Pro, from Windows
 - Pen
 - Digitizer
 
-Not yet tested on hardware: Battery, Raw, and Toggle on the System Control,
+Not yet tested on hardware: Raw, and Toggle on the System Control,
 Camera Control, and Telephony pages. See [TARGET_MATRIX.md](TARGET_MATRIX.md)
 for per-target results.
 
@@ -37,7 +37,7 @@ form, independent of this testing:
 |---|---|
 | Mouse, Touchscreen, Pen | `AOAHID_ANDROID_PORTABLE_CANDIDATE` |
 | Gamepad with canonical Hat and Buttons starting at 1 with at least 5 buttons | `AOAHID_ANDROID_PORTABLE_CANDIDATE` |
-| Keyboard, Toggle, Touchpad, Digitizer, Battery, other Gamepad forms | `AOAHID_ANDROID_CONDITIONAL` |
+| Keyboard, Toggle, Touchpad, Digitizer, other Gamepad forms | `AOAHID_ANDROID_CONDITIONAL` |
 | Raw | `AOAHID_ANDROID_UNKNOWN` |
 
 "Portable candidate" means the form follows documented Android input behavior;
@@ -393,28 +393,45 @@ the last position to leave the pointer where it was. The eraser selection is rem
 
 Display association, rotation, and tilt/twist handling depend on the target.
 
-## Battery
+## Battery report
 
-`aoahid_spec_create_battery(&aoahid_battery_options)`
+Every generated profile (Keyboard, Mouse, Touchscreen, Touchpad, Pen,
+Digitizer, Gamepad, Toggle) takes `enable_battery` and `battery`
+(`aoahid_battery_report`) at the end of its options.
 
-- Application Collection: Generic Device Controls / Background/Nonuser
-  Controls (`0x06/0x01`).
-- One field: Battery Strength (`0x06/0x20`). The range is your choice
-  (minimum at least 0, maximum greater than minimum).
-- `enable_unknown_null_state = 1` sets the Null State flag and requires an
-  encoding outside the range to exist.
+- `enable_battery = 0`: nothing changes; `battery` must be all zero.
+- `enable_battery = 1`: the profile's Application Collection gets a second
+  Input report with one field, Battery Strength (`0x06/0x20`). The profile's
+  `report_id` and `battery.report_id` must both be enabled and differ; the
+  library does not pick them. The range is yours (minimum at least 0, maximum
+  greater than minimum, fitting `bit_width`).
 
-`aoahid_battery_update(node, 1, strength)` sends `strength` (0 is a valid known
-value). `aoahid_battery_update(node, 0, 0)` sends "unknown" as an out-of-range
-Null value; it needs `enable_unknown_null_state`. The Null value is chosen as
-for the Hat: for an unsigned field 0 if the range starts above 0, otherwise the
-largest encodable value; for a signed field the most negative encodable value
-if it is below the range, otherwise the most positive.
+There is no battery device on its own. Linux registers a HID battery only
+with an input device: `hidinput_connect()` drops a HID device that has no
+input usages and unregisters the power supply it had set up (see
+[LIMITS.md](LIMITS.md#linux-hid-values)).
+
+`aoahid_battery_update(node, strength)` sets the level. The report goes out on
+the next `aoahid_node_submit` that has no input report to send, so input is
+never held back to send a battery level, and it is sent only when the level
+changed. A Node has one report in flight: while the battery report is on the
+wire, an input update returns `AOAHID_ERR_BUSY` like any other. Closing a Node
+does not send a level that was still waiting.
+
+There is no "unknown" to send. Linux drops any battery value outside the
+declared range and reports the level as unknown until the first value arrives,
+so a Node that was never updated sends nothing and the target shows no level.
+
+Use a range that starts at 1 (for example 1 to 100). Linux v5.10 through
+v6.12 ignores a raw value of 0 for every battery usage; later kernels ignore
+it only on the Digitizers page. Linux reports
+`(value - minimum) * 100 / (maximum - minimum)` percent. How often to send is
+yours: Linux forwards an unchanged level at most once in 30 seconds, and every
+forwarded change is a `power_supply` uevent.
 
 Linux reports Battery Strength through its power-supply class only when the
-kernel is built with `CONFIG_HID_BATTERY_STRENGTH`. Some kernel versions ignore
-a raw value of 0 (see [LIMITS.md](LIMITS.md#linux-hid-values)). Whether
-Android shows the battery depends on the device.
+kernel is built with `CONFIG_HID_BATTERY_STRENGTH`. On Android an app reads
+the level with `InputDevice.getBatteryState()`.
 
 ## Raw
 

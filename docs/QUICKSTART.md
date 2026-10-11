@@ -126,14 +126,12 @@ what to do before it starts and pauses so you have time to react:
 | `aoahid_verify_toggle` | Unlock the phone and put a media app in the foreground (ideally a paused track) | Play/Pause, Volume Increment, Mute, and "AC New" each fire in turn; watch the media app and/or `adb shell getevent -lt` for the accessory's `/dev/input/eventN` (only Consumer Control Usages are sent -- see the comment at the top of the file for why System Control is deliberately excluded) |
 | `aoahid_verify_accessory <manufacturer> <model>` | Open a text field; the two strings are your product values (Android matches them against an app's accessory filter and may show a "no app" prompt) | The phone disconnects and reconnects in AOA accessory mode (`18d1:2d00`, or `2d01` with USB debugging), one `a` is typed, and with `2d01` an ADB Channel opens and closes on the same USB handle. Unplug and replug to leave accessory mode |
 | `aoahid_verify_all` | Open a text field | Touch circles, `hello world` typed, and mouse circles, one profile at a time for two rounds, then all three interleaved |
-| `aoahid_verify_battery` | Nothing required | Nothing shows in `getevent` by design (Battery Strength is kernel `power_supply` metadata, not an input event); check `adb shell dumpsys battery` and `/sys/class/power_supply` instead, as printed by the program and detailed in the comment at the top of the file |
 
 ```sh
 sudo ./aoahid_verify_keyboard
 sudo ./aoahid_verify_touch
 sudo ./aoahid_verify_mouse
 sudo ./aoahid_verify_toggle
-sudo ./aoahid_verify_battery
 sudo ./aoahid_verify_all
 sudo ./aoahid_verify_accessory "Your Company" "Your Model"
 ```

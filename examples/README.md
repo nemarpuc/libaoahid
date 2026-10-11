@@ -27,6 +27,7 @@ cc -std=c17 -O2 -Iinclude $EX/c/profiles/gamepad.c     lib/libaoahid.a -lstdc++ 
 cc -std=c17 -O2 -Iinclude $EX/c/profiles/touchscreen.c lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o touchscreen
 cc -std=c17 -O2 -Iinclude $EX/c/profiles/touchpad.c    lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o touchpad
 cc -std=c17 -O2 -Iinclude $EX/c/profiles/pen.c         lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o pen
+cc -std=c17 -O2 -Iinclude $EX/c/profiles/keyboard_battery.c lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o keyboard_battery
 cc -std=c17 -O2 -Iinclude $EX/c/profiles/raw.c         lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o raw
 
 # The full discovery-to-teardown lifecycle example. Opens a real device if one

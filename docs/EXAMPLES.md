@@ -41,7 +41,8 @@ The close helpers follow the ABI's ownership rules (see `include/aoahid.h`):
 ## One example per profile kind
 
 `examples/c/profiles/` holds one small, self-contained program for each of the
-ten `aoahid_profile_kind` values. Each file carries the complete option set
+nine `aoahid_profile_kind` values, plus `keyboard_battery.c` for the battery
+report any generated profile can carry. Each file carries the complete option set
 for its own profile and nothing else, so it can be copied into a product and
 edited directly. None of them creates a Context or opens a device, so they run
 anywhere the library links. With both `AOAHID_BUILD_EXAMPLES` and
@@ -52,14 +53,14 @@ anywhere the library links. With both `AOAHID_BUILD_EXAMPLES` and
 |---:|---|---|---|
 | 1 | `AOAHID_PROFILE_KEYBOARD` | `keyboard.c` | `aoahid_spec_create_keyboard` (also reaches the former Barcode/MSR wedge form) |
 | 2 | `AOAHID_PROFILE_MOUSE` | `mouse.c` | `aoahid_spec_create_mouse` |
-| 3 | `AOAHID_PROFILE_TOGGLE` | `toggle.c` | `aoahid_spec_create_toggle` (Consumer/System/Camera/Telephony, selected by `application_page`/`application_usage`/`field_page`) |
-| 4 | `AOAHID_PROFILE_GAMEPAD` | `gamepad.c` | `aoahid_spec_create_gamepad` |
-| 5 | `AOAHID_PROFILE_TOUCHSCREEN` | `touchscreen.c` | `aoahid_spec_create_touchscreen` |
-| 6 | `AOAHID_PROFILE_PEN` | `pen.c` | `aoahid_spec_create_pen` |
-| 7 | `AOAHID_PROFILE_BATTERY` | `battery.c` | `aoahid_spec_create_battery` |
-| 8 | `AOAHID_PROFILE_RAW` | `raw.c` | `aoahid_spec_create_raw` |
-| 9 | `AOAHID_PROFILE_TOUCHPAD` | `touchpad.c` | `aoahid_spec_create_touchpad` |
-| 10 | `AOAHID_PROFILE_DIGITIZER` | `digitizer.c` | `aoahid_spec_create_digitizer` |
+| 3 | `AOAHID_PROFILE_TOUCHSCREEN` | `touchscreen.c` | `aoahid_spec_create_touchscreen` |
+| 4 | `AOAHID_PROFILE_TOUCHPAD` | `touchpad.c` | `aoahid_spec_create_touchpad` |
+| 5 | `AOAHID_PROFILE_PEN` | `pen.c` | `aoahid_spec_create_pen` |
+| 6 | `AOAHID_PROFILE_DIGITIZER` | `digitizer.c` | `aoahid_spec_create_digitizer` |
+| 7 | `AOAHID_PROFILE_GAMEPAD` | `gamepad.c` | `aoahid_spec_create_gamepad` |
+| 8 | `AOAHID_PROFILE_TOGGLE` | `toggle.c` | `aoahid_spec_create_toggle` (Consumer/System/Camera/Telephony, selected by `application_page`/`application_usage`/`field_page`) |
+| 9 | `AOAHID_PROFILE_RAW` | `raw.c` | `aoahid_spec_create_raw` |
+| - | `AOAHID_PROFILE_KEYBOARD` with `enable_battery` | `keyboard_battery.c` | `aoahid_spec_create_keyboard` (the same two option fields exist on every generated profile) |
 
 `profile_example.h` is shared by all ten. It holds only the reporting
 helper; it contains no product values, so each example remains the single
@@ -99,10 +100,6 @@ repeatedly (`verify_keyboard.c`), dragging across the screen five times
 Play/Pause, Volume Increment, Mute, "AC New" -- for a media app to react to
 (`verify_toggle.c`). `verify_all.c` runs touch, keyboard, and mouse together,
 and `verify_accessory.c` switches the phone to accessory mode first.
-`verify_battery.c` is the one exception to "sighted on
-the phone's screen": Battery Strength is kernel `power_supply` metadata, not
-an input event, so confirming it means checking `adb shell dumpsys battery`
-and `/sys/class/power_supply` instead, as its own comment header explains.
 They print what to do before they start (for example, focus a text field)
 and print a plain-language error instead of failing silently.
 `docs/QUICKSTART.md` is the full walkthrough these programs are built for;

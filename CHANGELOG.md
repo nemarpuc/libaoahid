@@ -11,16 +11,32 @@ The first stable release under this version number. The earlier release tags
 and their version numbers were withdrawn; their change history is kept below
 under "Earlier history". Hardware-verified on a Samsung Galaxy Tab S11 (Arch Linux):
 Keyboard, Mouse, Toggle (media keys), Gamepad, Touchscreen, Touchpad, Pen,
-and Digitizer were verified via devtest and kernel getevent. Battery Strength
-remains not hardware-verified (AOA reports are accepted by the USB gadget,
-but no power_supply or InputManager association was observed on Android).
+and Digitizer were verified via devtest and kernel getevent. A battery report
+on a Keyboard was registered there too (the kernel creates the power supply
+and Android classes the device `BATTERY`); the reported level was not read
+back.
 
 
 ### Changed (breaking)
 
+- A battery level is now a second Input report inside an input profile, not a
+  profile of its own. Every generated profile's options end with
+  `enable_battery` and `battery` (`aoahid_battery_report`: `report_id`,
+  `strength`); when enabled, the profile's Application Collection carries a
+  Battery Strength (`0x06/0x20`) report under its own Report ID. Linux drops a
+  HID device that has no input usages, so the standalone form never produced a
+  power supply.
+- `aoahid_spec_create_battery`, `aoahid_battery_options`, and
+  `AOAHID_PROFILE_BATTERY` are removed.
+- `aoahid_battery_update(node, strength)` takes the level only and works on
+  any Node whose Spec has a battery report. There is no "unknown" value:
+  Linux drops out-of-range battery values. The report is sent by a submit that
+  has no input report to send, and only when the level changed.
+- The profile numbers are reordered: `KEYBOARD` 1, `MOUSE` 2, `TOUCHSCREEN` 3,
+  `TOUCHPAD` 4, `PEN` 5, `DIGITIZER` 6, `GAMEPAD` 7, `TOGGLE` 8, `RAW` 9.
 - The Pen profile is split in two, like Touch Screen and Touch Pad. `PEN` is
   the direct-screen stylus under Digitizers / Pen (`0x0D/0x02`). The indirect
-  tablet form is the new `AOAHID_PROFILE_DIGITIZER` (= 10), created with
+  tablet form is the new `AOAHID_PROFILE_DIGITIZER` (= 6), created with
   `aoahid_spec_create_digitizer(&aoahid_digitizer_options)`, under Digitizers /
   Digitizer (`0x0D/0x01`).
 - `aoahid_pen_options` no longer has a `mode` field. `aoahid_pen_mode`,

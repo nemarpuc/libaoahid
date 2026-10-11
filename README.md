@@ -42,7 +42,7 @@ Arch Linux:
 | Media keys (volume, play/pause, next/previous) | yes |
 | Pen (stylus, buttons, eraser, pressure, tilt) | yes |
 | Digitizer (stylus, buttons, eraser, pressure, tilt) | yes |
-| Battery (strength reports) | not yet |
+| Battery report (on a keyboard) | registered; level not read back |
 | Raw report | not yet |
 
 Details per device and OS are in [TARGET_MATRIX.md](docs/TARGET_MATRIX.md).
@@ -98,7 +98,7 @@ choose every product and target value.
 | Gamepad | D-pad directions become the eight Hat values plus Null (`15`); adjacent pairs become diagonals, opposite pairs are rejected. Raw four-bit D-pad and no-D-pad modes are also available. | Axes (role, range, width, neutral), buttons, D-pad form, Report ID. |
 | Touchscreen / touchpad | Contact Count, multi-report frames, Tip=0 release records with stable Contact IDs, Scan Time, packet sequencing. | Coordinate ranges, maximum contacts, contacts per report, optional fields. |
 | Pen, Digitizer | Tip/pressure consistency, out-of-range normalization, automatic leave-and-re-enter when switching pen/eraser. | Coordinate and optional-field ranges, hover/eraser/barrel options. |
-| Battery Strength | Known and unknown values (Null encoding only when enabled). | Range, width, unknown support, Report ID. |
+| Battery report | A second Input report inside any profile, sent only when the level changed and no input report is waiting. | Range, width, both Report IDs. |
 | Raw Input | Only length, Report ID, and padding are checked against your descriptor. | Descriptor and report bytes. |
 
 A state change is kept until its report is accepted; a conflicting change
@@ -155,7 +155,8 @@ can confirm a real phone reacts before writing product code.
 The complete, fully explicit C session is
 [examples/c/multi_profile.c](examples/c/multi_profile.c). For a single profile
 in isolation, [examples/c/profiles/](examples/c/profiles) has one self-contained
-program per HID profile kind, all ten of which run without a device. In
+program per HID profile kind and one for the battery report, all ten of which
+run without a device. In
 outline:
 
 1. Create a context and explicitly select caller-poll or internal-thread mode.

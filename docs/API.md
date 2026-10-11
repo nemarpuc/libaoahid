@@ -86,7 +86,7 @@ allows; calls the caller must serialize are still the caller's responsibility.
 | Accessory mode | `aoahid_accessory_start` |
 | Device | `aoahid_device_open`, `aoahid_device_close`, `aoahid_device_latched_error` |
 | Channel | `aoahid_channel_open`, `aoahid_channel_close`, `aoahid_channel_write`, `aoahid_channel_read` |
-| Spec factories | `aoahid_spec_create_keyboard`, `_mouse`, `_toggle`, `_gamepad`, `_touchscreen`, `_touchpad`, `_pen`, `_digitizer`, `_battery`, `_raw` |
+| Spec factories | `aoahid_spec_create_keyboard`, `_mouse`, `_toggle`, `_gamepad`, `_touchscreen`, `_touchpad`, `_pen`, `_digitizer`, `_raw` |
 | Spec access | `aoahid_spec_retain`, `aoahid_spec_release`, `aoahid_spec_descriptor`, `aoahid_spec_manifest` |
 | Node | `aoahid_node_open`, `aoahid_node_close`, `aoahid_node_hid_id`, `aoahid_node_manifest`, `aoahid_node_submit`, `aoahid_node_submit_blocking` |
 | Profile state | `aoahid_keyboard_key`, `aoahid_mouse_move`, `aoahid_mouse_scroll`, `aoahid_mouse_button`, `aoahid_toggle_usage`, `aoahid_gamepad_button`, `aoahid_gamepad_axis`, `aoahid_gamepad_dpad`, `aoahid_touchscreen_contact`, `aoahid_touchpad_contact`, `aoahid_touchpad_button`, `aoahid_pen_update`, `aoahid_digitizer_update`, `aoahid_battery_update`, `aoahid_raw_submit` |
@@ -366,7 +366,7 @@ I/O or allocates.
 | Touchpad | `aoahid_touchpad_contact(node, contact_id, down, x, y, extra)`, `aoahid_touchpad_button(node, button, down)` |
 | Pen | `aoahid_pen_update(node, &sample)` |
 | Digitizer | `aoahid_digitizer_update(node, &sample)` |
-| Battery | `aoahid_battery_update(node, has_value, strength)` |
+| Battery report (any profile with `enable_battery`) | `aoahid_battery_update(node, strength)` |
 | Raw | `aoahid_raw_submit(node, report, length)` (validates, copies, and queues request 57 directly) |
 
 `down` and the D-pad directions must be exactly 0 or 1. Buttons are
@@ -400,8 +400,9 @@ is in [PROFILES.md](PROFILES.md). In short:
   (the contact does not end as a lift). libaoahid does not prevent this and
   has no primary source for it; hold the mouse reports back while a contact is
   down, and send the contact's lift before the next mouse report.
-- **Battery.** `has_value = 0` (with `strength = 0`) reports "unknown" and
-  requires the Spec to enable the Null state.
+- **Battery report.** `aoahid_battery_update` works on a Node whose Spec was
+  created with `enable_battery = 1`. The level is sent by the next submit that
+  has no input report to send, and only when it changed.
 
 No profile generates key repeat, debounce, long-press, or any other timed
 action.
