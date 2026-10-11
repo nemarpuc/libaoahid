@@ -11,8 +11,7 @@ Do not infer Usage IDs, wire values, Android classification, or libusb behavior.
 
 Changes must keep product, target, HID descriptor, and parser-policy choices
 caller-supplied. Only documented host-transport tuning zeros may normalize to
-project-policy fallbacks; do not add another fallback without tests and an
-evidence-qualified audit entry. Add boundary and failure tests, run formatting
-and the complete CTest suite, and update the fact audit when source evidence
-changes. Hardware claims require all four observations in
-`docs/TARGET_MATRIX.md`; source review alone is not hardware evidence.
+project-policy fallbacks; do not add another fallback without tests. Add
+boundary and failure tests, and run formatting and the complete CTest suite.
+Hardware claims require all four observations in `docs/TARGET_MATRIX.md`;
+source review alone is not hardware evidence.

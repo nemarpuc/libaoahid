@@ -103,38 +103,27 @@ class GlibcVersionTests(unittest.TestCase):
 
 
 class AbiNamespacePolicyTests(unittest.TestCase):
-    def test_major_zero_minor_bumps_keep_initial_namespace(self) -> None:
-        for version in ("0.1.0", "0.2.0", "0.99.7"):
-            with self.subTest(version=version):
-                validate_release.validate_abi_namespace(version, "0", "0.1")
-
     def test_major_one_minor_bumps_keep_the_1_0_namespace(self) -> None:
         for version in ("1.0.0", "1.1.0", "1.99.7"):
             with self.subTest(version=version):
                 validate_release.validate_abi_namespace(version, "1", "1.0")
 
-    def test_major_two_minor_bumps_keep_the_2_0_namespace(self) -> None:
-        for version in ("2.0.0", "2.1.0", "2.99.7"):
-            with self.subTest(version=version):
-                validate_release.validate_abi_namespace(version, "2", "2.0")
-
     def test_project_minor_is_not_an_abi_namespace(self) -> None:
         with self.assertRaisesRegex(
             validate_release.ValidationError,
-            r"stable namespace 0\.1",
+            r"stable namespace 1\.0",
         ):
-            validate_release.validate_abi_namespace("0.2.0", "0", "0.2")
+            validate_release.validate_abi_namespace("1.1.0", "1", "1.1")
 
     def test_soversion_must_match_project_major(self) -> None:
         with self.assertRaisesRegex(
             validate_release.ValidationError,
-            "SOVERSION 1 disagrees with project major 0",
+            "SOVERSION 1 disagrees with project major 2",
         ):
-            validate_release.validate_abi_namespace("0.2.0", "1", "0.1")
+            validate_release.validate_abi_namespace("2.0.0", "1", "1.0")
 
     def test_new_abi_major_requires_an_explicit_namespace_policy(self) -> None:
-        # "99" stands in for a hypothetical next major with no policy entry
-        # yet; "1" is now a real, registered major (see ABI_NAMESPACE_BY_SOVERSION).
+        # "99" stands in for a next major with no policy entry yet.
         with self.assertRaisesRegex(
             validate_release.ValidationError,
             "no ELF ABI namespace policy is defined",

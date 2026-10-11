@@ -18,21 +18,9 @@ VERSION_RE = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 REPOSITORY_URL = package_source.REPOSITORY_URL
 ABI_NAMESPACE_BY_SOVERSION = {
     # ABI version nodes are persistent loader contracts, not package-version
-    # labels.  All compatible 0.x releases retain the initial AOAHID_0.1 node.
-    "0": "0.1",
-    # A SOVERSION bump changes the SONAME (libaoahid.so.0 -> .so.1), which the
-    # dynamic linker already treats as a separate, independently versioned
-    # artifact; all compatible 1.x releases retain this AOAHID_1.0 node.
+    # labels: all compatible 1.x releases retain the AOAHID_1.0 node. A new
+    # SOVERSION changes the SONAME and needs its own entry here.
     "1": "1.0",
-    # 2.0.0 changed documented behavior (no library retry), so it starts
-    # libaoahid.so.2 with its own AOAHID_2.0 node.
-    "2": "2.0",
-    # 3.0.0 grew aoahid_channel_options, so it starts libaoahid.so.3 with its
-    # own AOAHID_3.0 node.
-    "3": "3.0",
-    # 4.0.0 reshaped aoahid_device_info and aoahid_device_options, so it starts
-    # libaoahid.so.4 with its own AOAHID_4.0 node.
-    "4": "4.0",
 }
 
 
