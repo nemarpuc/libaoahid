@@ -1,6 +1,6 @@
 # HID Input Profiles
 
-libaoahid builds HID report descriptors for ten profile kinds and keeps a
+libaoahid builds HID report descriptors for nine profile kinds and keeps a
 state machine per Node that turns simple calls (`aoahid_keyboard_key`, `aoahid_touchscreen_contact`,
 ...) into reports. This page describes each descriptor, what the library
 derives for you, and which values you must choose. The C calls are summarized

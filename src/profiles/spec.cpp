@@ -1014,31 +1014,31 @@ struct TouchFieldNames {
 };
 
 constexpr TouchFieldNames kTouchscreenFieldNames{
-    "touch.report_id",
-    "touch.x",
-    "touch.y",
-    "touch.enable_pressure",
-    "touch.enable_width",
-    "touch.enable_height",
-    "touch.enable_azimuth",
-    "touch.enable_scan_time",
-    "touch.scan_time_unit_100us",
-    "touch.enable_contact_count_maximum_feature_declaration",
-    "touch.enable_multi_packet_frames",
-    "touch.fields",
-    "touch.contact_id",
-    "touch.contact_count",
-    "touch.contact_fields",
-    "touch.contacts_per_report",
-    "touch.pressure",
-    "touch.disabled_fields",
-    "touch.azimuth",
-    "touch.width",
-    "touch.height",
-    "touch.inactive_geometry",
-    "touch.geometry_units",
-    "touch.scan_time",
-    "touch.button_count",
+    "touchscreen.report_id",
+    "touchscreen.x",
+    "touchscreen.y",
+    "touchscreen.enable_pressure",
+    "touchscreen.enable_width",
+    "touchscreen.enable_height",
+    "touchscreen.enable_azimuth",
+    "touchscreen.enable_scan_time",
+    "touchscreen.scan_time_unit_100us",
+    "touchscreen.enable_contact_count_maximum_feature_declaration",
+    "touchscreen.enable_multi_packet_frames",
+    "touchscreen.fields",
+    "touchscreen.contact_id",
+    "touchscreen.contact_count",
+    "touchscreen.contact_fields",
+    "touchscreen.contacts_per_report",
+    "touchscreen.pressure",
+    "touchscreen.disabled_fields",
+    "touchscreen.azimuth",
+    "touchscreen.width",
+    "touchscreen.height",
+    "touchscreen.inactive_geometry",
+    "touchscreen.geometry_units",
+    "touchscreen.scan_time",
+    "touchscreen.button_count",
 };
 
 constexpr TouchFieldNames kTouchpadFieldNames{
@@ -1371,35 +1371,98 @@ static aoahid_result aoahid_spec_create_touchpad_impl(const aoahid_touchpad_opti
         BatteryRequest{options->enable_battery, options->battery, options->report_id}, out_spec);
 }
 
+// Pen and Digitizer share their validation; each reports its own field names.
+struct StylusFieldNames {
+    const char* barrel_usages;
+    const char* disabled_fields;
+    const char* enable_eraser;
+    const char* enable_hover;
+    const char* enable_pressure;
+    const char* enable_tilt;
+    const char* enable_twist_target_specific;
+    const char* fields;
+    const char* neutral_fields;
+    const char* pressure;
+    const char* report_id;
+    const char* tilt_x;
+    const char* tilt_y;
+    const char* twist;
+    const char* x;
+    const char* y;
+    const char* options;
+};
+
+constexpr StylusFieldNames kPenFieldNames{
+    "pen.barrel_usages",
+    "pen.disabled_fields",
+    "pen.enable_eraser",
+    "pen.enable_hover",
+    "pen.enable_pressure",
+    "pen.enable_tilt",
+    "pen.enable_twist_target_specific",
+    "pen.fields",
+    "pen.neutral_fields",
+    "pen.pressure",
+    "pen.report_id",
+    "pen.tilt_x",
+    "pen.tilt_y",
+    "pen.twist",
+    "pen.x",
+    "pen.y",
+    "pen_options",
+};
+
+constexpr StylusFieldNames kDigitizerFieldNames{
+    "digitizer.barrel_usages",
+    "digitizer.disabled_fields",
+    "digitizer.enable_eraser",
+    "digitizer.enable_hover",
+    "digitizer.enable_pressure",
+    "digitizer.enable_tilt",
+    "digitizer.enable_twist_target_specific",
+    "digitizer.fields",
+    "digitizer.neutral_fields",
+    "digitizer.pressure",
+    "digitizer.report_id",
+    "digitizer.tilt_x",
+    "digitizer.tilt_y",
+    "digitizer.twist",
+    "digitizer.x",
+    "digitizer.y",
+    "digitizer_options",
+};
+
 // Pen and Digitizer share one report shape; only the Application Usage and
 // the Android classification differ.
 static aoahid_result create_stylus_spec(const aoahid_pen_options* options,
                                         const aoahid_profile_kind kind, aoahid_spec** out_spec) {
-    if (options->reserved != 0U || !validate_report_id(options->report_id, "pen.report_id") ||
-        !validate_field(options->x, "pen.x") || !validate_field(options->y, "pen.y") ||
+    const StylusFieldNames& names =
+        kind == AOAHID_PROFILE_PEN ? kPenFieldNames : kDigitizerFieldNames;
+    if (options->reserved != 0U || !validate_report_id(options->report_id, names.report_id) ||
+        !validate_field(options->x, names.x) || !validate_field(options->y, names.y) ||
         options->x.logical_minimum > 0 || options->x.logical_maximum < 0 ||
         options->y.logical_minimum > 0 || options->y.logical_maximum < 0 ||
-        !validate_option_boolean(options->enable_pressure, "pen.enable_pressure") ||
-        !validate_option_boolean(options->enable_tilt, "pen.enable_tilt") ||
+        !validate_option_boolean(options->enable_pressure, names.enable_pressure) ||
+        !validate_option_boolean(options->enable_tilt, names.enable_tilt) ||
         !validate_option_boolean(options->enable_twist_target_specific,
-                                 "pen.enable_twist_target_specific") ||
-        !validate_option_boolean(options->enable_eraser, "pen.enable_eraser") ||
-        !validate_option_boolean(options->enable_hover, "pen.enable_hover") ||
+                                 names.enable_twist_target_specific) ||
+        !validate_option_boolean(options->enable_eraser, names.enable_eraser) ||
+        !validate_option_boolean(options->enable_hover, names.enable_hover) ||
         options->barrel_usage_count > 32U ||
         (options->barrel_usage_count != 0U && options->barrel_usages == nullptr)) {
         return aoa::detail::finish_result(
-            AOAHID_ERR_PARAM, "pen_options",
+            AOAHID_ERR_PARAM, names.options,
             "An enabled pen field has an invalid range or bit width.");
     }
     if ((options->enable_pressure == 1U &&
-         (!validate_field(options->pressure, "pen.pressure") ||
+         (!validate_field(options->pressure, names.pressure) ||
           options->pressure.logical_minimum != 0 || options->pressure.logical_maximum < 1)) ||
-        (options->enable_tilt == 1U && (!validate_field(options->tilt_x, "pen.tilt_x") ||
-                                        !validate_field(options->tilt_y, "pen.tilt_y"))) ||
+        (options->enable_tilt == 1U && (!validate_field(options->tilt_x, names.tilt_x) ||
+                                        !validate_field(options->tilt_y, names.tilt_y))) ||
         (options->enable_twist_target_specific == 1U &&
-         !validate_field(options->twist, "pen.twist"))) {
+         !validate_field(options->twist, names.twist))) {
         return aoa::detail::finish_result(
-            AOAHID_ERR_PARAM, "pen.fields",
+            AOAHID_ERR_PARAM, names.fields,
             "An enabled pen field has an invalid range or bit width.");
     }
     if ((options->enable_pressure == 0U && !field_is_zero(options->pressure)) ||
@@ -1407,7 +1470,7 @@ static aoahid_result create_stylus_spec(const aoahid_pen_options* options,
          (!field_is_zero(options->tilt_x) || !field_is_zero(options->tilt_y))) ||
         (options->enable_twist_target_specific == 0U && !field_is_zero(options->twist)) ||
         (options->barrel_usage_count == 0U && options->barrel_usages != nullptr)) {
-        set_error(AOAHID_ERR_PARAM, "pen.disabled_fields",
+        set_error(AOAHID_ERR_PARAM, names.disabled_fields,
                   "Disabled optional pen declarations and absent barrel storage must be canonical "
                   "zero/null.");
         return AOAHID_ERR_PARAM;
@@ -1418,7 +1481,7 @@ static aoahid_result create_stylus_spec(const aoahid_pen_options* options,
         (options->enable_twist_target_specific == 1U &&
          (options->twist.logical_minimum > 0 || options->twist.logical_maximum < 0))) {
         set_error(
-            AOAHID_ERR_PARAM, "pen.neutral_fields",
+            AOAHID_ERR_PARAM, names.neutral_fields,
             "Enabled tilt and twist fields must represent zero for hover and departure reports.");
         return AOAHID_ERR_PARAM;
     }
@@ -1435,7 +1498,7 @@ static aoahid_result create_stylus_spec(const aoahid_pen_options* options,
                       config.barrel_usages.begin() + static_cast<std::ptrdiff_t>(index),
                       config.barrel_usages[index]) !=
                 config.barrel_usages.begin() + static_cast<std::ptrdiff_t>(index)) {
-            set_error(AOAHID_ERR_PARAM, "pen.barrel_usages",
+            set_error(AOAHID_ERR_PARAM, names.barrel_usages,
                       "Each barrel control must be a unique HUT 1.7 Barrel Switch (0x44) or "
                       "Secondary Barrel Switch (0x5A).");
             return AOAHID_ERR_PARAM;

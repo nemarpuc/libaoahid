@@ -32,6 +32,10 @@ back.
   any Node whose Spec has a battery report. There is no "unknown" value:
   Linux drops out-of-range battery values. The report is sent by a submit that
   has no input report to send, and only when the level changed.
+- Error fields name the structure the caller filled in: Touchscreen option
+  errors are `touchscreen.*` (they were `touch.*`), Digitizer option and
+  sample errors are `digitizer.*` (they were `pen.*`), and the contact errors
+  shared by Touchscreen and Touchpad carry their own profile's name.
 - The profile numbers are reordered: `KEYBOARD` 1, `MOUSE` 2, `TOUCHSCREEN` 3,
   `TOUCHPAD` 4, `PEN` 5, `DIGITIZER` 6, `GAMEPAD` 7, `TOGGLE` 8, `RAW` 9.
 - The Pen profile is split in two, like Touch Screen and Touch Pad. `PEN` is

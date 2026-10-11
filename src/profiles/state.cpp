@@ -1046,7 +1046,10 @@ static aoahid_result touch_contact_impl(aoahid_node* node, const aoahid_profile_
         });
     if (down == 0U) {
         if (active == touch->contacts.end()) {
-            set_error(AOAHID_ERR_PARAM, "touch.contact_id", "Lift requires an active Contact ID.");
+            set_error(AOAHID_ERR_PARAM,
+                      kind == AOAHID_PROFILE_TOUCHSCREEN ? "touchscreen.contact_id"
+                                                         : "touchpad.contact_id",
+                      "Lift requires an active Contact ID.");
             return AOAHID_ERR_PARAM;
         }
         if (!in_range(x, spec->fields.x) || !in_range(y, spec->fields.y)) {
@@ -1091,7 +1094,10 @@ static aoahid_result touch_contact_impl(aoahid_node* node, const aoahid_profile_
     }
     for (const auto& entry : touch->contacts) {
         if (entry.phase != ContactPhase::none && entry.sample.contact_id == contact_id) {
-            set_error(AOAHID_ERR_BUSY, "touch.contact_id", "The Contact ID is already active.");
+            set_error(AOAHID_ERR_BUSY,
+                      kind == AOAHID_PROFILE_TOUCHSCREEN ? "touchscreen.contact_id"
+                                                         : "touchpad.contact_id",
+                      "The Contact ID is already active.");
             return AOAHID_ERR_BUSY;
         }
     }
@@ -1101,7 +1107,9 @@ static aoahid_result touch_contact_impl(aoahid_node* node, const aoahid_profile_
         std::count_if(touch->contacts.begin(), touch->contacts.end(), [](const auto& entry) {
             return entry.phase != ContactPhase::none;
         }) >= static_cast<std::ptrdiff_t>(spec->fields.maximum_contacts)) {
-        set_error(AOAHID_ERR_OVERFLOW, "touch.maximum_contacts",
+        set_error(AOAHID_ERR_OVERFLOW,
+                  kind == AOAHID_PROFILE_TOUCHSCREEN ? "touchscreen.maximum_contacts"
+                                                     : "touchpad.maximum_contacts",
                   "No declared contact slot remains.");
         return AOAHID_ERR_OVERFLOW;
     }
@@ -1155,7 +1163,8 @@ static aoahid_result stylus_update_impl(aoahid_node* node, const aoahid_profile_
     if (check != AOAHID_OK)
         return check;
     if (sample == nullptr) {
-        set_error(AOAHID_ERR_PARAM, "pen.sample", "The pen sample pointer is null.");
+        set_error(AOAHID_ERR_PARAM, kind == AOAHID_PROFILE_PEN ? "pen.sample" : "digitizer.sample",
+                  "The pen sample pointer is null.");
         return AOAHID_ERR_PARAM;
     }
     const auto* spec = config<aoa::detail::PenConfig>(node);
@@ -1178,7 +1187,7 @@ static aoahid_result stylus_update_impl(aoahid_node* node, const aoahid_profile_
         (options.enable_tilt == 1U && (!in_range(sample->tilt_x, options.tilt_x) ||
                                        !in_range(sample->tilt_y, options.tilt_y))) ||
         (options.enable_twist_target_specific == 1U && !in_range(sample->twist, options.twist))) {
-        set_error(AOAHID_ERR_PARAM, "pen.sample",
+        set_error(AOAHID_ERR_PARAM, kind == AOAHID_PROFILE_PEN ? "pen.sample" : "digitizer.sample",
                   "A flag, button, or value is outside the immutable pen spec.");
         return AOAHID_ERR_PARAM;
     }
@@ -1191,7 +1200,7 @@ static aoahid_result stylus_update_impl(aoahid_node* node, const aoahid_profile_
         pen->desired.tilt_x != sample->tilt_x || pen->desired.tilt_y != sample->tilt_y ||
         pen->desired.twist != sample->twist;
     if (pen_transition_conflicts(*pen, *sample)) {
-        return pending_transition("pen.update");
+        return pending_transition(kind == AOAHID_PROFILE_PEN ? "pen.update" : "digitizer.update");
     }
     record_pen_transitions(pen, *sample);
     pen->desired = *sample;

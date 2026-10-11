@@ -1669,6 +1669,32 @@ void test_battery_state() {
     aoahid_spec_release(spec);
 }
 
+// Every options error names the structure the caller filled in, not the
+// implementation two profiles share.
+void test_error_fields_name_their_profile() {
+    const auto field_starts_with = [](const std::string_view prefix) {
+        const char* field = aoahid_last_error()->field;
+        return field != nullptr && std::string_view(field).substr(0, prefix.size()) == prefix;
+    };
+    aoahid_spec* spec = nullptr;
+    aoahid_touchscreen_options touchscreen = touchscreen_options();
+    touchscreen.x = {};
+    AOAHID_CHECK(aoahid_spec_create_touchscreen(&touchscreen, &spec) != AOAHID_OK);
+    AOAHID_CHECK(field_starts_with("touchscreen"));
+    aoahid_touchpad_options touchpad = touchpad_options();
+    touchpad.x = {};
+    AOAHID_CHECK(aoahid_spec_create_touchpad(&touchpad, &spec) != AOAHID_OK);
+    AOAHID_CHECK(field_starts_with("touchpad"));
+    aoahid_pen_options pen{};
+    pen.struct_size = static_cast<std::uint32_t>(sizeof(pen));
+    AOAHID_CHECK(aoahid_spec_create_pen(&pen, &spec) != AOAHID_OK);
+    AOAHID_CHECK(field_starts_with("pen"));
+    aoahid_digitizer_options digitizer{};
+    digitizer.struct_size = static_cast<std::uint32_t>(sizeof(digitizer));
+    AOAHID_CHECK(aoahid_spec_create_digitizer(&digitizer, &spec) != AOAHID_OK);
+    AOAHID_CHECK(field_starts_with("digitizer"));
+}
+
 void test_profiles() {
     aoahid_keyboard_options zero{};
     auto* spec = reinterpret_cast<aoahid_spec*>(static_cast<std::uintptr_t>(1U));
@@ -1712,6 +1738,7 @@ void test_profiles() {
     test_battery_builder();
     test_battery_options();
     test_battery_state();
+    test_error_fields_name_their_profile();
 
     aoahid_touchscreen_options invalid_touch = touchscreen_options();
     invalid_touch.contact_id = {1, 15, 4U, {}};
