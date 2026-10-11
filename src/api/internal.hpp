@@ -146,8 +146,9 @@ struct MouseState {
 };
 
 struct ConsumerState {
-    std::uint16_t usage{};
-    bool transition_pending{};
+    // One entry per allowed Usage, in allow-list order.
+    std::vector<std::uint8_t> pressed;
+    std::vector<std::uint8_t> transitions;
 };
 
 struct GamepadState {

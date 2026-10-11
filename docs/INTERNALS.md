@@ -230,7 +230,7 @@ value of a Null State field.
 - With multi-packet frames the Node stays busy until the last packet of the
   frame has completed.
 - A pen that changes tool while in range first sends one out-of-range report.
-- The toggle profile holds one Usage at a time.
+- The toggle profile keeps one pressed bit and one edge flag per allowed Usage.
 
 ## Tests and checks
 

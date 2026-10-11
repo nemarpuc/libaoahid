@@ -172,11 +172,13 @@ With `field_page = 0x90`, only Auto-focus (`0x20`, else `AOAHID_ERR_PARAM`) and
 Shutter (`0x21`) are allowed, each as `AOAHID_USAGE_ONE_SHOT` (else
 `AOAHID_ERR_UNSUPPORTED`); HUT 1.7 defines no other Camera Control Usage.
 
-`aoahid_toggle(node, usage, 1)` sets exactly one allow-listed bit.
-`aoahid_toggle(node, usage, 0)` clears it; `usage` must be 0 (release whatever
-is pressed) or the pressed Usage, otherwise `AOAHID_ERR_PARAM`. One control is
-active at a time. A tap is `down = 1`, submit, `down = 0`, submit; the edge
-guard keeps the press from being lost even if you submit only once in between.
+`aoahid_toggle(node, usage, 1)` sets the bit of one allow-listed Usage and
+`aoahid_toggle(node, usage, 0)` clears it; a Usage outside the allow-list is
+`AOAHID_ERR_PARAM`. Any number of controls can be active at once, and they go
+out in one report. There is no release-all call; release every Usage you
+pressed before closing the Node (close does clear all bits). A tap is
+`down = 1`, submit, `down = 0`, submit; the edge guard keeps the press from
+being lost even if you submit only once in between.
 
 Whether the target delivers a control to apps, or the system intercepts it,
 depends on Android's key layout and policy.

@@ -1309,17 +1309,14 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_mouse_button(aoahid_node* node, uint
  * Blocking: Does not block, allocate, log, or perform I/O.
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
  * submission calls. It is rejected while one report is in flight.
- * down must be exactly zero or one: one presses usage, which must be in the
- * Spec allow-list, matching the prior press; zero releases the currently
- * pressed Usage, and usage must then be either 0 (release whichever Usage is
- * pressed, for a caller that never tracked it) or that same Usage -- a
- * different nonzero Usage is rejected instead of silently releasing the
- * wrong one.
- * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid Node/profile/down, a
- * Usage outside the Spec allow-list, or a release Usage that is neither 0 nor
- * the one currently pressed; AOAHID_ERR_BUSY for an in-flight report or an unsent opposite edge;
- * AOAHID_ERR_NO_DEVICE for sticky loss; AOAHID_ERR_INTERNAL for an unexpected
- * ABI-boundary failure. */
+ * down must be exactly zero or one: one presses usage and zero releases it.
+ * usage must be in the Spec allow-list. Any number of Usages may be pressed at
+ * once; each is its own bit. There is no release-all call; release every Usage
+ * you pressed before closing the Node (close does clear them all).
+ * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid Node/profile/down or a
+ * Usage outside the Spec allow-list; AOAHID_ERR_BUSY for an in-flight report or an unsent opposite
+ * edge; AOAHID_ERR_NO_DEVICE for sticky loss; AOAHID_ERR_INTERNAL for an unexpected ABI-boundary
+ * failure. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_toggle(aoahid_node* node, uint16_t usage,
                                                    uint32_t down);
 

@@ -187,7 +187,7 @@ void consume_lifecycle_transitions(aoahid_node* node) noexcept {
         std::fill(mouse->button_transitions.begin(), mouse->button_transitions.end(),
                   std::uint8_t{0});
     } else if (auto* consumer = state<aoa::detail::ConsumerState>(node); consumer != nullptr) {
-        consumer->transition_pending = false;
+        std::fill(consumer->transitions.begin(), consumer->transitions.end(), std::uint8_t{0});
     } else if (auto* gamepad = state<aoa::detail::GamepadState>(node); gamepad != nullptr) {
         std::fill(gamepad->button_transitions.begin(), gamepad->button_transitions.end(),
                   std::uint8_t{0});
@@ -336,7 +336,6 @@ aoahid_result serialize_node(aoahid_node* node, std::uint8_t* report, const std:
     const PenState* pen = state<PenState>(node);
     const BatteryState* battery = state<BatteryState>(node);
     const KeyboardConfig* keyboard_config = config<KeyboardConfig>(node);
-    const ConsumerConfig* consumer_config = config<ConsumerConfig>(node);
     const GamepadConfig* gamepad_config = config<GamepadConfig>(node);
     const TouchConfig* touch_config = config<TouchConfig>(node);
     std::array<const ContactState*, 16> active{};
@@ -443,10 +442,8 @@ aoahid_result serialize_node(aoahid_node* node, std::uint8_t* report, const std:
             }
             break;
         case FieldSemantic::consumer_usage:
-            value = consumer != nullptr && consumer_config != nullptr &&
-                            field.instance < consumer_config->allowed_usages.size() &&
-                            consumer->usage == consumer_config->allowed_usages[field.instance]
-                        ? 1
+            value = consumer != nullptr && field.instance < consumer->pressed.size()
+                        ? consumer->pressed[field.instance]
                         : 0;
             break;
         case FieldSemantic::gamepad_axis:
@@ -857,32 +854,24 @@ static aoahid_result aoahid_toggle_impl(aoahid_node* node, const std::uint16_t u
         return AOAHID_ERR_BUSY;
     }
     auto* consumer = state<aoa::detail::ConsumerState>(node);
-    std::uint16_t next_usage = 0U;
-    if (down == 1U) {
-        const auto* spec = config<aoa::detail::ConsumerConfig>(node);
-        if (std::find(spec->allowed_usages.begin(), spec->allowed_usages.end(), usage) ==
-            spec->allowed_usages.end()) {
-            set_error(AOAHID_ERR_PARAM, "toggle.usage",
-                      "The Usage is not in the caller allow-list.");
-            return AOAHID_ERR_PARAM;
-        }
-        next_usage = usage;
-    } else if (usage != 0U && usage != consumer->usage) {
-        // 0 releases whichever Usage is currently pressed, so a caller that
-        // never tracked it can still release; a nonzero usage here must name
-        // that same Usage, catching a caller that has lost track of what it
-        // pressed instead of silently releasing the wrong (or no) Usage.
-        set_error(AOAHID_ERR_PARAM, "toggle.usage",
-                  "usage on release must be 0 or the Usage currently pressed.");
+    const auto* spec = config<aoa::detail::ConsumerConfig>(node);
+    const auto found = std::find(spec->allowed_usages.begin(), spec->allowed_usages.end(), usage);
+    if (found == spec->allowed_usages.end()) {
+        set_error(AOAHID_ERR_PARAM, "toggle.usage", "The Usage is not in the caller allow-list.");
         return AOAHID_ERR_PARAM;
     }
-    const bool changed = consumer->usage != next_usage;
-    if (changed && consumer->transition_pending) {
+    if (!transition_storage_matches(consumer->pressed, consumer->transitions, "toggle")) {
+        return AOAHID_ERR_INTERNAL;
+    }
+    const auto index = static_cast<std::size_t>(found - spec->allowed_usages.begin());
+    const auto value = static_cast<std::uint8_t>(down);
+    const bool changed = consumer->pressed[index] != value;
+    if (changed && consumer->transitions[index] != 0U) {
         return pending_transition("toggle");
     }
     if (changed) {
-        consumer->usage = next_usage;
-        consumer->transition_pending = true;
+        consumer->pressed[index] = value;
+        consumer->transitions[index] = 1U;
     }
     node->dirty = node->dirty || changed;
     return AOAHID_OK;

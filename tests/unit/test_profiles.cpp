@@ -253,6 +253,15 @@ void test_mouse_delta_splitting_and_consumption() {
     aoahid_spec_release(spec);
 }
 
+// One pressed/transition slot per allowed Usage, as aoahid_node_open builds it.
+aoa::detail::ConsumerState consumer_state_for(const aoahid_spec* spec) {
+    const auto* config = std::get_if<aoa::detail::ConsumerConfig>(&spec->config);
+    aoa::detail::ConsumerState state{};
+    state.pressed.resize(config->allowed_usages.size());
+    state.transitions.resize(config->allowed_usages.size());
+    return state;
+}
+
 void test_usage_control_semantics() {
     const std::array<std::uint16_t, 6U> usages{0x00CDU, 0x00E9U, 0x00E2U,
                                                0x0201U, 0x00B0U, 0x00BBU};
@@ -293,7 +302,7 @@ void test_usage_control_semantics() {
 
         aoahid_node node{};
         node.spec = spec;
-        node.state = aoa::detail::ConsumerState{};
+        node.state = consumer_state_for(spec);
         AOAHID_CHECK(aoahid_toggle(&node, 0x00E9U, 1U) == AOAHID_OK);
         std::array<std::uint8_t, 8U> report{};
         std::size_t report_length = 0U;
@@ -314,19 +323,32 @@ void test_usage_control_semantics() {
         AOAHID_CHECK(report[0] == 0U);
         AOAHID_CHECK(aoahid_toggle(&node, 0x00E0U, 1U) == AOAHID_ERR_PARAM);
 
-        // Release must name 0 (whichever Usage is pressed) or that same
-        // Usage; a different pressed Usage's number is rejected instead of
-        // silently releasing the wrong (or no) Usage.
+        // Several Usages can be held at once, and each is released by name.
+        // Usage 0 is not in the allow-list, so there is no release-all call.
         aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
         AOAHID_CHECK(aoahid_toggle(&node, 0x00CDU, 1U) == AOAHID_OK);
-        AOAHID_CHECK(aoahid_toggle(&node, 0x00E9U, 0U) == AOAHID_ERR_PARAM);
+        AOAHID_CHECK(aoahid_toggle(&node, 0x00E9U, 1U) == AOAHID_OK);
+        report.fill(0U);
+        AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(),
+                                                 &report_length) == AOAHID_OK);
+        for (std::uint16_t index = 0U; index < usages.size(); ++index) {
+            const auto* control = field(spec, aoa::hid::FieldSemantic::consumer_usage, index);
+            const bool held = usages[index] == 0x00CDU || usages[index] == 0x00E9U;
+            AOAHID_CHECK(control != nullptr &&
+                         extract(report.data(), *control) == (held ? 1U : 0U));
+        }
         aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
         AOAHID_CHECK(aoahid_toggle(&node, 0x00CDU, 0U) == AOAHID_OK);
+        report.fill(0U);
+        AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(),
+                                                 &report_length) == AOAHID_OK);
+        for (std::uint16_t index = 0U; index < usages.size(); ++index) {
+            const auto* control = field(spec, aoa::hid::FieldSemantic::consumer_usage, index);
+            AOAHID_CHECK(control != nullptr &&
+                         extract(report.data(), *control) == (usages[index] == 0x00E9U ? 1U : 0U));
+        }
         aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
-        AOAHID_CHECK(aoahid_toggle(&node, 0x00CDU, 1U) == AOAHID_OK);
-        aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
-        AOAHID_CHECK(aoahid_toggle(&node, 0U, 0U) == AOAHID_OK);
-        aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
+        AOAHID_CHECK(aoahid_toggle(&node, 0U, 0U) == AOAHID_ERR_PARAM);
 
         // The state object enforces the same accepted 1->0 lifecycle for each
         // caller-declared HUT semantic. Semantic flags stay descriptor policy;
@@ -334,7 +356,7 @@ void test_usage_control_semantics() {
         for (std::size_t selected = 0U; selected < usages.size(); ++selected) {
             aoahid_node semantic_node{};
             semantic_node.spec = spec;
-            semantic_node.state = aoa::detail::ConsumerState{};
+            semantic_node.state = consumer_state_for(spec);
             AOAHID_CHECK(aoahid_toggle(&semantic_node, usages[selected], 1U) == AOAHID_OK);
             report.fill(0U);
             AOAHID_CHECK(aoa::detail::serialize_node(&semantic_node, report.data(), report.size(),
@@ -364,7 +386,7 @@ void test_usage_control_semantics() {
             return;
         aoahid_node control_node{};
         control_node.spec = control_spec;
-        control_node.state = aoa::detail::ConsumerState{};
+        control_node.state = consumer_state_for(control_spec);
         AOAHID_CHECK(aoahid_toggle(&control_node, usage, 1U) == AOAHID_OK);
         std::array<std::uint8_t, 16U> control_report{};
         std::size_t control_length = 0U;

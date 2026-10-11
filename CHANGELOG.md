@@ -36,6 +36,10 @@ profiles have not been run against a phone, and the `Verified` rows in
   `aoahid_keyboard_key` and `aoahid_dpad` is `aoahid_gamepad_dpad` (C++
   `aoahid::keyboard_key` and `aoahid::gamepad_dpad`; C# `KeyboardKey` and
   `GamepadDpad`). Every send call is now `aoahid_<profile>_<operation>`.
+- `aoahid_toggle` works like `aoahid_keyboard_key`: any number of allowed Usages
+  can be pressed at once, each is released by its own Usage, and a Usage that
+  is not in the allow-list (including 0) is `AOAHID_ERR_PARAM`. It used to hold
+  one Usage at a time, and 0 released whichever Usage was pressed.
 
 ### Added
 

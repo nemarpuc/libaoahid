@@ -411,9 +411,14 @@ aoahid_result initialize_node_state(aoahid_node* node) {
         node->state = std::move(value);
         break;
     }
-    case AOAHID_PROFILE_TOGGLE:
-        node->state = aoa::detail::ConsumerState{};
+    case AOAHID_PROFILE_TOGGLE: {
+        const auto* spec = std::get_if<aoa::detail::ConsumerConfig>(&node->spec->config);
+        aoa::detail::ConsumerState value{};
+        value.pressed.resize(spec->allowed_usages.size());
+        value.transitions.resize(spec->allowed_usages.size());
+        node->state = std::move(value);
         break;
+    }
     case AOAHID_PROFILE_GAMEPAD: {
         const auto* spec = std::get_if<aoa::detail::GamepadConfig>(&node->spec->config);
         aoa::detail::GamepadState value{};
@@ -466,7 +471,8 @@ bool has_non_neutral_state(const aoahid_node* node) noexcept {
                            [](const std::uint8_t value) { return value != 0U; });
     }
     if (const auto* consumer = std::get_if<aoa::detail::ConsumerState>(&node->state)) {
-        return consumer->usage != 0U;
+        return std::any_of(consumer->pressed.begin(), consumer->pressed.end(),
+                           [](const std::uint8_t value) { return value != 0U; });
     }
     if (const auto* gamepad = std::get_if<aoa::detail::GamepadState>(&node->state)) {
         const auto* spec = std::get_if<aoa::detail::GamepadConfig>(&node->spec->config);
@@ -584,8 +590,9 @@ void make_neutral(aoahid_node* node) noexcept {
     } else if (auto* mouse = std::get_if<aoa::detail::MouseState>(&node->state)) {
         had_non_neutral_state = neutralize_mouse(mouse);
     } else if (auto* consumer = std::get_if<aoa::detail::ConsumerState>(&node->state)) {
-        had_non_neutral_state = consumer->usage != 0U;
-        consumer->usage = 0U;
+        had_non_neutral_state = std::any_of(consumer->pressed.begin(), consumer->pressed.end(),
+                                            [](const std::uint8_t value) { return value != 0U; });
+        std::fill(consumer->pressed.begin(), consumer->pressed.end(), std::uint8_t{0});
     } else if (auto* gamepad = std::get_if<aoa::detail::GamepadState>(&node->state)) {
         const auto* spec = std::get_if<aoa::detail::GamepadConfig>(&node->spec->config);
         had_non_neutral_state = neutralize_gamepad(gamepad, spec);
@@ -720,7 +727,9 @@ void release_node_storage(aoahid_node* node) noexcept {
     // Only internal-thread mode can race Node teardown against its callback.
     // Caller-poll callbacks execute inside the caller's synchronization domain,
     // so its null active mutex deliberately keeps teardown lock-free too.
-    { const aoa::detail::ModeMutexGuard callback_exit(node->active_completion_mutex); }
+    {
+        const aoa::detail::ModeMutexGuard callback_exit(node->active_completion_mutex);
+    }
     node->closed = true;
     static_cast<void>(aoa::detail::release_spec(node->spec));
     node->spec = nullptr;
