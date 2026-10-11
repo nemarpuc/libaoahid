@@ -218,7 +218,7 @@ std::size_t collect_touch(const aoa::detail::TouchState& touch,
 }
 
 bool validate_contact(const aoa::detail::TouchConfig& config_value,
-                      const aoahid_touch_contact& contact, const char* operation) noexcept {
+                      const aoa::detail::TouchContact& contact, const char* operation) noexcept {
     const auto& options = config_value.fields;
     if (contact.contact_id >
             static_cast<std::uint32_t>(options.contact_identifier.logical_maximum) ||
@@ -803,22 +803,22 @@ static aoahid_result aoahid_mouse_scroll_impl(aoahid_node* node, const std::int3
 }
 
 static aoahid_result aoahid_mouse_button_impl(aoahid_node* node, const std::uint32_t button,
-                                              const std::uint32_t pressed) {
+                                              const std::uint32_t down) {
     aoa::detail::clear_error();
     const aoahid_result check = usable(node, AOAHID_PROFILE_MOUSE, "mouse.button");
     if (check != AOAHID_OK)
         return check;
     auto* mouse = state<aoa::detail::MouseState>(node);
-    if (button == 0U || button > mouse->buttons.size() || !aoa::detail::valid_boolean(pressed)) {
+    if (button == 0U || button > mouse->buttons.size() || !aoa::detail::valid_boolean(down)) {
         set_error(AOAHID_ERR_PARAM, "mouse.button",
-                  "Button is one-based and pressed must be zero or one.");
+                  "Button is one-based and down must be zero or one.");
         return AOAHID_ERR_PARAM;
     }
     if (!transition_storage_matches(mouse->buttons, mouse->button_transitions, "mouse.button")) {
         return AOAHID_ERR_INTERNAL;
     }
     const std::size_t index = button - 1U;
-    const auto value = static_cast<std::uint8_t>(pressed);
+    const auto value = static_cast<std::uint8_t>(down);
     const bool changed = mouse->buttons[index] != value;
     if (changed && mouse->button_transitions[index] != 0U) {
         return pending_transition("mouse.button");
@@ -831,7 +831,7 @@ static aoahid_result aoahid_mouse_button_impl(aoahid_node* node, const std::uint
     return AOAHID_OK;
 }
 
-// The usage/down order is the fixed, already-shipped aoahid_toggle(node,
+// The usage/down order is the fixed, already-shipped aoahid_toggle_usage(node,
 // usage, down) ABI order and cannot be changed to avoid this warning.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 static aoahid_result aoahid_toggle_impl(aoahid_node* node, const std::uint16_t usage,
@@ -878,15 +878,15 @@ static aoahid_result aoahid_toggle_impl(aoahid_node* node, const std::uint16_t u
 }
 
 static aoahid_result aoahid_gamepad_button_impl(aoahid_node* node, const std::uint32_t button,
-                                                const std::uint32_t pressed) {
+                                                const std::uint32_t down) {
     aoa::detail::clear_error();
     const aoahid_result check = usable(node, AOAHID_PROFILE_GAMEPAD, "gamepad.button");
     if (check != AOAHID_OK)
         return check;
     auto* gamepad = state<aoa::detail::GamepadState>(node);
-    if (button == 0U || button > gamepad->buttons.size() || !aoa::detail::valid_boolean(pressed)) {
+    if (button == 0U || button > gamepad->buttons.size() || !aoa::detail::valid_boolean(down)) {
         set_error(AOAHID_ERR_PARAM, "gamepad.button",
-                  "Button is one-based and pressed must be zero or one.");
+                  "Button is one-based and down must be zero or one.");
         return AOAHID_ERR_PARAM;
     }
     if (!transition_storage_matches(gamepad->buttons, gamepad->button_transitions,
@@ -894,7 +894,7 @@ static aoahid_result aoahid_gamepad_button_impl(aoahid_node* node, const std::ui
         return AOAHID_ERR_INTERNAL;
     }
     const std::size_t index = button - 1U;
-    const auto value = static_cast<std::uint8_t>(pressed);
+    const auto value = static_cast<std::uint8_t>(down);
     const bool changed = gamepad->buttons[index] != value;
     if (changed && gamepad->button_transitions[index] != 0U) {
         return pending_transition("gamepad.button");
@@ -1037,7 +1037,7 @@ static aoahid_result touch_contact_impl(aoahid_node* node, const aoahid_profile_
         node->dirty = true;
         return AOAHID_OK;
     }
-    aoahid_touch_contact contact{};
+    aoa::detail::TouchContact contact{};
     contact.contact_id = contact_id;
     contact.x = x;
     contact.y = y;
@@ -1086,7 +1086,7 @@ static aoahid_result touch_contact_impl(aoahid_node* node, const aoahid_profile_
 }
 
 static aoahid_result aoahid_touchpad_button_impl(aoahid_node* node, const std::uint32_t button,
-                                                 const std::uint32_t pressed) {
+                                                 const std::uint32_t down) {
     aoa::detail::clear_error();
     const aoahid_result check = usable(node, AOAHID_PROFILE_TOUCHPAD, "touchpad.button");
     if (check != AOAHID_OK)
@@ -1097,16 +1097,16 @@ static aoahid_result aoahid_touchpad_button_impl(aoahid_node* node, const std::u
                   "The current multi-packet frame must finish before state changes.");
         return AOAHID_ERR_BUSY;
     }
-    if (button == 0U || button > touch->buttons.size() || !aoa::detail::valid_boolean(pressed)) {
+    if (button == 0U || button > touch->buttons.size() || !aoa::detail::valid_boolean(down)) {
         set_error(AOAHID_ERR_PARAM, "touchpad.button",
-                  "Button is one-based and pressed must be zero or one.");
+                  "Button is one-based and down must be zero or one.");
         return AOAHID_ERR_PARAM;
     }
     if (!transition_storage_matches(touch->buttons, touch->button_transitions, "touchpad.button")) {
         return AOAHID_ERR_INTERNAL;
     }
     const std::size_t index = button - 1U;
-    const auto value = static_cast<std::uint8_t>(pressed);
+    const auto value = static_cast<std::uint8_t>(down);
     const bool changed = touch->buttons[index] != value;
     if (changed && touch->button_transitions[index] != 0U) {
         return pending_transition("touchpad.button");
@@ -1173,30 +1173,6 @@ static aoahid_result stylus_update_impl(aoahid_node* node, const aoahid_profile_
     return AOAHID_OK;
 }
 
-static aoahid_result stylus_depart_impl(aoahid_node* node, const aoahid_profile_kind kind) {
-    aoa::detail::clear_error();
-    const aoahid_result check =
-        usable(node, kind, kind == AOAHID_PROFILE_PEN ? "pen.depart" : "digitizer.depart");
-    if (check != AOAHID_OK)
-        return check;
-    auto* pen = state<aoa::detail::PenState>(node);
-    aoahid_pen_sample next = pen->desired;
-    next.in_range = 0U;
-    next.tip = 0U;
-    next.barrel_buttons = 0U;
-    next.pressure = 0;
-    if (pen_transition_conflicts(*pen, next)) {
-        return pending_transition("pen.depart");
-    }
-    const bool changed = pen->desired.in_range != 0U || pen->desired.tip != 0U ||
-                         pen->desired.barrel_buttons != 0U || pen->desired.pressure != 0;
-    record_pen_transitions(pen, next);
-    pen->desired = next;
-    pen->tool_switch_departure = false;
-    node->dirty = node->dirty || changed;
-    return AOAHID_OK;
-}
-
 static aoahid_result aoahid_battery_update_impl(aoahid_node* node, const std::uint32_t has_value,
                                                 const std::int32_t strength) {
     aoa::detail::clear_error();
@@ -1242,20 +1218,20 @@ aoahid_result AOAHID_CALL aoahid_mouse_scroll(aoahid_node* node, const std::int3
 }
 
 aoahid_result AOAHID_CALL aoahid_mouse_button(aoahid_node* node, const std::uint32_t button,
-                                              const std::uint32_t pressed) {
+                                              const std::uint32_t down) {
     return abi_state_result("mouse.button",
-                            [&] { return aoahid_mouse_button_impl(node, button, pressed); });
+                            [&] { return aoahid_mouse_button_impl(node, button, down); });
 }
 
-aoahid_result AOAHID_CALL aoahid_toggle(aoahid_node* node, const std::uint16_t usage,
-                                        const std::uint32_t down) {
+aoahid_result AOAHID_CALL aoahid_toggle_usage(aoahid_node* node, const std::uint16_t usage,
+                                              const std::uint32_t down) {
     return abi_state_result("toggle", [&] { return aoahid_toggle_impl(node, usage, down); });
 }
 
 aoahid_result AOAHID_CALL aoahid_gamepad_button(aoahid_node* node, const std::uint32_t button,
-                                                const std::uint32_t pressed) {
+                                                const std::uint32_t down) {
     return abi_state_result("gamepad.button",
-                            [&] { return aoahid_gamepad_button_impl(node, button, pressed); });
+                            [&] { return aoahid_gamepad_button_impl(node, button, down); });
 }
 
 aoahid_result AOAHID_CALL aoahid_gamepad_set_axis(aoahid_node* node, const std::size_t axis_index,
@@ -1299,19 +1275,14 @@ aoahid_result AOAHID_CALL aoahid_touchpad_contact(aoahid_node* node, const std::
 }
 
 aoahid_result AOAHID_CALL aoahid_touchpad_button(aoahid_node* node, const std::uint32_t button,
-                                                 const std::uint32_t pressed) {
+                                                 const std::uint32_t down) {
     return abi_state_result("touchpad.button",
-                            [&] { return aoahid_touchpad_button_impl(node, button, pressed); });
+                            [&] { return aoahid_touchpad_button_impl(node, button, down); });
 }
 
 aoahid_result AOAHID_CALL aoahid_pen_update(aoahid_node* node, const aoahid_pen_sample* sample) {
     return abi_state_result("pen.update",
                             [&] { return stylus_update_impl(node, AOAHID_PROFILE_PEN, sample); });
-}
-
-aoahid_result AOAHID_CALL aoahid_pen_depart(aoahid_node* node) {
-    return abi_state_result("pen.depart",
-                            [&] { return stylus_depart_impl(node, AOAHID_PROFILE_PEN); });
 }
 
 aoahid_result AOAHID_CALL aoahid_digitizer_update(aoahid_node* node,
@@ -1327,11 +1298,6 @@ aoahid_result AOAHID_CALL aoahid_digitizer_update(aoahid_node* node,
         return stylus_update_impl(node, AOAHID_PROFILE_DIGITIZER,
                                   sample == nullptr ? nullptr : &values);
     });
-}
-
-aoahid_result AOAHID_CALL aoahid_digitizer_depart(aoahid_node* node) {
-    return abi_state_result("digitizer.depart",
-                            [&] { return stylus_depart_impl(node, AOAHID_PROFILE_DIGITIZER); });
 }
 
 aoahid_result AOAHID_CALL aoahid_battery_update(aoahid_node* node, const std::uint32_t has_value,

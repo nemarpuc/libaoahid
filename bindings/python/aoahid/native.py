@@ -488,18 +488,6 @@ class CapabilityManifest(c.Structure):
     ]
 
 
-class TouchContact(c.Structure):
-    _fields_ = [
-        ("contact_id", c.c_uint32),
-        ("x", c.c_int32),
-        ("y", c.c_int32),
-        ("pressure", c.c_int32),
-        ("width", c.c_int32),
-        ("height", c.c_int32),
-        ("azimuth", c.c_int32),
-    ]
-
-
 class TouchscreenExtra(c.Structure):
     _fields_ = [
         ("pressure", c.c_int32),
@@ -574,7 +562,6 @@ ABI_STRUCTS = {
     "aoahid_raw_options": RawOptions,
     "aoahid_report_capability": ReportCapability,
     "aoahid_capability_manifest": CapabilityManifest,
-    "aoahid_touch_contact": TouchContact,
     "aoahid_touchscreen_extra": TouchscreenExtra,
     "aoahid_touchpad_extra": TouchpadExtra,
     "aoahid_pen_sample": PenSample,
@@ -641,7 +628,7 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
     declare("aoahid_mouse_move", [NodeP, c.c_int32, c.c_int32], result)
     declare("aoahid_mouse_scroll", [NodeP, c.c_int32, c.c_int32], result)
     declare("aoahid_mouse_button", [NodeP, c.c_uint32, c.c_uint32], result)
-    declare("aoahid_toggle", [NodeP, c.c_uint16, c.c_uint32], result)
+    declare("aoahid_toggle_usage", [NodeP, c.c_uint16, c.c_uint32], result)
     declare("aoahid_gamepad_button", [NodeP, c.c_uint32, c.c_uint32], result)
     declare("aoahid_gamepad_set_axis", [NodeP, c.c_size_t, c.c_int32], result)
     declare("aoahid_gamepad_dpad", [NodeP, c.c_uint32, c.c_uint32, c.c_uint32, c.c_uint32], result)
@@ -649,9 +636,7 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
     declare("aoahid_touchpad_contact", [NodeP, c.c_uint32, c.c_uint32, c.c_int32, c.c_int32, c.POINTER(TouchpadExtra)], result)
     declare("aoahid_touchpad_button", [NodeP, c.c_uint32, c.c_uint32], result)
     declare("aoahid_pen_update", [NodeP, c.POINTER(PenSample)], result)
-    declare("aoahid_pen_depart", [NodeP], result)
     declare("aoahid_digitizer_update", [NodeP, c.POINTER(DigitizerSample)], result)
-    declare("aoahid_digitizer_depart", [NodeP], result)
     declare("aoahid_battery_update", [NodeP, c.c_uint32, c.c_int32], result)
     declare("aoahid_raw_submit", [NodeP, c.POINTER(c.c_uint8), c.c_size_t], result)
     return library
@@ -699,7 +684,6 @@ __all__ += [
     "RawOptions",
     "ReportCapability",
     "CapabilityManifest",
-    "TouchContact",
     "TouchscreenExtra",
     "TouchpadExtra",
     "PenSample",

@@ -303,7 +303,7 @@ void test_usage_control_semantics() {
         aoahid_node node{};
         node.spec = spec;
         node.state = consumer_state_for(spec);
-        AOAHID_CHECK(aoahid_toggle(&node, 0x00E9U, 1U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_toggle_usage(&node, 0x00E9U, 1U) == AOAHID_OK);
         std::array<std::uint8_t, 8U> report{};
         std::size_t report_length = 0U;
         AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(),
@@ -314,20 +314,20 @@ void test_usage_control_semantics() {
             AOAHID_CHECK(control != nullptr &&
                          extract(report.data(), *control) == (index == 1U ? 1U : 0U));
         }
-        AOAHID_CHECK(aoahid_toggle(&node, 0x00E9U, 0U) == AOAHID_ERR_BUSY);
+        AOAHID_CHECK(aoahid_toggle_usage(&node, 0x00E9U, 0U) == AOAHID_ERR_BUSY);
         aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
-        AOAHID_CHECK(aoahid_toggle(&node, 0x00E9U, 0U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_toggle_usage(&node, 0x00E9U, 0U) == AOAHID_OK);
         report.fill(0xFFU);
         AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(),
                                                  &report_length) == AOAHID_OK);
         AOAHID_CHECK(report[0] == 0U);
-        AOAHID_CHECK(aoahid_toggle(&node, 0x00E0U, 1U) == AOAHID_ERR_PARAM);
+        AOAHID_CHECK(aoahid_toggle_usage(&node, 0x00E0U, 1U) == AOAHID_ERR_PARAM);
 
         // Several Usages can be held at once, and each is released by name.
         // Usage 0 is not in the allow-list, so there is no release-all call.
         aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
-        AOAHID_CHECK(aoahid_toggle(&node, 0x00CDU, 1U) == AOAHID_OK);
-        AOAHID_CHECK(aoahid_toggle(&node, 0x00E9U, 1U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_toggle_usage(&node, 0x00CDU, 1U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_toggle_usage(&node, 0x00E9U, 1U) == AOAHID_OK);
         report.fill(0U);
         AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(),
                                                  &report_length) == AOAHID_OK);
@@ -338,7 +338,7 @@ void test_usage_control_semantics() {
                          extract(report.data(), *control) == (held ? 1U : 0U));
         }
         aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
-        AOAHID_CHECK(aoahid_toggle(&node, 0x00CDU, 0U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_toggle_usage(&node, 0x00CDU, 0U) == AOAHID_OK);
         report.fill(0U);
         AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(),
                                                  &report_length) == AOAHID_OK);
@@ -348,7 +348,7 @@ void test_usage_control_semantics() {
                          extract(report.data(), *control) == (usages[index] == 0x00E9U ? 1U : 0U));
         }
         aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
-        AOAHID_CHECK(aoahid_toggle(&node, 0U, 0U) == AOAHID_ERR_PARAM);
+        AOAHID_CHECK(aoahid_toggle_usage(&node, 0U, 0U) == AOAHID_ERR_PARAM);
 
         // The state object enforces the same accepted 1->0 lifecycle for each
         // caller-declared HUT semantic. Semantic flags stay descriptor policy;
@@ -357,7 +357,7 @@ void test_usage_control_semantics() {
             aoahid_node semantic_node{};
             semantic_node.spec = spec;
             semantic_node.state = consumer_state_for(spec);
-            AOAHID_CHECK(aoahid_toggle(&semantic_node, usages[selected], 1U) == AOAHID_OK);
+            AOAHID_CHECK(aoahid_toggle_usage(&semantic_node, usages[selected], 1U) == AOAHID_OK);
             report.fill(0U);
             AOAHID_CHECK(aoa::detail::serialize_node(&semantic_node, report.data(), report.size(),
                                                      &report_length) == AOAHID_OK);
@@ -367,15 +367,17 @@ void test_usage_control_semantics() {
                 AOAHID_CHECK(control != nullptr &&
                              extract(report.data(), *control) == (index == selected ? 1U : 0U));
             }
-            AOAHID_CHECK(aoahid_toggle(&semantic_node, usages[selected], 0U) == AOAHID_ERR_BUSY);
+            AOAHID_CHECK(aoahid_toggle_usage(&semantic_node, usages[selected], 0U) ==
+                         AOAHID_ERR_BUSY);
             aoa::detail::transfer_complete(&semantic_node, AOAHID_OK, 0);
-            AOAHID_CHECK(aoahid_toggle(&semantic_node, usages[selected], 0U) == AOAHID_OK);
+            AOAHID_CHECK(aoahid_toggle_usage(&semantic_node, usages[selected], 0U) == AOAHID_OK);
             report.fill(0xFFU);
             AOAHID_CHECK(aoa::detail::serialize_node(&semantic_node, report.data(), report.size(),
                                                      &report_length) == AOAHID_OK);
-            AOAHID_CHECK(aoahid_toggle(&semantic_node, usages[selected], 1U) == AOAHID_ERR_BUSY);
+            AOAHID_CHECK(aoahid_toggle_usage(&semantic_node, usages[selected], 1U) ==
+                         AOAHID_ERR_BUSY);
             aoa::detail::transfer_complete(&semantic_node, AOAHID_OK, 0);
-            AOAHID_CHECK(aoahid_toggle(&semantic_node, usages[selected], 1U) == AOAHID_OK);
+            AOAHID_CHECK(aoahid_toggle_usage(&semantic_node, usages[selected], 1U) == AOAHID_OK);
         }
     }
     aoahid_spec_release(spec);
@@ -387,7 +389,7 @@ void test_usage_control_semantics() {
         aoahid_node control_node{};
         control_node.spec = control_spec;
         control_node.state = consumer_state_for(control_spec);
-        AOAHID_CHECK(aoahid_toggle(&control_node, usage, 1U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_toggle_usage(&control_node, usage, 1U) == AOAHID_OK);
         std::array<std::uint8_t, 16U> control_report{};
         std::size_t control_length = 0U;
         AOAHID_CHECK(aoa::detail::serialize_node(&control_node, control_report.data(),
@@ -396,7 +398,7 @@ void test_usage_control_semantics() {
         const auto* selected = field(control_spec, aoa::hid::FieldSemantic::consumer_usage, 0U);
         AOAHID_CHECK(selected != nullptr && extract(control_report.data(), *selected) == 1U);
         aoa::detail::transfer_complete(&control_node, AOAHID_OK, 0);
-        AOAHID_CHECK(aoahid_toggle(&control_node, usage, 0U) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_toggle_usage(&control_node, usage, 0U) == AOAHID_OK);
         control_report.fill(0xFFU);
         AOAHID_CHECK(aoa::detail::serialize_node(&control_node, control_report.data(),
                                                  control_report.size(),
@@ -894,7 +896,7 @@ void test_touch_azimuth() {
     aoahid_node node{};
     node.spec = spec;
     node.state = aoa::detail::TouchState{};
-    const aoahid_touch_contact contact{1U, 100, 200, 10, 0, 0, 35999};
+    const aoa::detail::TouchContact contact{1U, 100, 200, 10, 0, 0, 35999};
     aoahid_touchscreen_extra extra{contact.pressure, contact.width, contact.height,
                                    contact.azimuth};
     AOAHID_CHECK(aoahid_touchscreen_contact(&node, contact.contact_id, 1U, contact.x, contact.y,
@@ -941,13 +943,13 @@ void test_touch_packets() {
     node.spec = spec;
     node.state = aoa::detail::TouchState{};
     for (std::uint32_t id = 0U; id < 3U; ++id) {
-        const aoahid_touch_contact contact{id,
-                                           static_cast<std::int32_t>(100U + id),
-                                           static_cast<std::int32_t>(200U + id),
-                                           id == 0U ? 0 : 10,
-                                           0,
-                                           0,
-                                           0};
+        const aoa::detail::TouchContact contact{id,
+                                                static_cast<std::int32_t>(100U + id),
+                                                static_cast<std::int32_t>(200U + id),
+                                                id == 0U ? 0 : 10,
+                                                0,
+                                                0,
+                                                0};
         aoahid_touchscreen_extra extra{contact.pressure, contact.width, contact.height,
                                        contact.azimuth};
         AOAHID_CHECK(aoahid_touchscreen_contact(&node, contact.contact_id, 1U, contact.x, contact.y,
@@ -965,7 +967,7 @@ void test_touch_packets() {
     AOAHID_CHECK(scan_time != nullptr && extract(report.data(), *scan_time) == 0U);
     node.transfer_inflight.store(true);
     aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
-    const aoahid_touch_contact changed{0U, 300, 400, 10, 0, 0, 0};
+    const aoa::detail::TouchContact changed{0U, 300, 400, 10, 0, 0, 0};
     aoahid_touchscreen_extra changed_extra{changed.pressure, changed.width, changed.height,
                                            changed.azimuth};
     AOAHID_CHECK(aoahid_touchscreen_contact(&node, changed.contact_id, 1U, changed.x, changed.y,
@@ -987,7 +989,7 @@ void test_touch_lift_frame_and_idle_suppression() {
     aoahid_node node{};
     node.spec = spec;
     node.state = aoa::detail::TouchState{};
-    const aoahid_touch_contact contact{7U, 100, 200, 0, 0, 0, 0};
+    const aoa::detail::TouchContact contact{7U, 100, 200, 0, 0, 0, 0};
     AOAHID_CHECK(aoahid_touchscreen_contact(&node, contact.contact_id, 1U, contact.x, contact.y,
                                             nullptr) == AOAHID_OK);
     AOAHID_CHECK(aoahid_touchscreen_contact(&node, 7U, 0U, 300, 400, nullptr) == AOAHID_ERR_BUSY);
@@ -1039,7 +1041,7 @@ void test_touch_lift_frame_and_idle_suppression() {
     // zero-count report instead of sending one and reusing the previous count.
     AOAHID_CHECK(!node.dirty);
     AOAHID_CHECK(aoahid_touchscreen_contact(&node, 7U, 0U, 300, 400, nullptr) == AOAHID_ERR_PARAM);
-    const aoahid_touch_contact next_contact{8U, 500, 600, 10, 0, 0, 0};
+    const aoa::detail::TouchContact next_contact{8U, 500, 600, 10, 0, 0, 0};
     aoahid_touchscreen_extra next_extra{next_contact.pressure, next_contact.width,
                                         next_contact.height, next_contact.azimuth};
     AOAHID_CHECK(aoahid_touchscreen_contact(&node, next_contact.contact_id, 1U, next_contact.x,
@@ -1096,6 +1098,52 @@ void test_touchpad_button_only_and_mid_frame_guard() {
     aoahid_spec_release(spec);
 }
 
+void test_pen_away_coordinates() {
+    const std::array<std::uint16_t, 1> barrels{0x44U};
+    aoahid_pen_options options{};
+    options.struct_size = static_cast<std::uint32_t>(sizeof(options));
+    options.report_id = {0U, 0U, {0U, 0U, 0U}};
+    options.x = {0, 1000, 16U, {}};
+    options.y = {0, 1000, 16U, {}};
+    options.enable_pressure = 1U;
+    options.pressure = {0, 255, 8U, {}};
+    options.barrel_usages = barrels.data();
+    options.barrel_usage_count = barrels.size();
+    options.enable_hover = 1U;
+    aoahid_spec* spec = nullptr;
+    AOAHID_CHECK(aoahid_spec_create_pen(&options, &spec) == AOAHID_OK);
+    if (spec == nullptr)
+        return;
+    const auto* x = field(spec, aoa::hid::FieldSemantic::x);
+    const auto* y = field(spec, aoa::hid::FieldSemantic::y);
+    AOAHID_CHECK(x != nullptr && y != nullptr);
+    std::array<std::uint8_t, 128> report{};
+    std::size_t length = 0U;
+    aoahid_node node{};
+    node.spec = spec;
+    node.state = aoa::detail::PenState{};
+    aoahid_pen_sample sample{};
+    sample.in_range = 1U;
+    sample.x = 100;
+    sample.y = 200;
+    AOAHID_CHECK(aoahid_pen_update(&node, &sample) == AOAHID_OK);
+    node.transfer_inflight.store(true);
+    aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
+    // The away report carries the sample's own X/Y, not the last position.
+    sample.in_range = 0U;
+    sample.x = 500;
+    sample.y = 600;
+    AOAHID_CHECK(aoahid_pen_update(&node, &sample) == AOAHID_OK);
+    report.fill(0U);
+    AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(), &length) ==
+                 AOAHID_OK);
+    const auto* range = field(spec, aoa::hid::FieldSemantic::in_range);
+    AOAHID_CHECK(range != nullptr && extract(report.data(), *range) == 0U);
+    AOAHID_CHECK(x != nullptr && extract(report.data(), *x) == 500U);
+    AOAHID_CHECK(y != nullptr && extract(report.data(), *y) == 600U);
+    aoahid_spec_release(spec);
+}
+
 void test_pen_switch() {
     const std::array<std::uint16_t, 1> barrels{0x44U};
     aoahid_pen_options options{};
@@ -1134,7 +1182,8 @@ void test_pen_switch() {
     sample.x = 100;
     sample.y = 200;
     AOAHID_CHECK(aoahid_pen_update(&node, &sample) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_pen_depart(&node) == AOAHID_ERR_BUSY);
+    sample.in_range = 0U;
+    AOAHID_CHECK(aoahid_pen_update(&node, &sample) == AOAHID_ERR_BUSY);
     std::array<std::uint8_t, 128> report{};
     std::size_t length = 0U;
     AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(), &length) ==
@@ -1168,7 +1217,8 @@ void test_pen_switch() {
     // clear Invert so current Linux tool state can release BTN_TOOL_RUBBER.
     node.transfer_inflight.store(true);
     aoa::detail::transfer_complete(&node, AOAHID_OK, 0);
-    AOAHID_CHECK(aoahid_pen_depart(&node) == AOAHID_OK);
+    sample.in_range = 0U;
+    AOAHID_CHECK(aoahid_pen_update(&node, &sample) == AOAHID_OK);
     report.fill(0U);
     AOAHID_CHECK(aoa::detail::serialize_node(&node, report.data(), report.size(), &length) ==
                  AOAHID_OK);
@@ -1231,7 +1281,9 @@ void test_pen_switch() {
         digitizer_sample.x = 10;
         digitizer_sample.y = 20;
         AOAHID_CHECK(aoahid_digitizer_update(&digitizer_node, &digitizer_sample) == AOAHID_OK);
-        AOAHID_CHECK(aoahid_digitizer_depart(&digitizer_node) != AOAHID_ERR_PARAM);
+        digitizer_sample.in_range = 0U;
+        AOAHID_CHECK(aoahid_digitizer_update(&digitizer_node, &digitizer_sample) !=
+                     AOAHID_ERR_PARAM);
         aoahid_spec_release(spec);
     }
 }
@@ -1378,6 +1430,7 @@ void test_profiles() {
     test_touch_packets();
     test_touch_lift_frame_and_idle_suppression();
     test_touchpad_button_only_and_mid_frame_guard();
+    test_pen_away_coordinates();
     test_pen_switch();
     test_raw_report_id_order();
     test_raw_factory_bounds_before_allocation();

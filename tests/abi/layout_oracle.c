@@ -372,15 +372,6 @@ int main(void) {
     AOAHID_FIELD(aoahid_capability_manifest, report_count);
     AOAHID_FIELD(aoahid_capability_manifest, descriptor_bytes);
 
-    AOAHID_BEGIN(aoahid_touch_contact);
-    AOAHID_FIELD(aoahid_touch_contact, contact_id);
-    AOAHID_FIELD(aoahid_touch_contact, x);
-    AOAHID_FIELD(aoahid_touch_contact, y);
-    AOAHID_FIELD(aoahid_touch_contact, pressure);
-    AOAHID_FIELD(aoahid_touch_contact, width);
-    AOAHID_FIELD(aoahid_touch_contact, height);
-    AOAHID_FIELD(aoahid_touch_contact, azimuth);
-
     AOAHID_BEGIN(aoahid_touchscreen_extra);
     AOAHID_FIELD(aoahid_touchscreen_extra, pressure);
     AOAHID_FIELD(aoahid_touchscreen_extra, width);

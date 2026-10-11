@@ -152,8 +152,8 @@ impl NodeRef {
         result(unsafe { sys::aoahid_node_submit(self.as_ptr()) })
     }
 
-    pub fn submit_blocking(self, deadline_ms: u32) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_node_submit_blocking(self.as_ptr(), deadline_ms) })
+    pub fn submit_blocking(self, timeout_ms: u32) -> Result<(), Error> {
+        result(unsafe { sys::aoahid_node_submit_blocking(self.as_ptr(), timeout_ms) })
     }
 }
 
@@ -177,8 +177,8 @@ macro_rules! node_type {
                 self.0.submit()
             }
 
-            pub fn submit_blocking(self, deadline_ms: u32) -> Result<(), Error> {
-                self.0.submit_blocking(deadline_ms)
+            pub fn submit_blocking(self, timeout_ms: u32) -> Result<(), Error> {
+                self.0.submit_blocking(timeout_ms)
             }
         }
     };
@@ -208,8 +208,8 @@ impl MouseNodeRef {
     pub fn scroll(self, wheel: i32, pan: i32) -> Result<(), Error> {
         result(unsafe { sys::aoahid_mouse_scroll(self.as_ptr(), wheel, pan) })
     }
-    pub fn button(self, button: u32, pressed: bool) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_mouse_button(self.as_ptr(), button, u32::from(pressed)) })
+    pub fn button(self, button: u32, down: bool) -> Result<(), Error> {
+        result(unsafe { sys::aoahid_mouse_button(self.as_ptr(), button, u32::from(down)) })
     }
 }
 
@@ -218,13 +218,13 @@ impl MouseNodeRef {
 /// bound node speaks is decided entirely by the Spec it was opened with.
 impl ToggleNodeRef {
     pub fn set(self, usage: u16, down: bool) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_toggle(self.as_ptr(), usage, u32::from(down)) })
+        result(unsafe { sys::aoahid_toggle_usage(self.as_ptr(), usage, u32::from(down)) })
     }
 }
 
 impl GamepadNodeRef {
-    pub fn button(self, button: u32, pressed: bool) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_gamepad_button(self.as_ptr(), button, u32::from(pressed)) })
+    pub fn button(self, button: u32, down: bool) -> Result<(), Error> {
+        result(unsafe { sys::aoahid_gamepad_button(self.as_ptr(), button, u32::from(down)) })
     }
     pub fn axis(self, axis_index: usize, value: i32) -> Result<(), Error> {
         result(unsafe { sys::aoahid_gamepad_set_axis(self.as_ptr(), axis_index, value) })
@@ -287,17 +287,14 @@ impl TouchpadNodeRef {
         })
     }
 
-    pub fn button(self, button: u32, pressed: bool) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_touchpad_button(self.as_ptr(), button, u32::from(pressed)) })
+    pub fn button(self, button: u32, down: bool) -> Result<(), Error> {
+        result(unsafe { sys::aoahid_touchpad_button(self.as_ptr(), button, u32::from(down)) })
     }
 }
 
 impl PenNodeRef {
     pub fn update(self, sample: &sys::aoahid_pen_sample) -> Result<(), Error> {
         result(unsafe { sys::aoahid_pen_update(self.as_ptr(), sample) })
-    }
-    pub fn depart(self) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_pen_depart(self.as_ptr()) })
     }
 }
 
@@ -306,9 +303,6 @@ impl PenNodeRef {
 impl DigitizerNodeRef {
     pub fn update(self, sample: &sys::aoahid_digitizer_sample) -> Result<(), Error> {
         result(unsafe { sys::aoahid_digitizer_update(self.as_ptr(), sample) })
-    }
-    pub fn depart(self) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_digitizer_depart(self.as_ptr()) })
     }
 }
 

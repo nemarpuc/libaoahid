@@ -372,9 +372,6 @@ def update_then_submit(
 ) -> tuple[list[Locator], int]:
     disappeared: list[Locator] = []
     result = AOAHID_OK  # noqa: F405
-    contact = TouchContact(  # noqa: F405
-        TOUCH_CONTACT_ID, EXAMPLE_TOUCH_X, EXAMPLE_TOUCH_Y, 0, 0, 0, 0
-    )
     # Update every device first.  Submitting in a second pass keeps one USB
     # operation out of the next device's state preparation.
     ready: list[Session] = []
@@ -386,7 +383,7 @@ def update_then_submit(
                 library.aoahid_keyboard_key(session.keyboard, KEYBOARD_A_USAGE, 1),
                 library.aoahid_mouse_move(session.mouse, EXAMPLE_MOUSE_DX, EXAMPLE_MOUSE_DY),
                 library.aoahid_touchscreen_contact(
-                    session.touchscreen, contact.contact_id, 1, contact.x, contact.y, None
+                    session.touchscreen, TOUCH_CONTACT_ID, 1, EXAMPLE_TOUCH_X, EXAMPLE_TOUCH_Y, None
                 ),
             )
         )

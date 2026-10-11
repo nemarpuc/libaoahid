@@ -172,8 +172,8 @@ With `field_page = 0x90`, only Auto-focus (`0x20`, else `AOAHID_ERR_PARAM`) and
 Shutter (`0x21`) are allowed, each as `AOAHID_USAGE_ONE_SHOT` (else
 `AOAHID_ERR_UNSUPPORTED`); HUT 1.7 defines no other Camera Control Usage.
 
-`aoahid_toggle(node, usage, 1)` sets the bit of one allow-listed Usage and
-`aoahid_toggle(node, usage, 0)` clears it; a Usage outside the allow-list is
+`aoahid_toggle_usage(node, usage, 1)` sets the bit of one allow-listed Usage and
+`aoahid_toggle_usage(node, usage, 0)` clears it; a Usage outside the allow-list is
 `AOAHID_ERR_PARAM`. Any number of controls can be active at once, and they go
 out in one report. There is no release-all call; release every Usage you
 pressed before closing the Node (close does clear all bits). A tap is
@@ -351,9 +351,8 @@ Collection Usage and in how Linux and Android classify the device:
 | `android_status` | `AOAHID_ANDROID_PORTABLE_CANDIDATE` | `AOAHID_ANDROID_CONDITIONAL` |
 
 Both use a Stylus (`0x20`) Physical Collection. A Pen Node is driven with
-`aoahid_pen_update` and `aoahid_pen_depart` (`aoahid_pen_sample`), a Digitizer
-Node with `aoahid_digitizer_update` and `aoahid_digitizer_depart`
-(`aoahid_digitizer_sample`, the same fields); each rejects the other profile's
+`aoahid_pen_update` (`aoahid_pen_sample`), a Digitizer Node with
+`aoahid_digitizer_update` (`aoahid_digitizer_sample`, the same fields); each rejects the other profile's
 Node.
 
 - Bits, in this order: Invert (`0x3C`, only with `enable_eraser`), Tip Switch
@@ -380,9 +379,9 @@ In Range turns on to choose the pen or rubber tool.
 - Switching between pen and eraser while in range first sends an
   out-of-range report, then re-enters with the new tool.
 
-`aoahid_pen_depart(node)` or `aoahid_digitizer_depart(node)`, close, or a sample with `in_range = 0` sends In
-Range, Tip, pressure, Invert, and barrel bits as 0. X/Y, tilt, and twist keep
-their last values. The eraser selection is remembered for the next entry.
+A sample with `in_range = 0`, or close, sends In Range, Tip, pressure, Invert,
+and barrel bits as 0. In a sample, X/Y, tilt, and twist go out as given: repeat
+the last position to leave the pointer where it was. The eraser selection is remembered for the next entry.
 
 | State | In Range | Tip | Pressure |
 |---|---:|---:|---:|

@@ -572,16 +572,6 @@ typedef struct aoahid_capability_manifest {
     size_t descriptor_bytes;
 } aoahid_capability_manifest;
 
-typedef struct aoahid_touch_contact {
-    uint32_t contact_id;
-    int32_t x;
-    int32_t y;
-    int32_t pressure;
-    int32_t width;
-    int32_t height;
-    int32_t azimuth;
-} aoahid_touch_contact;
-
 /* Optional fields for aoahid_touchscreen_contact(); pass null to send
  * zero/absent for every field the Spec did not enable. Passing a value for a
  * field the Spec left disabled is rejected exactly as an out-of-range value
@@ -1240,17 +1230,17 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node);
 /* aoahid_node_submit_blocking
  * Ownership: Borrows Node and changes no handle ownership.
  * Blocking: Pumps/waits until every dirty report fragment completes or the
- * explicit deadline expires; in caller-poll mode this call drives libusb events.
+ * timeout expires; in caller-poll mode this call drives libusb events.
  * Synchronization: Belongs to the parent Context domain and must be serialized
  * against all Context/Device/Node application calls.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for an invalid Node/report path;
- * AOAHID_ERR_UNSET_FIELD for a zero deadline; AOAHID_ERR_UNSUPPORTED,
+ * AOAHID_ERR_UNSET_FIELD for a zero timeout; AOAHID_ERR_UNSUPPORTED,
  * AOAHID_ERR_ACCESS, AOAHID_ERR_BUSY, AOAHID_ERR_NO_DEVICE, AOAHID_ERR_STALL,
  * AOAHID_ERR_TIMEOUT, AOAHID_ERR_SHORT_TRANSFER, AOAHID_ERR_IO, or
  * AOAHID_ERR_OVERFLOW for deferred, completion, pool, event, or submit failure;
  * AOAHID_ERR_INTERNAL for serializer, validation, allocation, or unexpected failure. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_node_submit_blocking(aoahid_node* node,
-                                                                 uint32_t deadline_ms);
+                                                                 uint32_t timeout_ms);
 
 /* aoahid_keyboard_key
  * Ownership: Borrows a Keyboard Node; no ownership changes.
@@ -1298,13 +1288,13 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_mouse_scroll(aoahid_node* node, int3
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
  * submission calls. It is rejected while one report is in flight.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid Node/profile, one-based button,
- * or pressed flag; AOAHID_ERR_BUSY for an in-flight report or an unsent opposite edge;
+ * or down flag; AOAHID_ERR_BUSY for an in-flight report or an unsent opposite edge;
  * AOAHID_ERR_NO_DEVICE for sticky loss; AOAHID_ERR_INTERNAL for an unexpected
  * ABI-boundary failure. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_mouse_button(aoahid_node* node, uint32_t button,
-                                                         uint32_t pressed);
+                                                         uint32_t down);
 
-/* aoahid_toggle
+/* aoahid_toggle_usage
  * Ownership: Borrows a Toggle Node; no ownership changes.
  * Blocking: Does not block, allocate, log, or perform I/O.
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
@@ -1317,8 +1307,8 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_mouse_button(aoahid_node* node, uint
  * Usage outside the Spec allow-list; AOAHID_ERR_BUSY for an in-flight report or an unsent opposite
  * edge; AOAHID_ERR_NO_DEVICE for sticky loss; AOAHID_ERR_INTERNAL for an unexpected ABI-boundary
  * failure. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_toggle(aoahid_node* node, uint16_t usage,
-                                                   uint32_t down);
+AOAHID_API aoahid_result AOAHID_CALL aoahid_toggle_usage(aoahid_node* node, uint16_t usage,
+                                                         uint32_t down);
 
 /* aoahid_gamepad_button
  * Ownership: Borrows a Gamepad Node; no ownership changes.
@@ -1326,11 +1316,11 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_toggle(aoahid_node* node, uint16_t u
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
  * submission calls. It is rejected while one report is in flight.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid Node/profile, one-based button,
- * or pressed flag; AOAHID_ERR_BUSY for an in-flight report or an unsent opposite edge;
+ * or down flag; AOAHID_ERR_BUSY for an in-flight report or an unsent opposite edge;
  * AOAHID_ERR_NO_DEVICE for sticky loss; AOAHID_ERR_INTERNAL for an unexpected
  * ABI-boundary failure. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_gamepad_button(aoahid_node* node, uint32_t button,
-                                                           uint32_t pressed);
+                                                           uint32_t down);
 
 /* aoahid_gamepad_set_axis
  * Ownership: Borrows a Gamepad Node; no ownership changes.
@@ -1409,11 +1399,11 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_touchpad_contact(aoahid_node* node, 
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
  * submission calls. It is rejected during an in-flight/multi-packet frame.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid Node/profile, one-based button,
- * or pressed flag; AOAHID_ERR_BUSY for an in-flight frame or an unsent opposite edge;
+ * or down flag; AOAHID_ERR_BUSY for an in-flight frame or an unsent opposite edge;
  * AOAHID_ERR_NO_DEVICE for sticky loss; AOAHID_ERR_INTERNAL for unexpected
  * ABI-boundary failure. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_touchpad_button(aoahid_node* node, uint32_t button,
-                                                            uint32_t pressed);
+                                                            uint32_t down);
 
 /* aoahid_pen_update
  * Ownership: Borrows a Pen Node and sample for the call; it copies the sample and
@@ -1421,6 +1411,9 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_touchpad_button(aoahid_node* node, u
  * Blocking: Does not block, allocate, log, or perform I/O.
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
  * submission calls. It is rejected while one report is in flight.
+ * A sample with in_range 0 takes the tool away: the report carries In Range,
+ * Tip, pressure, Invert, and the barrel bits as 0 and the sample's own X/Y, tilt,
+ * and twist, so repeat the last position to leave the pointer where it was.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid Node/profile/sample flags,
  * buttons, or values; AOAHID_ERR_BUSY for an in-flight report or an unsent opposite edge;
  * AOAHID_ERR_NO_DEVICE for sticky loss; AOAHID_ERR_INTERNAL for unexpected
@@ -1428,40 +1421,21 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_touchpad_button(aoahid_node* node, u
 AOAHID_API aoahid_result AOAHID_CALL aoahid_pen_update(aoahid_node* node,
                                                        const aoahid_pen_sample* sample);
 
-/* aoahid_pen_depart
- * Ownership: Borrows a Pen Node; no ownership changes.
- * Blocking: Does not block, allocate, log, or perform I/O.
- * Synchronization: Belongs to the parent Context domain; serialize mutation and
- * submission calls. It is rejected while one report is in flight.
- * Returns: AOAHID_OK; AOAHID_ERR_PARAM for an invalid Node/profile;
- * AOAHID_ERR_BUSY for an in-flight report or an unsent opposite edge;
- * AOAHID_ERR_NO_DEVICE for sticky loss; AOAHID_ERR_INTERNAL for an unexpected
- * ABI-boundary failure. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_pen_depart(aoahid_node* node);
-
 /* aoahid_digitizer_update
  * Ownership: Borrows a Digitizer Node and sample for the call; it copies the sample and
  * changes no ownership.
  * Blocking: Does not block, allocate, log, or perform I/O.
  * Synchronization: Belongs to the parent Context domain; serialize mutation and
  * submission calls. It is rejected while one report is in flight.
+ * A sample with in_range 0 takes the tool away: the report carries In Range,
+ * Tip, pressure, Invert, and the barrel bits as 0 and the sample's own X/Y, tilt,
+ * and twist, so repeat the last position to leave the pointer where it was.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid Node/profile/sample flags,
  * buttons, or values; AOAHID_ERR_BUSY for an in-flight report or an unsent opposite edge;
  * AOAHID_ERR_NO_DEVICE for sticky loss; AOAHID_ERR_INTERNAL for unexpected
  * ABI-boundary failure. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_digitizer_update(aoahid_node* node,
                                                              const aoahid_digitizer_sample* sample);
-
-/* aoahid_digitizer_depart
- * Ownership: Borrows a Digitizer Node; no ownership changes.
- * Blocking: Does not block, allocate, log, or perform I/O.
- * Synchronization: Belongs to the parent Context domain; serialize mutation and
- * submission calls. It is rejected while one report is in flight.
- * Returns: AOAHID_OK; AOAHID_ERR_PARAM for an invalid Node/profile;
- * AOAHID_ERR_BUSY for an in-flight report or an unsent opposite edge;
- * AOAHID_ERR_NO_DEVICE for sticky loss; AOAHID_ERR_INTERNAL for an unexpected
- * ABI-boundary failure. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_digitizer_depart(aoahid_node* node);
 
 /* aoahid_battery_update
  * Ownership: Borrows a Battery Node; no ownership changes.

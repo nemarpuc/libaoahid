@@ -404,13 +404,11 @@ static aoahid_result first_failure(const aoahid_result* values, size_t count) {
 }
 
 static aoahid_result update_session(session* value) {
-    const aoahid_touch_contact contact = {
-        k_touch_contact_id, k_example_touch_x, k_example_touch_y, 0, 0, 0, 0};
     const aoahid_result statuses[] = {
         aoahid_keyboard_key(value->keyboard, k_keyboard_a_usage, 1U),
         aoahid_mouse_move(value->mouse, k_example_mouse_dx, k_example_mouse_dy),
-        aoahid_touchscreen_contact(value->touchscreen, contact.contact_id, 1U, contact.x, contact.y,
-                                   NULL),
+        aoahid_touchscreen_contact(value->touchscreen, k_touch_contact_id, 1U, k_example_touch_x,
+                                   k_example_touch_y, NULL),
     };
     return first_failure(statuses, sizeof(statuses) / sizeof(statuses[0]));
 }

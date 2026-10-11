@@ -151,8 +151,8 @@ inline void spec_release(aoahid_spec* spec) noexcept { aoahid_spec_release(spec)
     return aoahid_node_submit(node);
 }
 [[nodiscard]] inline aoahid_result node_submit_blocking(aoahid_node* node,
-                                                        uint32_t deadline_ms) noexcept {
-    return aoahid_node_submit_blocking(node, deadline_ms);
+                                                        uint32_t timeout_ms) noexcept {
+    return aoahid_node_submit_blocking(node, timeout_ms);
 }
 [[nodiscard]] inline aoahid_result keyboard_key(aoahid_node* node, uint16_t usage,
                                                 uint32_t down) noexcept {
@@ -166,16 +166,16 @@ inline void spec_release(aoahid_spec* spec) noexcept { aoahid_spec_release(spec)
     return aoahid_mouse_scroll(node, wheel, pan);
 }
 [[nodiscard]] inline aoahid_result mouse_button(aoahid_node* node, uint32_t button,
-                                                uint32_t pressed) noexcept {
-    return aoahid_mouse_button(node, button, pressed);
+                                                uint32_t down) noexcept {
+    return aoahid_mouse_button(node, button, down);
 }
-[[nodiscard]] inline aoahid_result toggle(aoahid_node* node, uint16_t usage,
-                                          uint32_t down) noexcept {
-    return aoahid_toggle(node, usage, down);
+[[nodiscard]] inline aoahid_result toggle_usage(aoahid_node* node, uint16_t usage,
+                                                uint32_t down) noexcept {
+    return aoahid_toggle_usage(node, usage, down);
 }
 [[nodiscard]] inline aoahid_result gamepad_button(aoahid_node* node, uint32_t button,
-                                                  uint32_t pressed) noexcept {
-    return aoahid_gamepad_button(node, button, pressed);
+                                                  uint32_t down) noexcept {
+    return aoahid_gamepad_button(node, button, down);
 }
 [[nodiscard]] inline aoahid_result gamepad_set_axis(aoahid_node* node, size_t axis_index,
                                                     int32_t value) noexcept {
@@ -196,22 +196,16 @@ touchscreen_contact(aoahid_node* node, uint32_t contact_id, uint32_t down, int32
     return aoahid_touchpad_contact(node, contact_id, down, x, y, extra);
 }
 [[nodiscard]] inline aoahid_result touchpad_button(aoahid_node* node, uint32_t button,
-                                                   uint32_t pressed) noexcept {
-    return aoahid_touchpad_button(node, button, pressed);
+                                                   uint32_t down) noexcept {
+    return aoahid_touchpad_button(node, button, down);
 }
 [[nodiscard]] inline aoahid_result pen_update(aoahid_node* node,
                                               const aoahid_pen_sample* sample) noexcept {
     return aoahid_pen_update(node, sample);
 }
-[[nodiscard]] inline aoahid_result pen_depart(aoahid_node* node) noexcept {
-    return aoahid_pen_depart(node);
-}
 [[nodiscard]] inline aoahid_result
 digitizer_update(aoahid_node* node, const aoahid_digitizer_sample* sample) noexcept {
     return aoahid_digitizer_update(node, sample);
-}
-[[nodiscard]] inline aoahid_result digitizer_depart(aoahid_node* node) noexcept {
-    return aoahid_digitizer_depart(node);
 }
 [[nodiscard]] inline aoahid_result battery_update(aoahid_node* node, uint32_t has_value,
                                                   int32_t strength) noexcept {

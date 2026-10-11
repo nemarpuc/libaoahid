@@ -474,12 +474,6 @@ fn rust_layout() -> BTreeMap<String, usize> {
     );
     layout!(
         values,
-        aoahid_touch_contact,
-        "aoahid_touch_contact",
-        [contact_id, x, y, pressure, width, height, azimuth]
-    );
-    layout!(
-        values,
         aoahid_touchscreen_extra,
         "aoahid_touchscreen_extra",
         [pressure, width, height, azimuth]

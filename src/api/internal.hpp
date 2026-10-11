@@ -119,11 +119,22 @@ struct DeferredError {
 using SpecConfig = std::variant<std::monostate, KeyboardConfig, MouseConfig, ConsumerConfig,
                                 GamepadConfig, TouchConfig, PenConfig, BatteryConfig, RawConfig>;
 
+// One touch contact as the state machine keeps it; not part of the public ABI.
+struct TouchContact {
+    std::uint32_t contact_id;
+    std::int32_t x;
+    std::int32_t y;
+    std::int32_t pressure;
+    std::int32_t width;
+    std::int32_t height;
+    std::int32_t azimuth;
+};
+
 enum class ContactPhase : std::uint8_t { none, down, up };
 
 struct ContactState {
     ContactPhase phase{ContactPhase::none};
-    aoahid_touch_contact sample{};
+    TouchContact sample{};
     /* A Down edge must reach one accepted frame before Up may replace it. */
     bool lifecycle_transition_pending{};
 };

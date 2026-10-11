@@ -405,16 +405,6 @@ internal static class Program
         var disappeared = new List<Locator>();
         var result = Result.Ok;
         var ready = new List<Session>();
-        var contact = new TouchContact
-        {
-            ContactId = TouchContactId,
-            X = ExampleTouchX,
-            Y = ExampleTouchY,
-            Pressure = 0,
-            Width = 0,
-            Height = 0,
-            Azimuth = 0,
-        };
         // Prepare all state first; USB submission is a separate pass so one
         // device does not delay the next device's preparation.
         foreach (var session in sessions.Where(value => value.Device != nint.Zero))
@@ -422,7 +412,7 @@ internal static class Program
             var status = FirstFailure(
                 Native.KeyboardKey(session.Keyboard, KeyboardAUsage, 1),
                 Native.MouseMove(session.Mouse, ExampleMouseDx, ExampleMouseDy),
-                Native.TouchscreenContact(session.Touchscreen, contact.ContactId, 1, contact.X, contact.Y, default));
+                Native.TouchscreenContact(session.Touchscreen, TouchContactId, 1, ExampleTouchX, ExampleTouchY, default));
             if (status == Result.NoDevice)
             {
                 disappeared.Add(session.Locator);

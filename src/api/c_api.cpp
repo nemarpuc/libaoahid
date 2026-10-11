@@ -606,15 +606,15 @@ void make_neutral(aoahid_node* node) noexcept {
                   node->spec->kind != AOAHID_PROFILE_BATTERY;
 }
 
-aoahid_result poll_until_idle(aoahid_node* node, const std::uint32_t deadline_ms) {
-    if (deadline_ms == 0U) {
-        set_error(AOAHID_ERR_UNSET_FIELD, "deadline_ms", "A nonzero deadline is required.");
+aoahid_result poll_until_idle(aoahid_node* node, const std::uint32_t timeout_ms) {
+    if (timeout_ms == 0U) {
+        set_error(AOAHID_ERR_UNSET_FIELD, "timeout_ms", "A nonzero timeout is required.");
         return AOAHID_ERR_UNSET_FIELD;
     }
     const aoahid_result preflight = preflight_context(node->device->context);
     if (preflight != AOAHID_OK)
         return preflight;
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(deadline_ms);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
     do {
         // Set when every pool slot is taken by other Nodes: this Node has no
         // transfer of its own to wait for, so it waits for any slot instead.
@@ -1732,14 +1732,14 @@ aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node) try {
 AOAHID_C_RESULT_CATCH("node.submit")
 
 aoahid_result AOAHID_CALL aoahid_node_submit_blocking(aoahid_node* node,
-                                                      const std::uint32_t deadline_ms) try {
+                                                      const std::uint32_t timeout_ms) try {
     aoa::detail::clear_error();
     if (node == nullptr || node->closed || node->device == nullptr || node->spec == nullptr) {
         set_error(AOAHID_ERR_PARAM, "node.submit_blocking",
                   "A live Node with an attached Device and Spec is required.");
         return AOAHID_ERR_PARAM;
     }
-    const aoahid_result result = poll_until_idle(node, deadline_ms);
+    const aoahid_result result = poll_until_idle(node, timeout_ms);
     return aoa::detail::finish_result(result, "node.submit_blocking",
                                       "The blocking report sequence failed.");
 }

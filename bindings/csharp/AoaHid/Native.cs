@@ -425,18 +425,6 @@ public struct CapabilityManifest
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct TouchContact
-{
-    public uint ContactId;
-    public int X;
-    public int Y;
-    public int Pressure;
-    public int Width;
-    public int Height;
-    public int Azimuth;
-}
-
-[StructLayout(LayoutKind.Sequential)]
 public struct TouchscreenExtra
 {
     public int Pressure;
@@ -593,7 +581,6 @@ public static class Native
             ["aoahid_raw_options"] = typeof(RawOptions),
             ["aoahid_report_capability"] = typeof(ReportCapability),
             ["aoahid_capability_manifest"] = typeof(CapabilityManifest),
-            ["aoahid_touch_contact"] = typeof(TouchContact),
             ["aoahid_touchscreen_extra"] = typeof(TouchscreenExtra),
             ["aoahid_touchpad_extra"] = typeof(TouchpadExtra),
             ["aoahid_pen_sample"] = typeof(PenSample),
@@ -680,7 +667,7 @@ public static class Native
     [DllImport(Library, EntryPoint = "aoahid_node_submit", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result NodeSubmit(nint node);
     [DllImport(Library, EntryPoint = "aoahid_node_submit_blocking", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result NodeSubmitBlocking(nint node, uint deadlineMs);
+    public static extern Result NodeSubmitBlocking(nint node, uint timeoutMs);
 
     [DllImport(Library, EntryPoint = "aoahid_keyboard_key", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result KeyboardKey(nint node, ushort usage, uint down);
@@ -689,11 +676,11 @@ public static class Native
     [DllImport(Library, EntryPoint = "aoahid_mouse_scroll", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result MouseScroll(nint node, int wheel, int pan);
     [DllImport(Library, EntryPoint = "aoahid_mouse_button", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result MouseButton(nint node, uint button, uint pressed);
-    [DllImport(Library, EntryPoint = "aoahid_toggle", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result Toggle(nint node, ushort usage, uint down);
+    public static extern Result MouseButton(nint node, uint button, uint down);
+    [DllImport(Library, EntryPoint = "aoahid_toggle_usage", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result ToggleUsage(nint node, ushort usage, uint down);
     [DllImport(Library, EntryPoint = "aoahid_gamepad_button", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result GamepadButton(nint node, uint button, uint pressed);
+    public static extern Result GamepadButton(nint node, uint button, uint down);
     [DllImport(Library, EntryPoint = "aoahid_gamepad_set_axis", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result GamepadSetAxis(nint node, nuint axisIndex, int value);
     [DllImport(Library, EntryPoint = "aoahid_gamepad_dpad", ExactSpelling = true, CallingConvention = Call)]
@@ -706,15 +693,11 @@ public static class Native
     [DllImport(Library, EntryPoint = "aoahid_touchpad_contact", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result TouchpadContact(nint node, uint contactId, uint down, int x, int y, in TouchpadExtra extra);
     [DllImport(Library, EntryPoint = "aoahid_touchpad_button", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result TouchpadButton(nint node, uint button, uint pressed);
+    public static extern Result TouchpadButton(nint node, uint button, uint down);
     [DllImport(Library, EntryPoint = "aoahid_pen_update", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result PenUpdate(nint node, in PenSample sample);
-    [DllImport(Library, EntryPoint = "aoahid_pen_depart", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result PenDepart(nint node);
     [DllImport(Library, EntryPoint = "aoahid_digitizer_update", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DigitizerUpdate(nint node, in DigitizerSample sample);
-    [DllImport(Library, EntryPoint = "aoahid_digitizer_depart", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result DigitizerDepart(nint node);
     [DllImport(Library, EntryPoint = "aoahid_battery_update", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result BatteryUpdate(nint node, uint hasValue, int strength);
     [DllImport(Library, EntryPoint = "aoahid_raw_submit", ExactSpelling = true, CallingConvention = Call)]

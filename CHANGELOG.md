@@ -27,19 +27,28 @@ profiles have not been run against a phone, and the `Verified` rows in
 - Every profile that Android recognizes differently has its own send calls and
   structures. `aoahid_touch` is replaced by `aoahid_touchscreen_contact` and
   `aoahid_touchpad_contact`, and `aoahid_touch_extra` by `aoahid_touchscreen_extra`
-  and `aoahid_touchpad_extra`. `aoahid_pen_update` and `aoahid_pen_depart` take
-  Pen Nodes only; Digitizer Nodes use `aoahid_digitizer_update`,
-  `aoahid_digitizer_depart`, and `aoahid_digitizer_sample`. Each call rejects a
+  and `aoahid_touchpad_extra`. `aoahid_pen_update` takes
+  Pen Nodes only; Digitizer Nodes use `aoahid_digitizer_update` and
+  `aoahid_digitizer_sample`. Leaving range is a sample with `in_range = 0`;
+  there is no separate depart call. Each call rejects a
   Node of the other profile with `AOAHID_ERR_PARAM`. The C++ forwarders and the
   three bindings follow.
 - The Keyboard and Gamepad calls take the profile's name too: `aoahid_kbd` is
   `aoahid_keyboard_key` and `aoahid_dpad` is `aoahid_gamepad_dpad` (C++
   `aoahid::keyboard_key` and `aoahid::gamepad_dpad`; C# `KeyboardKey` and
   `GamepadDpad`). Every send call is now `aoahid_<profile>_<operation>`.
-- `aoahid_toggle` works like `aoahid_keyboard_key`: any number of allowed Usages
-  can be pressed at once, each is released by its own Usage, and a Usage that
-  is not in the allow-list (including 0) is `AOAHID_ERR_PARAM`. It used to hold
-  one Usage at a time, and 0 released whichever Usage was pressed.
+- The Toggle call is `aoahid_toggle_usage` (C++ `aoahid::toggle_usage`, C#
+  `ToggleUsage`), so every send call follows `aoahid_<profile>_<operation>`. It
+  works like `aoahid_keyboard_key`: any number of allowed Usages can be pressed
+  at once, each is released by its own Usage, and a Usage that is not in the
+  allow-list (including 0) is `AOAHID_ERR_PARAM`. It used to hold one Usage at
+  a time, and 0 released whichever Usage was pressed.
+- `aoahid_touch_contact` is no longer public: no public function takes it. The
+  library keeps it internally, and the Python, C#, and Rust bindings and the
+  examples no longer declare it.
+- The button calls name their flag `down`, like the other send calls, and
+  `aoahid_node_submit_blocking` names its wait `timeout_ms` (it was
+  `deadline_ms`). Only parameter names changed.
 
 ### Added
 

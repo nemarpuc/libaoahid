@@ -20,9 +20,9 @@ static const char* const k_expected[] = {"TEST_EVENT_CODE", "TEST_EVENT_CODE", "
                                          "TEST_EVENT_CODE"};
 
 static const char* const k_send_sequence[] = {
-    "aoahid_toggle(node, 0x00CD, 1)   assert one allow-listed Usage",
+    "aoahid_toggle_usage(node, 0x00CD, 1)   assert one allow-listed Usage",
     "aoahid_node_submit(node)         sends the 1 edge",
-    "aoahid_toggle(node, 0x00CD, 0)   release it",
+    "aoahid_toggle_usage(node, 0x00CD, 0)   release it",
     "aoahid_node_submit(node)         sends the 0 edge that completes the tap", NULL};
 
 int main(void) {

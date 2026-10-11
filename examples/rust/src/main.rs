@@ -442,15 +442,6 @@ fn update_then_submit(
     sessions: &mut [Session],
     timeout_ms: u32,
 ) -> (Vec<Locator>, sys::aoahid_result) {
-    let contact = sys::aoahid_touch_contact {
-        contact_id: TOUCH_CONTACT_ID,
-        x: EXAMPLE_TOUCH_X,
-        y: EXAMPLE_TOUCH_Y,
-        pressure: 0,
-        width: 0,
-        height: 0,
-        azimuth: 0,
-    };
     let mut disappeared = Vec::new();
     let mut result = sys::AOAHID_OK;
     let mut ready = Vec::new();
@@ -466,10 +457,10 @@ fn update_then_submit(
             unsafe {
                 sys::aoahid_touchscreen_contact(
                     session.touchscreen,
-                    contact.contact_id,
+                    TOUCH_CONTACT_ID,
                     1,
-                    contact.x,
-                    contact.y,
+                    EXAMPLE_TOUCH_X,
+                    EXAMPLE_TOUCH_Y,
                     std::ptr::null(),
                 )
             },

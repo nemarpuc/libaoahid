@@ -84,7 +84,7 @@ Each Node has at most one report in flight.
    slot of the Device's transfer pool and submits it as an asynchronous AOA
    request 57 control transfer. It does not wait for completion; in caller-poll
    mode it may run one zero-timeout event pump after acceptance.
-   `aoahid_node_submit_blocking` additionally waits, up to an explicit deadline,
+   `aoahid_node_submit_blocking` additionally waits, up to an explicit timeout,
    until every dirty report has completed. `aoahid_raw_submit` copies caller
    bytes for a Raw Node.
 3. **Completion.** The libusb callback (in `aoahid_context_poll` or on the event

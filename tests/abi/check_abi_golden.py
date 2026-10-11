@@ -387,18 +387,6 @@ class CapabilityManifest(c.Structure):
     ]
 
 
-class TouchContact(c.Structure):
-    _fields_ = [
-        ("contact_id", U32),
-        ("x", I32),
-        ("y", I32),
-        ("pressure", I32),
-        ("width", I32),
-        ("height", I32),
-        ("azimuth", I32),
-    ]
-
-
 class TouchscreenExtra(c.Structure):
     _fields_ = [
         ("pressure", I32),
@@ -473,7 +461,6 @@ GOLDEN_STRUCTS = {
     "aoahid_raw_options": RawOptions,
     "aoahid_report_capability": ReportCapability,
     "aoahid_capability_manifest": CapabilityManifest,
-    "aoahid_touch_contact": TouchContact,
     "aoahid_touchscreen_extra": TouchscreenExtra,
     "aoahid_touchpad_extra": TouchpadExtra,
     "aoahid_pen_sample": PenSample,

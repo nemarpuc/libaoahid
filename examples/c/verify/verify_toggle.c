@@ -56,14 +56,14 @@ static const toggle_case k_cases[] = {
 static int run_case(aoahid_node* node, const toggle_case* c) {
     printf("\n-- sending: %s --\n", c->label);
     printf("   watch the phone now (and getevent, if you have it running)\n");
-    aoahid_result result = aoahid_toggle(node, c->usage, 1U);
+    aoahid_result result = aoahid_toggle_usage(node, c->usage, 1U);
     if (result != AOAHID_OK)
         return verify_fail("toggle down", result);
     result = verify_submit(node);
     if (result != AOAHID_OK)
         return verify_fail("submit toggle down", result);
     verify_sleep_ms(600);
-    result = aoahid_toggle(node, c->usage, 0U);
+    result = aoahid_toggle_usage(node, c->usage, 0U);
     if (result != AOAHID_OK)
         return verify_fail("toggle up", result);
     result = verify_submit(node);

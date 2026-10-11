@@ -89,7 +89,7 @@ allows; calls the caller must serialize are still the caller's responsibility.
 | Spec factories | `aoahid_spec_create_keyboard`, `_mouse`, `_toggle`, `_gamepad`, `_touchscreen`, `_touchpad`, `_pen`, `_digitizer`, `_battery`, `_raw` |
 | Spec access | `aoahid_spec_retain`, `aoahid_spec_release`, `aoahid_spec_descriptor`, `aoahid_spec_manifest` |
 | Node | `aoahid_node_open`, `aoahid_node_close`, `aoahid_node_hid_id`, `aoahid_node_manifest`, `aoahid_node_submit`, `aoahid_node_submit_blocking` |
-| Profile state | `aoahid_keyboard_key`, `aoahid_mouse_move`, `aoahid_mouse_scroll`, `aoahid_mouse_button`, `aoahid_toggle`, `aoahid_gamepad_button`, `aoahid_gamepad_set_axis`, `aoahid_gamepad_dpad`, `aoahid_touchscreen_contact`, `aoahid_touchpad_contact`, `aoahid_touchpad_button`, `aoahid_pen_update`, `aoahid_pen_depart`, `aoahid_digitizer_update`, `aoahid_digitizer_depart`, `aoahid_battery_update`, `aoahid_raw_submit` |
+| Profile state | `aoahid_keyboard_key`, `aoahid_mouse_move`, `aoahid_mouse_scroll`, `aoahid_mouse_button`, `aoahid_toggle_usage`, `aoahid_gamepad_button`, `aoahid_gamepad_set_axis`, `aoahid_gamepad_dpad`, `aoahid_touchscreen_contact`, `aoahid_touchpad_contact`, `aoahid_touchpad_button`, `aoahid_pen_update`, `aoahid_digitizer_update`, `aoahid_battery_update`, `aoahid_raw_submit` |
 
 `aoahid_version()` returns `(major << 24) | (minor << 16) | patch`; the header
 also defines `AOAHID_VERSION_MAJOR`, `_MINOR`, and `_PATCH`.
@@ -318,9 +318,9 @@ queues request 57 asynchronously, then returns. In caller-poll mode it may run
 one non-waiting poll afterwards. If nothing changed it returns `AOAHID_OK`
 without sending.
 
-`aoahid_node_submit_blocking(node, deadline_ms)` keeps submitting and pumping
-until the Node has nothing left to send or the deadline expires
-(`deadline_ms = 0` is `AOAHID_ERR_UNSET_FIELD`). Use it to flush every
+`aoahid_node_submit_blocking(node, timeout_ms)` keeps submitting and pumping
+until the Node has nothing left to send or the timeout expires
+(`timeout_ms = 0` is `AOAHID_ERR_UNSET_FIELD`). Use it to flush every
 mouse-delta fragment, touch continuation packet, and pen tool-change report in
 one call. It returns the completion result for its Node.
 
@@ -359,17 +359,17 @@ I/O or allocates.
 | Profile | Calls |
 |---|---|
 | Keyboard | `aoahid_keyboard_key(node, usage, down)` |
-| Mouse | `aoahid_mouse_move(node, dx, dy)`, `aoahid_mouse_scroll(node, wheel, pan)`, `aoahid_mouse_button(node, button, pressed)` |
-| Toggle | `aoahid_toggle(node, usage, down)` |
-| Gamepad | `aoahid_gamepad_button(node, button, pressed)`, `aoahid_gamepad_set_axis(node, axis_index, value)`, `aoahid_gamepad_dpad(node, up, down, right, left)` |
+| Mouse | `aoahid_mouse_move(node, dx, dy)`, `aoahid_mouse_scroll(node, wheel, pan)`, `aoahid_mouse_button(node, button, down)` |
+| Toggle | `aoahid_toggle_usage(node, usage, down)` |
+| Gamepad | `aoahid_gamepad_button(node, button, down)`, `aoahid_gamepad_set_axis(node, axis_index, value)`, `aoahid_gamepad_dpad(node, up, down, right, left)` |
 | Touchscreen | `aoahid_touchscreen_contact(node, contact_id, down, x, y, extra)` |
-| Touchpad | `aoahid_touchpad_contact(node, contact_id, down, x, y, extra)`, `aoahid_touchpad_button(node, button, pressed)` |
-| Pen | `aoahid_pen_update(node, &sample)`, `aoahid_pen_depart(node)` |
-| Digitizer | `aoahid_digitizer_update(node, &sample)`, `aoahid_digitizer_depart(node)` |
+| Touchpad | `aoahid_touchpad_contact(node, contact_id, down, x, y, extra)`, `aoahid_touchpad_button(node, button, down)` |
+| Pen | `aoahid_pen_update(node, &sample)` |
+| Digitizer | `aoahid_digitizer_update(node, &sample)` |
 | Battery | `aoahid_battery_update(node, has_value, strength)` |
 | Raw | `aoahid_raw_submit(node, report, length)` (validates, copies, and queues request 57 directly) |
 
-`down`, `pressed`, and the D-pad directions must be exactly 0 or 1. Buttons are
+`down` and the D-pad directions must be exactly 0 or 1. Buttons are
 one-based. What each call derives, and which values stay the caller's choice,
 is in [PROFILES.md](PROFILES.md). In short:
 
@@ -383,12 +383,16 @@ is in [PROFILES.md](PROFILES.md). In short:
 - **Mouse.** Deltas accumulate in signed 64-bit totals (overflow returns
   `AOAHID_ERR_OVERFLOW`); `aoahid_mouse_scroll` on an axis the Spec did not
   enable returns `AOAHID_ERR_UNSUPPORTED`.
-- **Toggle.** `down = 1` presses an allow-listed `usage`. `down = 0` releases the
-  pressed Usage; `usage` must then be 0 or that same Usage.
+- **Toggle.** `down = 1` presses an allow-listed `usage` and `down = 0` releases
+  that same `usage`. Each Usage is its own bit, so several can be held at once.
 - **Touch.** `down = 1` places a new `contact_id` or moves an active one;
   `down = 0` lifts an active one at the given final x/y. `extra` may be null;
   a nonzero value for a field the Spec did not enable is rejected. No free
   slot returns `AOAHID_ERR_OVERFLOW`.
+- **Pen and Digitizer.** Each call sends the whole state as one sample. There is
+  no separate depart call: `in_range = 0` takes the tool away, and X/Y, tilt,
+  and twist in that sample go out as given, so repeat the last position to
+  leave the pointer where it was.
 - **Touch together with a mouse.** A Touchscreen Node and a Mouse Node on the
   same device are separate input devices. Observed on a Galaxy Tab S11: when
   both report at the same time, Android drops the one that was there first,

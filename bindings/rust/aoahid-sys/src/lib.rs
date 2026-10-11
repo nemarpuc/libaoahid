@@ -339,15 +339,6 @@ c_struct!(aoahid_capability_manifest {
     reports: *const aoahid_report_capability, report_count: usize,
     descriptor_bytes: usize,
 });
-c_struct!(aoahid_touch_contact {
-    contact_id: u32,
-    x: i32,
-    y: i32,
-    pressure: i32,
-    width: i32,
-    height: i32,
-    azimuth: i32,
-});
 c_struct!(aoahid_touchscreen_extra {
     pressure: i32,
     width: i32,
@@ -509,16 +500,16 @@ extern "C" {
         manifest: *mut aoahid_capability_manifest,
     ) -> aoahid_result;
     pub fn aoahid_node_submit(node: *mut aoahid_node) -> aoahid_result;
-    pub fn aoahid_node_submit_blocking(node: *mut aoahid_node, deadline_ms: u32) -> aoahid_result;
+    pub fn aoahid_node_submit_blocking(node: *mut aoahid_node, timeout_ms: u32) -> aoahid_result;
     pub fn aoahid_keyboard_key(node: *mut aoahid_node, usage: u16, down: u32) -> aoahid_result;
     pub fn aoahid_mouse_move(node: *mut aoahid_node, dx: i32, dy: i32) -> aoahid_result;
     pub fn aoahid_mouse_scroll(node: *mut aoahid_node, wheel: i32, pan: i32) -> aoahid_result;
-    pub fn aoahid_mouse_button(node: *mut aoahid_node, button: u32, pressed: u32) -> aoahid_result;
-    pub fn aoahid_toggle(node: *mut aoahid_node, usage: u16, down: u32) -> aoahid_result;
+    pub fn aoahid_mouse_button(node: *mut aoahid_node, button: u32, down: u32) -> aoahid_result;
+    pub fn aoahid_toggle_usage(node: *mut aoahid_node, usage: u16, down: u32) -> aoahid_result;
     pub fn aoahid_gamepad_button(
         node: *mut aoahid_node,
         button: u32,
-        pressed: u32,
+        down: u32,
     ) -> aoahid_result;
     pub fn aoahid_gamepad_set_axis(
         node: *mut aoahid_node,
@@ -548,18 +539,16 @@ extern "C" {
         y: i32,
         extra: *const aoahid_touchpad_extra,
     ) -> aoahid_result;
-    pub fn aoahid_touchpad_button(node: *mut aoahid_node, button: u32, pressed: u32)
+    pub fn aoahid_touchpad_button(node: *mut aoahid_node, button: u32, down: u32)
         -> aoahid_result;
     pub fn aoahid_pen_update(
         node: *mut aoahid_node,
         sample: *const aoahid_pen_sample,
     ) -> aoahid_result;
-    pub fn aoahid_pen_depart(node: *mut aoahid_node) -> aoahid_result;
     pub fn aoahid_digitizer_update(
         node: *mut aoahid_node,
         sample: *const aoahid_digitizer_sample,
     ) -> aoahid_result;
-    pub fn aoahid_digitizer_depart(node: *mut aoahid_node) -> aoahid_result;
     pub fn aoahid_battery_update(
         node: *mut aoahid_node,
         has_value: u32,

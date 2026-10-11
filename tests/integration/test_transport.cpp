@@ -2494,8 +2494,8 @@ void open_public_touch_session(aoahid_context** context, aoahid_device** device,
     AOAHID_CHECK(aoahid_node_open(*device, spec, &node_options, node) == AOAHID_OK);
     aoahid_spec_release(spec);
 
-    const aoahid_touch_contact first{1U, 100, 200, 0, 0, 0, 0};
-    const aoahid_touch_contact second{2U, 300, 400, 0, 0, 0, 0};
+    const aoa::detail::TouchContact first{1U, 100, 200, 0, 0, 0, 0};
+    const aoa::detail::TouchContact second{2U, 300, 400, 0, 0, 0, 0};
     AOAHID_CHECK(aoahid_touchscreen_contact(*node, first.contact_id, 1U, first.x, first.y,
                                             nullptr) == AOAHID_OK);
     AOAHID_CHECK(aoahid_touchscreen_contact(*node, second.contact_id, 1U, second.x, second.y,
@@ -2569,7 +2569,7 @@ void test_public_touch_scan_time_lifecycle() {
     payloads = control_payloads_for(57U);
     AOAHID_CHECK(payloads.size() == 4U);
 
-    const aoahid_touch_contact next{3U, 500, 600, 0, 0, 0, 0};
+    const aoa::detail::TouchContact next{3U, 500, 600, 0, 0, 0, 0};
     AOAHID_CHECK(aoahid_touchscreen_contact(node, next.contact_id, 1U, next.x, next.y, nullptr) ==
                  AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(node, 100U) == AOAHID_OK);
@@ -2642,7 +2642,7 @@ void test_public_touch_scan_time_rejected_first_attempt_stays_zero() {
     aoahid_node* touch_node = nullptr;
     AOAHID_CHECK(aoahid_node_open(device, raw_spec, &node_options, &raw_node) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_open(device, touch_spec, &node_options, &touch_node) == AOAHID_OK);
-    const aoahid_touch_contact contact{1U, 100, 200, 0, 0, 0, 0};
+    const aoa::detail::TouchContact contact{1U, 100, 200, 0, 0, 0, 0};
     AOAHID_CHECK(aoahid_touchscreen_contact(touch_node, contact.contact_id, 1U, contact.x,
                                             contact.y, nullptr) == AOAHID_OK);
     auto* touch = std::get_if<aoa::detail::TouchState>(&touch_node->state);
@@ -2694,7 +2694,7 @@ void test_close_drains_touch_frame_before_neutral() {
     aoahid_fake_libusb_queue_async_completion(LIBUSB_TRANSFER_COMPLETED, -1, 0U);
     AOAHID_CHECK(aoahid_node_submit(node) == AOAHID_OK);
     AOAHID_CHECK(aoahid_fake_libusb_pending_transfer_count() == 0U);
-    const aoahid_touch_contact blocked_change{1U, 101, 201, 0, 0, 0, 0};
+    const aoa::detail::TouchContact blocked_change{1U, 101, 201, 0, 0, 0, 0};
     AOAHID_CHECK(aoahid_touchscreen_contact(node, blocked_change.contact_id, 1U, blocked_change.x,
                                             blocked_change.y, nullptr) == AOAHID_ERR_BUSY);
     AOAHID_CHECK(controls_for(57U).size() == 1U);
