@@ -491,6 +491,33 @@ if(AOAHID_BUILD_TESTS)
   aoahid_instrument_executable(aoahid_internal_thread_test)
   add_test(NAME aoahid.internal-thread COMMAND aoahid_internal_thread_test)
 
+  if(AOAHID_CHECK_SERIALIZATION)
+    add_executable(aoahid_serialization_check_test
+        tests/integration/test_serialization_check.cpp
+        $<TARGET_OBJECTS:aoahid_test_objects>)
+    target_include_directories(aoahid_serialization_check_test
+        PRIVATE include src tests tests/fake_libusb)
+    set_target_properties(aoahid_serialization_check_test PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO)
+    if(MSVC)
+      target_compile_options(aoahid_serialization_check_test PRIVATE
+          /W4 /WX /permissive- /EHsc /GR- /utf-8)
+    else()
+      target_compile_options(aoahid_serialization_check_test PRIVATE
+          -Wall -Wextra -Wpedantic -Werror -fno-rtti)
+    endif()
+    aoahid_instrument_executable(aoahid_serialization_check_test)
+    add_test(NAME aoahid.serialization-check-ok
+        COMMAND aoahid_serialization_check_test ok)
+    add_test(
+        NAME aoahid.serialization-check-violation
+        COMMAND ${CMAKE_COMMAND}
+            -DAOAHID_SERIALIZATION_TEST=$<TARGET_FILE:aoahid_serialization_check_test>
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/expect_serialization_abort.cmake)
+  endif()
+
   add_executable(aoahid_export_descriptors tests/hidtools/export_descriptors.cpp)
   target_link_libraries(aoahid_export_descriptors PRIVATE aoahid::aoahid)
   target_include_directories(aoahid_export_descriptors PRIVATE src)
