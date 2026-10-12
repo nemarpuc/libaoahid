@@ -10,7 +10,8 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "AOAHID_BUILD_TESTS": "ON",
-        "AOAHID_USE_FAKE_LIBUSB": "ON"
+        "AOAHID_USE_FAKE_LIBUSB": "ON",
+        "AOAHID_CHECK_SERIALIZATION": "ON"
       }
     },
     {
@@ -33,7 +34,8 @@
         "AOAHID_BUILD_TESTS": "ON",
         "AOAHID_BUILD_EXAMPLES": "ON",
         "AOAHID_USE_FAKE_LIBUSB": "ON",
-        "AOAHID_TSAN": "ON"
+        "AOAHID_TSAN": "ON",
+        "AOAHID_CHECK_SERIALIZATION": "ON"
       }
     }
   ],

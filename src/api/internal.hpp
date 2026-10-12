@@ -305,6 +305,12 @@ struct aoahid_context {
     // persistent fatal state: accepting more asynchronous work would leave it
     // without an event pump.
     aoa::detail::DeferredError event_thread_error;
+#if defined(AOAHID_CHECK_SERIALIZATION)
+    // The thread inside a call on this Context, and how deep (a public call
+    // may make another). Only that thread touches call_depth.
+    std::atomic<std::thread::id> call_thread{};
+    std::uint32_t call_depth{};
+#endif
 };
 
 struct aoahid_discovery_entry {
@@ -390,3 +396,84 @@ struct aoahid_node {
     bool submitted_battery{false};
     bool closed{false};
 };
+
+#if defined(AOAHID_CHECK_SERIALIZATION)
+namespace aoa::detail {
+
+[[noreturn]] void serialization_violation(const char* api) noexcept;
+
+/* Debugging aid for the caller-serialization contract: two threads inside
+ * calls on one Context end the process with the name of the second call.
+ * It is not a lock and exists only in AOAHID_CHECK_SERIALIZATION builds. */
+class SerializationCheck final {
+  public:
+    SerializationCheck(aoahid_context* context, const char* api) noexcept : context_(context) {
+        if (context_ == nullptr) {
+            return;
+        }
+        const std::thread::id self = std::this_thread::get_id();
+        std::thread::id holder{};
+        if (context_->call_thread.compare_exchange_strong(holder, self,
+                                                          std::memory_order_acq_rel)) {
+            context_->call_depth = 1U;
+        } else if (holder == self) {
+            ++context_->call_depth;
+        } else {
+            serialization_violation(api);
+        }
+    }
+
+    ~SerializationCheck() noexcept {
+        if (context_ != nullptr && --context_->call_depth == 0U) {
+            context_->call_thread.store(std::thread::id{}, std::memory_order_release);
+        }
+    }
+
+    SerializationCheck(const SerializationCheck&) = delete;
+    SerializationCheck& operator=(const SerializationCheck&) = delete;
+
+    // For a call that may free the Context: checks, holds nothing.
+    static void probe(const aoahid_context* context, const char* api) noexcept {
+        if (context == nullptr) {
+            return;
+        }
+        const std::thread::id holder = context->call_thread.load(std::memory_order_acquire);
+        if (holder != std::thread::id{} && holder != std::this_thread::get_id()) {
+            serialization_violation(api);
+        }
+    }
+
+  private:
+    aoahid_context* context_{};
+};
+
+inline aoahid_context* serialization_context(const aoahid_device* device) noexcept {
+    return device != nullptr ? device->context : nullptr;
+}
+
+inline aoahid_context* serialization_context(const aoahid_node* node) noexcept {
+    return node != nullptr ? serialization_context(node->device) : nullptr;
+}
+
+inline aoahid_context* serialization_context(const aoahid_channel* channel) noexcept {
+    return channel != nullptr ? serialization_context(channel->device) : nullptr;
+}
+
+// Channel reads and writes belong to the Context domain only in caller-poll mode.
+inline aoahid_context* serialization_context_caller_poll(const aoahid_channel* channel) noexcept {
+    aoahid_context* context = serialization_context(channel);
+    return context != nullptr && context->options.event_mode == AOAHID_EVENT_CALLER_POLL
+               ? context
+               : nullptr;
+}
+
+} // namespace aoa::detail
+
+#define AOAHID_SERIALIZED(context_expr, api)                                                       \
+    const ::aoa::detail::SerializationCheck aoahid_serialization_check_((context_expr), (api))
+#define AOAHID_SERIALIZED_PROBE(context_expr, api)                                                 \
+    ::aoa::detail::SerializationCheck::probe((context_expr), (api))
+#else
+#define AOAHID_SERIALIZED(context_expr, api) static_cast<void>(0)
+#define AOAHID_SERIALIZED_PROBE(context_expr, api) static_cast<void>(0)
+#endif

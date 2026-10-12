@@ -9,6 +9,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <memory>
@@ -999,6 +1001,20 @@ aoahid_result allocate_hid_id(aoahid_device* device, std::uint16_t* hid_id) noex
     return AOAHID_OK;
 }
 } // namespace
+
+#if defined(AOAHID_CHECK_SERIALIZATION)
+namespace aoa::detail {
+void serialization_violation(const char* api) noexcept {
+    // Not through the log sink: it belongs to the caller and may itself be mid-call.
+    std::fprintf(stderr,
+                 "libaoahid: %s was called while another thread is inside a call on the same "
+                 "Context; the caller must serialize them.\n",
+                 api);
+    std::fflush(stderr);
+    std::abort();
+}
+} // namespace aoa::detail
+#endif
 
 #define AOAHID_C_RESULT_CATCH(api_name)                                                            \
     catch (const std::bad_alloc&) {                                                                \

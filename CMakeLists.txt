@@ -18,6 +18,7 @@ option(AOAHID_BUILD_EXAMPLES "Build examples." OFF)
 option(AOAHID_BUILD_FUZZ "Build fuzz targets." OFF)
 option(AOAHID_SANITIZE "Enable AddressSanitizer and UndefinedBehaviorSanitizer." OFF)
 option(AOAHID_TSAN "Enable ThreadSanitizer for race detection." OFF)
+option(AOAHID_CHECK_SERIALIZATION "Abort when two threads are inside calls on one Context (debugging aid)." OFF)
 option(AOAHID_USE_FAKE_LIBUSB "Use the deterministic test-only libusb backend." OFF)
 
 if(AOAHID_SANITIZE AND AOAHID_TSAN)
@@ -145,6 +146,12 @@ else()
         INTERFACE_INCLUDE_DIRECTORIES "${LIBUSB_INCLUDE_DIR}")
     set(AOAHID_USB_LINK_TARGET aoahid_libusb)
   endif()
+endif()
+
+# The check adds members to the internal Context, so the library and every
+# test that includes its internal headers must agree on it.
+if(AOAHID_CHECK_SERIALIZATION)
+  add_compile_definitions(AOAHID_CHECK_SERIALIZATION=1)
 endif()
 
 # The shared and static libraries intentionally use separately compiled object
