@@ -317,6 +317,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang++-14 \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DAOAHID_USE_FAKE_LIBUSB=ON \
+            -DAOAHID_CHECK_SERIALIZATION=ON \
             -DAOAHID_BUILD_TESTS=ON \
             -DAOAHID_BUILD_EXAMPLES=ON
           cmake --build build/tidy --parallel

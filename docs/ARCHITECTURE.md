@@ -72,6 +72,22 @@ Serialization rules, from the header contracts:
 - `aoahid_last_error` is thread-local and valid until that thread's next call.
 - Never call close/destroy functions from the log sink.
 
+### Checking the serialization rule
+
+Breaking the first rule is undefined behavior that usually shows up far from
+its cause. A library built with `-DAOAHID_CHECK_SERIALIZATION=ON` (off by
+default; on in the `dev` and `tsan` presets) ends the process, with the name
+of the call on stderr, when a thread enters a call on a Context while another
+thread is inside one. It is a debugging aid, not a lock: it adds an atomic
+exchange to every checked call and is not meant for release builds, whose code
+it does not change when off.
+
+It checks the calls whose contract in `aoahid.h` says they belong to the
+Context domain. It does not check `aoahid_channel_read` and
+`aoahid_channel_write` in internal-thread mode (one reader and one writer may
+run beside other calls there), the Spec functions, the discovery snapshot
+readers, or a Channel read racing its own close.
+
 ## Send path
 
 Each Node has at most one report in flight.
