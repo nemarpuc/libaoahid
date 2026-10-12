@@ -511,11 +511,14 @@ if(AOAHID_BUILD_TESTS)
     aoahid_instrument_executable(aoahid_serialization_check_test)
     add_test(NAME aoahid.serialization-check-ok
         COMMAND aoahid_serialization_check_test ok)
-    add_test(
-        NAME aoahid.serialization-check-violation
-        COMMAND ${CMAKE_COMMAND}
-            -DAOAHID_SERIALIZATION_TEST=$<TARGET_FILE:aoahid_serialization_check_test>
-            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/expect_serialization_abort.cmake)
+    # A debug C runtime on Windows answers abort() with a dialog and waits.
+    if(NOT WIN32)
+      add_test(
+          NAME aoahid.serialization-check-violation
+          COMMAND ${CMAKE_COMMAND}
+              -DAOAHID_SERIALIZATION_TEST=$<TARGET_FILE:aoahid_serialization_check_test>
+              -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/expect_serialization_abort.cmake)
+    endif()
   endif()
 
   add_executable(aoahid_export_descriptors tests/hidtools/export_descriptors.cpp)

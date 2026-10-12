@@ -34,8 +34,7 @@
         "AOAHID_BUILD_TESTS": "ON",
         "AOAHID_BUILD_EXAMPLES": "ON",
         "AOAHID_USE_FAKE_LIBUSB": "ON",
-        "AOAHID_TSAN": "ON",
-        "AOAHID_CHECK_SERIALIZATION": "ON"
+        "AOAHID_TSAN": "ON"
       }
     }
   ],

@@ -8,7 +8,7 @@ All notable changes to libaoahid are recorded here. This project follows
 ### Added
 
 - `AOAHID_CHECK_SERIALIZATION` build option (off by default): the library ends
-  the process, naming the call, when two threads are inside calls on one
+  the process, naming the second call, when two threads are inside calls on one
   Context. A debugging aid for the caller-serialization rule; with it off the
   built library is unchanged. See `docs/ARCHITECTURE.md`.
 

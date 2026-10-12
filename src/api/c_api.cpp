@@ -1606,7 +1606,6 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
 AOAHID_C_RESULT_CATCH("node.open")
 
 std::uint16_t AOAHID_CALL aoahid_node_hid_id(const aoahid_node* node) try {
-    AOAHID_SERIALIZED(aoa::detail::serialization_context(node), "aoahid_node_hid_id");
     aoa::detail::clear_error();
     if (node == nullptr || node->closed) {
         set_error(AOAHID_ERR_PARAM, "node",
@@ -1619,7 +1618,6 @@ AOAHID_C_VALUE_CATCH("node.hid_id", 0U)
 
 aoahid_result AOAHID_CALL aoahid_node_manifest(const aoahid_node* node,
                                                aoahid_capability_manifest* manifest) try {
-    AOAHID_SERIALIZED(aoa::detail::serialization_context(node), "aoahid_node_manifest");
     aoa::detail::clear_error();
     if (node == nullptr || node->closed || node->spec == nullptr) {
         set_error(AOAHID_ERR_PARAM, "node.manifest", "A live node is required.");

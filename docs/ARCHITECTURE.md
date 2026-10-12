@@ -76,17 +76,30 @@ Serialization rules, from the header contracts:
 
 Breaking the first rule is undefined behavior that usually shows up far from
 its cause. A library built with `-DAOAHID_CHECK_SERIALIZATION=ON` (off by
-default; on in the `dev` and `tsan` presets) ends the process, with the name
-of the call on stderr, when a thread enters a call on a Context while another
-thread is inside one. It is a debugging aid, not a lock: it adds an atomic
-exchange to every checked call and is not meant for release builds, whose code
-it does not change when off.
+default; on in the `dev` preset) ends the process, with a line on stderr that
+names the second call (the function, or for the report-state calls their
+field name, such as `mouse.move`), when a thread enters a call on a Context
+while another thread is inside one. It is a debugging aid, not a lock: it adds
+an atomic exchange to every checked call and is not meant for release builds,
+whose code it does not change when off. It is left out of the `tsan` preset:
+its own atomic orders the calls of different threads, which would hide from
+ThreadSanitizer the unsynchronized calls that happen not to overlap.
 
-It checks the calls whose contract in `aoahid.h` says they belong to the
-Context domain. It does not check `aoahid_channel_read` and
-`aoahid_channel_write` in internal-thread mode (one reader and one writer may
-run beside other calls there), the Spec functions, the discovery snapshot
-readers, or a Channel read racing its own close.
+It checks the calls whose contract in `aoahid.h` says they must be serialized
+with every other call on the Context. It does not check:
+
+- `aoahid_channel_read` and `aoahid_channel_write` in internal-thread mode
+  (one reader and one writer may run beside other calls there), or a Channel
+  read racing its own close;
+- `aoahid_node_hid_id` and `aoahid_node_manifest`, which only have to be kept
+  apart from the Node's teardown;
+- the Spec functions and the discovery snapshot readers;
+- a call on a null or closed handle;
+- a call made from inside another call on the same thread (the log sink must
+  not call into its Context, and this does not catch it);
+- a call that enters after `aoahid_context_destroy` or
+  `aoahid_context_destroy_blocking` has started: those two only look, on
+  entry, for a thread already inside.
 
 ## Send path
 
