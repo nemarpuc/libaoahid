@@ -452,7 +452,8 @@ inline aoahid_context* serialization_context(const aoahid_device* device) noexce
 }
 
 inline aoahid_context* serialization_context(const aoahid_node* node) noexcept {
-    return node != nullptr ? serialization_context(node->device) : nullptr;
+    // A closed Node may outlive its Device.
+    return node != nullptr && !node->closed ? serialization_context(node->device) : nullptr;
 }
 
 inline aoahid_context* serialization_context(const aoahid_channel* channel) noexcept {
@@ -462,9 +463,10 @@ inline aoahid_context* serialization_context(const aoahid_channel* channel) noex
 // Channel reads and writes belong to the Context domain only in caller-poll mode.
 inline aoahid_context* serialization_context_caller_poll(const aoahid_channel* channel) noexcept {
     aoahid_context* context = serialization_context(channel);
-    return context != nullptr && context->options.event_mode == AOAHID_EVENT_CALLER_POLL
-               ? context
-               : nullptr;
+    if (context != nullptr && context->options.event_mode != AOAHID_EVENT_CALLER_POLL) {
+        return nullptr;
+    }
+    return context;
 }
 
 } // namespace aoa::detail

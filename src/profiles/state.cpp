@@ -243,8 +243,10 @@ bool validate_contact(const aoa::detail::TouchConfig& config_value,
 }
 
 template <typename Function>
-aoahid_result abi_state_result(const char* field, Function&& function) noexcept {
+aoahid_result abi_state_result([[maybe_unused]] aoahid_node* node, const char* field,
+                               Function&& function) noexcept {
     try {
+        AOAHID_SERIALIZED(aoa::detail::serialization_context(node), field);
         return function();
     } catch (const std::bad_alloc&) {
         set_error(AOAHID_ERR_INTERNAL, field,
@@ -1238,47 +1240,49 @@ static aoahid_result aoahid_battery_update_impl(aoahid_node* node, const std::in
 
 aoahid_result AOAHID_CALL aoahid_keyboard_key(aoahid_node* node, const std::uint16_t usage,
                                               const std::uint32_t down) {
-    return abi_state_result("keyboard.key", [&] { return keyboard_key_impl(node, usage, down); });
+    return abi_state_result(node, "keyboard.key",
+                            [&] { return keyboard_key_impl(node, usage, down); });
 }
 
 aoahid_result AOAHID_CALL aoahid_mouse_move(aoahid_node* node, const std::int32_t dx,
                                             const std::int32_t dy) {
-    return abi_state_result("mouse.move", [&] { return aoahid_mouse_move_impl(node, dx, dy); });
+    return abi_state_result(node, "mouse.move",
+                            [&] { return aoahid_mouse_move_impl(node, dx, dy); });
 }
 
 aoahid_result AOAHID_CALL aoahid_mouse_scroll(aoahid_node* node, const std::int32_t wheel,
                                               const std::int32_t pan) {
-    return abi_state_result("mouse.scroll",
+    return abi_state_result(node, "mouse.scroll",
                             [&] { return aoahid_mouse_scroll_impl(node, wheel, pan); });
 }
 
 aoahid_result AOAHID_CALL aoahid_mouse_button(aoahid_node* node, const std::uint32_t button,
                                               const std::uint32_t down) {
-    return abi_state_result("mouse.button",
+    return abi_state_result(node, "mouse.button",
                             [&] { return aoahid_mouse_button_impl(node, button, down); });
 }
 
 aoahid_result AOAHID_CALL aoahid_toggle_usage(aoahid_node* node, const std::uint16_t usage,
                                               const std::uint32_t down) {
-    return abi_state_result("toggle", [&] { return aoahid_toggle_impl(node, usage, down); });
+    return abi_state_result(node, "toggle", [&] { return aoahid_toggle_impl(node, usage, down); });
 }
 
 aoahid_result AOAHID_CALL aoahid_gamepad_button(aoahid_node* node, const std::uint32_t button,
                                                 const std::uint32_t down) {
-    return abi_state_result("gamepad.button",
+    return abi_state_result(node, "gamepad.button",
                             [&] { return aoahid_gamepad_button_impl(node, button, down); });
 }
 
 aoahid_result AOAHID_CALL aoahid_gamepad_axis(aoahid_node* node, const std::size_t axis_index,
                                               const std::int32_t value) {
-    return abi_state_result("gamepad.axis",
+    return abi_state_result(node, "gamepad.axis",
                             [&] { return aoahid_gamepad_axis_impl(node, axis_index, value); });
 }
 
 aoahid_result AOAHID_CALL aoahid_gamepad_dpad(aoahid_node* node, const std::uint32_t up,
                                               const std::uint32_t down, const std::uint32_t right,
                                               const std::uint32_t left) {
-    return abi_state_result("gamepad.dpad",
+    return abi_state_result(node, "gamepad.dpad",
                             [&] { return gamepad_dpad_impl(node, up, down, right, left); });
 }
 
@@ -1287,7 +1291,7 @@ aoahid_result AOAHID_CALL aoahid_touchscreen_contact(aoahid_node* node,
                                                      const std::uint32_t down, const std::int32_t x,
                                                      const std::int32_t y,
                                                      const aoahid_touchscreen_extra* extra) {
-    return abi_state_result("touchscreen.contact", [&] {
+    return abi_state_result(node, "touchscreen.contact", [&] {
         const TouchExtra values = extra == nullptr ? TouchExtra{}
                                                    : TouchExtra{extra->pressure, extra->width,
                                                                 extra->height, extra->azimuth};
@@ -1300,7 +1304,7 @@ aoahid_result AOAHID_CALL aoahid_touchpad_contact(aoahid_node* node, const std::
                                                   const std::uint32_t down, const std::int32_t x,
                                                   const std::int32_t y,
                                                   const aoahid_touchpad_extra* extra) {
-    return abi_state_result("touchpad.contact", [&] {
+    return abi_state_result(node, "touchpad.contact", [&] {
         const TouchExtra values = extra == nullptr ? TouchExtra{}
                                                    : TouchExtra{extra->pressure, extra->width,
                                                                 extra->height, extra->azimuth};
@@ -1311,18 +1315,18 @@ aoahid_result AOAHID_CALL aoahid_touchpad_contact(aoahid_node* node, const std::
 
 aoahid_result AOAHID_CALL aoahid_touchpad_button(aoahid_node* node, const std::uint32_t button,
                                                  const std::uint32_t down) {
-    return abi_state_result("touchpad.button",
+    return abi_state_result(node, "touchpad.button",
                             [&] { return aoahid_touchpad_button_impl(node, button, down); });
 }
 
 aoahid_result AOAHID_CALL aoahid_pen_update(aoahid_node* node, const aoahid_pen_sample* sample) {
-    return abi_state_result("pen.update",
+    return abi_state_result(node, "pen.update",
                             [&] { return stylus_update_impl(node, AOAHID_PROFILE_PEN, sample); });
 }
 
 aoahid_result AOAHID_CALL aoahid_digitizer_update(aoahid_node* node,
                                                   const aoahid_digitizer_sample* sample) {
-    return abi_state_result("digitizer.update", [&] {
+    return abi_state_result(node, "digitizer.update", [&] {
         const aoahid_pen_sample values =
             sample == nullptr
                 ? aoahid_pen_sample{}
@@ -1336,7 +1340,7 @@ aoahid_result AOAHID_CALL aoahid_digitizer_update(aoahid_node* node,
 }
 
 aoahid_result AOAHID_CALL aoahid_battery_update(aoahid_node* node, const std::int32_t strength) {
-    return abi_state_result("battery.update",
+    return abi_state_result(node, "battery.update",
                             [&] { return aoahid_battery_update_impl(node, strength); });
 }
 

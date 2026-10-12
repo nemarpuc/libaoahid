@@ -1153,6 +1153,7 @@ AOAHID_C_RESULT_CATCH("context.create")
 
 aoahid_result AOAHID_CALL aoahid_context_poll(aoahid_context* context,
                                               const std::uint32_t timeout_ms) try {
+    AOAHID_SERIALIZED(context, "aoahid_context_poll");
     aoa::detail::clear_error();
     if (context == nullptr) {
         set_error(AOAHID_ERR_PARAM, "context", "The Context handle is null.");
@@ -1180,6 +1181,7 @@ AOAHID_C_RESULT_CATCH("context.poll")
 aoahid_result AOAHID_CALL aoahid_discover(aoahid_context* context,
                                           const std::uint32_t control_timeout_ms,
                                           aoahid_discovery** out_discovery) try {
+    AOAHID_SERIALIZED(context, "aoahid_discover");
     aoa::detail::clear_error();
     if (out_discovery != nullptr)
         *out_discovery = nullptr;
@@ -1259,6 +1261,7 @@ AOAHID_C_VOID_CATCH("discovery.destroy")
 aoahid_result AOAHID_CALL aoahid_accessory_start(aoahid_context* context,
                                                  const aoahid_device_info* selected,
                                                  const aoahid_accessory_options* options) try {
+    AOAHID_SERIALIZED(context, "aoahid_accessory_start");
     aoa::detail::clear_error();
     if (context == nullptr || selected == nullptr) {
         set_error(AOAHID_ERR_PARAM, "accessory.start", "Context and selection are required.");
@@ -1323,6 +1326,7 @@ aoahid_result AOAHID_CALL aoahid_device_open(aoahid_context* context,
                                              const aoahid_device_info* selected,
                                              const aoahid_device_options* options,
                                              aoahid_device** out_device) try {
+    AOAHID_SERIALIZED(context, "aoahid_device_open");
     aoa::detail::clear_error();
     if (out_device != nullptr)
         *out_device = nullptr;
@@ -1408,6 +1412,7 @@ AOAHID_C_RESULT_CATCH("device.open")
 aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* spec,
                                            const aoahid_node_options* options,
                                            aoahid_node** out_node) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(device), "aoahid_node_open");
     aoa::detail::clear_error();
     if (out_node == nullptr) {
         set_error(AOAHID_ERR_PARAM, "out_node", "The output pointer is null.");
@@ -1601,6 +1606,7 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
 AOAHID_C_RESULT_CATCH("node.open")
 
 std::uint16_t AOAHID_CALL aoahid_node_hid_id(const aoahid_node* node) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(node), "aoahid_node_hid_id");
     aoa::detail::clear_error();
     if (node == nullptr || node->closed) {
         set_error(AOAHID_ERR_PARAM, "node",
@@ -1613,6 +1619,7 @@ AOAHID_C_VALUE_CATCH("node.hid_id", 0U)
 
 aoahid_result AOAHID_CALL aoahid_node_manifest(const aoahid_node* node,
                                                aoahid_capability_manifest* manifest) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(node), "aoahid_node_manifest");
     aoa::detail::clear_error();
     if (node == nullptr || node->closed || node->spec == nullptr) {
         set_error(AOAHID_ERR_PARAM, "node.manifest", "A live node is required.");
@@ -1623,6 +1630,7 @@ aoahid_result AOAHID_CALL aoahid_node_manifest(const aoahid_node* node,
 AOAHID_C_RESULT_CATCH("node.manifest")
 
 aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(node), "aoahid_node_submit");
     aoa::detail::clear_error();
     if (node == nullptr || node->closed || node->device == nullptr || node->spec == nullptr) {
         set_error(AOAHID_ERR_PARAM, "node.submit",
@@ -1761,6 +1769,7 @@ AOAHID_C_RESULT_CATCH("node.submit")
 
 aoahid_result AOAHID_CALL aoahid_node_submit_blocking(aoahid_node* node,
                                                       const std::uint32_t timeout_ms) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(node), "aoahid_node_submit_blocking");
     aoa::detail::clear_error();
     if (node == nullptr || node->closed || node->device == nullptr || node->spec == nullptr) {
         set_error(AOAHID_ERR_PARAM, "node.submit_blocking",
@@ -1775,6 +1784,7 @@ AOAHID_C_RESULT_CATCH("node.submit_blocking")
 
 aoahid_result AOAHID_CALL aoahid_raw_submit(aoahid_node* node, const std::uint8_t* report,
                                             const std::size_t length) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(node), "aoahid_raw_submit");
     aoa::detail::clear_error();
     if (node == nullptr || node->closed || node->device == nullptr ||
         node->device->transport == nullptr || node->spec == nullptr ||
@@ -1851,6 +1861,7 @@ aoahid_result AOAHID_CALL aoahid_raw_submit(aoahid_node* node, const std::uint8_
 AOAHID_C_RESULT_CATCH("raw.submit")
 
 aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(node), "aoahid_node_close");
     aoa::detail::clear_error();
     if (node == nullptr || node->closed || node->device == nullptr ||
         node->device->closing.load(std::memory_order_acquire)) {
@@ -2045,12 +2056,14 @@ static aoahid_result device_close_impl(aoahid_device* device, bool* consumed) tr
 AOAHID_C_RESULT_CATCH("device.close")
 
 aoahid_result AOAHID_CALL aoahid_device_close(aoahid_device* device) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(device), "aoahid_device_close");
     bool consumed = false;
     return device_close_impl(device, &consumed);
 }
 AOAHID_C_RESULT_CATCH("device.close")
 
 aoahid_result AOAHID_CALL aoahid_device_latched_error(aoahid_device* device) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(device), "aoahid_device_latched_error");
     aoa::detail::clear_error();
     if (device == nullptr || device->closing.load(std::memory_order_acquire) ||
         device->transport == nullptr) {
@@ -2075,6 +2088,7 @@ AOAHID_C_RESULT_CATCH("device.latched_error")
 aoahid_result AOAHID_CALL aoahid_channel_open(aoahid_device* device,
                                               const aoahid_channel_options* options,
                                               aoahid_channel** out_channel) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(device), "aoahid_channel_open");
     aoa::detail::clear_error();
     if (out_channel == nullptr) {
         set_error(AOAHID_ERR_PARAM, "out_channel", "The output pointer is null.");
@@ -2162,6 +2176,7 @@ aoahid_result AOAHID_CALL aoahid_channel_open(aoahid_device* device,
 AOAHID_C_RESULT_CATCH("channel.open")
 
 aoahid_result AOAHID_CALL aoahid_channel_close(aoahid_channel* channel) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(channel), "aoahid_channel_close");
     aoa::detail::clear_error();
     if (channel == nullptr || channel->device == nullptr || channel->transport == nullptr ||
         channel->device->closing.load(std::memory_order_acquire)) {
@@ -2210,6 +2225,8 @@ AOAHID_C_RESULT_CATCH("channel.close")
 aoahid_result AOAHID_CALL aoahid_channel_write(aoahid_channel* channel, const std::uint8_t* data,
                                                const std::size_t length, std::size_t* out_written,
                                                const std::uint32_t timeout_ms) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context_caller_poll(channel),
+                      "aoahid_channel_write");
     aoa::detail::clear_error();
     if (channel == nullptr || channel->transport == nullptr) {
         if (out_written != nullptr)
@@ -2231,6 +2248,8 @@ AOAHID_C_RESULT_CATCH("channel.write")
 aoahid_result AOAHID_CALL aoahid_channel_read(aoahid_channel* channel, std::uint8_t* buffer,
                                               const std::size_t capacity, std::size_t* out_received,
                                               const std::uint32_t timeout_ms) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context_caller_poll(channel),
+                      "aoahid_channel_read");
     aoa::detail::clear_error();
     if (channel == nullptr || channel->transport == nullptr) {
         if (out_received != nullptr)
@@ -2341,6 +2360,7 @@ static aoahid_result context_destroy_impl(aoahid_context* context, bool* context
 }
 
 aoahid_result AOAHID_CALL aoahid_context_destroy(aoahid_context* context) try {
+    AOAHID_SERIALIZED_PROBE(context, "aoahid_context_destroy");
     bool consumed = false;
     return context_destroy_impl(context, &consumed);
 }
@@ -2348,6 +2368,7 @@ AOAHID_C_RESULT_CATCH("context.destroy")
 
 aoahid_result AOAHID_CALL aoahid_context_destroy_blocking(aoahid_context* context,
                                                           const std::uint32_t timeout_ms) try {
+    AOAHID_SERIALIZED_PROBE(context, "aoahid_context_destroy_blocking");
     aoa::detail::clear_error();
     if (context == nullptr || timeout_ms == 0U) {
         set_error(AOAHID_ERR_PARAM, context == nullptr ? "context.destroy" : "timeout_ms",
