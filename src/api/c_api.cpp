@@ -27,19 +27,6 @@ constexpr std::size_t kMaximumAccessoryStringBytes = 256U;
 // bounding shutdown if a backend cannot honor an event-handler interrupt.
 constexpr std::uint32_t kInternalEventPollTimeoutMs = 60'000U;
 
-// Zero-valued tuning inputs use bounded project-policy fallbacks. These are
-// not protocol limits or libusb recommendations; docs/API.md lists them.
-// Product policies stay mandatory.
-constexpr std::uint32_t kFallbackControlTimeoutMs = 500U;
-constexpr std::uint32_t kFallbackSendTimeoutMs = 500U;
-constexpr std::uint32_t kFallbackDescriptorFragmentBytes = 64U;
-constexpr std::uint32_t kFallbackTransferPoolSlots = 8U;
-constexpr std::uint32_t kFallbackMaximumReportBytes = 1024U;
-constexpr std::uint32_t kFallbackCloseDrainTimeoutMs = 1000U;
-constexpr std::uint32_t kFallbackChannelInTransfers = 4U;
-constexpr std::uint32_t kFallbackChannelOutTransfers = 4U;
-constexpr std::uint32_t kFallbackChannelTransferBytes = 65536U;
-
 std::uint16_t report_id(const aoahid_node* node) noexcept {
     return node != nullptr && node->spec != nullptr && node->spec->layout.has_report_id
                ? node->spec->layout.report_id
@@ -285,19 +272,11 @@ aoahid_result validate_context_options(const aoahid_context_options* options) no
     return AOAHID_OK;
 }
 
-void apply_tuning_fallbacks(aoahid_device_options* options) noexcept {
-    if (options->control_timeout_ms == 0U)
-        options->control_timeout_ms = kFallbackControlTimeoutMs;
-    if (options->send_timeout_ms == 0U)
-        options->send_timeout_ms = kFallbackSendTimeoutMs;
-    if (options->descriptor_fragment_bytes == 0U)
-        options->descriptor_fragment_bytes = kFallbackDescriptorFragmentBytes;
-    if (options->transfer_pool_slots == 0U)
-        options->transfer_pool_slots = kFallbackTransferPoolSlots;
-    if (options->maximum_report_bytes == 0U)
-        options->maximum_report_bytes = kFallbackMaximumReportBytes;
-    if (options->close_drain_timeout_ms == 0U)
-        options->close_drain_timeout_ms = kFallbackCloseDrainTimeoutMs;
+// The tuning values have no default: each is the caller's, and zero means none.
+bool required_tuning_nonzero(const aoahid_device_options& options) noexcept {
+    return options.control_timeout_ms != 0U && options.send_timeout_ms != 0U &&
+           options.descriptor_fragment_bytes != 0U && options.transfer_pool_slots != 0U &&
+           options.maximum_report_bytes != 0U && options.close_drain_timeout_ms != 0U;
 }
 
 bool required_product_policies_nonzero(const aoahid_device_options& options) noexcept {
@@ -320,8 +299,8 @@ aoahid_result prepare_device_options(const aoahid_device_options* options,
         return AOAHID_ERR_PARAM;
     }
     *effective = *options;
-    apply_tuning_fallbacks(effective);
-    if (effective->reserved != 0U || !required_product_policies_nonzero(*effective) ||
+    if (effective->reserved != 0U || !required_tuning_nonzero(*effective) ||
+        !required_product_policies_nonzero(*effective) ||
         !aoa::detail::valid_boolean(effective->validate_reports) ||
         (effective->interface_claim_policy != AOAHID_INTERFACE_CLAIM_NONE &&
          effective->interface_claim_policy != AOAHID_INTERFACE_CLAIM_EXPLICIT) ||
@@ -330,8 +309,8 @@ aoahid_result prepare_device_options(const aoahid_device_options* options,
         (effective->interface_claim_policy == AOAHID_INTERFACE_CLAIM_EXPLICIT &&
          (effective->interface_number < 0 || effective->interface_number > 255))) {
         set_error(AOAHID_ERR_UNSET_FIELD, "device_options",
-                  "Every required product policy, flag, and claim choice must be valid; "
-                  "only documented tuning fields accept zero as a fallback request.");
+                  "Every tuning value and product policy must be nonzero, and every flag and "
+                  "claim choice valid.");
         return AOAHID_ERR_UNSET_FIELD;
     }
     if (effective->descriptor_fragment_bytes > std::numeric_limits<std::uint16_t>::max() ||
@@ -1286,11 +1265,12 @@ aoahid_result AOAHID_CALL aoahid_accessory_start(aoahid_context* context,
         return AOAHID_ERR_PARAM;
     }
     const aoahid_aoa_strings& strings = options->strings;
-    if (options->reserved != 0U || strings.manufacturer == nullptr ||
-        strings.manufacturer[0] == '\0' || strings.model == nullptr || strings.model[0] == '\0') {
-        set_error(AOAHID_ERR_UNSET_FIELD, "accessory_options.strings",
-                  "A nonempty manufacturer and model are required product values, and reserved "
-                  "must be zero.");
+    if (options->reserved != 0U || options->control_timeout_ms == 0U ||
+        strings.manufacturer == nullptr || strings.manufacturer[0] == '\0' ||
+        strings.model == nullptr || strings.model[0] == '\0') {
+        set_error(AOAHID_ERR_UNSET_FIELD, "accessory_options",
+                  "control_timeout_ms and a nonempty manufacturer and model are required, and "
+                  "reserved must be zero.");
         return AOAHID_ERR_UNSET_FIELD;
     }
     const std::array<const char*, 6U> values{strings.manufacturer, strings.model,
@@ -1307,10 +1287,8 @@ aoahid_result AOAHID_CALL aoahid_accessory_start(aoahid_context* context,
             return AOAHID_ERR_OVERFLOW;
         }
     }
-    const std::uint32_t timeout_ms =
-        options->control_timeout_ms == 0U ? kFallbackControlTimeoutMs : options->control_timeout_ms;
-    const aoahid_result result =
-        context->runtime->start_accessory(copy_candidate(*selected), values.data(), timeout_ms);
+    const aoahid_result result = context->runtime->start_accessory(
+        copy_candidate(*selected), values.data(), options->control_timeout_ms);
     if (result != AOAHID_OK) {
         return finish_transport_result(result, "accessory.start",
                                        "An AOA accessory-mode start request failed.");
@@ -2114,22 +2092,22 @@ aoahid_result AOAHID_CALL aoahid_channel_open(aoahid_device* device,
     if (options->reserved != 0U || options->reserved8 != 0U ||
         !aoa::detail::valid_boolean(options->zero_length_termination) ||
         (options->read_mode != AOAHID_CHANNEL_READ_STREAM &&
-         options->read_mode != AOAHID_CHANNEL_READ_REQUEST)) {
+         options->read_mode != AOAHID_CHANNEL_READ_REQUEST) ||
+        options->out_transfers == 0U || options->transfer_bytes == 0U ||
+        (options->read_mode == AOAHID_CHANNEL_READ_STREAM && options->in_transfers == 0U)) {
         set_error(AOAHID_ERR_UNSET_FIELD, "channel_options",
-                  "Reserved fields must be zero, zero_length_termination exactly zero or one, and "
-                  "read_mode STREAM or REQUEST.");
+                  "Reserved fields must be zero, zero_length_termination exactly zero or one, "
+                  "read_mode STREAM or REQUEST, and out_transfers, transfer_bytes and (for "
+                  "STREAM) in_transfers nonzero.");
         return AOAHID_ERR_UNSET_FIELD;
     }
     aoa::transport::ChannelConfig config{};
     config.interface_class = options->interface_class;
     config.interface_subclass = options->interface_subclass;
     config.interface_protocol = options->interface_protocol;
-    config.in_transfers =
-        options->in_transfers == 0U ? kFallbackChannelInTransfers : options->in_transfers;
-    config.out_transfers =
-        options->out_transfers == 0U ? kFallbackChannelOutTransfers : options->out_transfers;
-    config.transfer_bytes =
-        options->transfer_bytes == 0U ? kFallbackChannelTransferBytes : options->transfer_bytes;
+    config.in_transfers = options->in_transfers;
+    config.out_transfers = options->out_transfers;
+    config.transfer_bytes = options->transfer_bytes;
     config.zero_length_termination = options->zero_length_termination == 1U;
     config.request_reads = options->read_mode == AOAHID_CHANNEL_READ_REQUEST;
     config.pump = device->context->options.event_mode == AOAHID_EVENT_CALLER_POLL

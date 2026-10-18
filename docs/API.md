@@ -18,9 +18,9 @@ structure layout does not change when a compiler uses short enums.
   Set `struct_size = sizeof(struct_type)` and every `reserved*` field to zero.
   A size mismatch fails with `AOAHID_ERR_PARAM`, so an old binary and a new
   header never silently reinterpret a structure.
-- Set every product- and target-specific field yourself. Zero is rejected where
-  it has no defined meaning (`AOAHID_ERR_UNSET_FIELD` or `AOAHID_ERR_PARAM`),
-  except for the tuning fields listed under [Tuning fallbacks](#tuning-fallbacks).
+- Set every field yourself; nothing has a default. Zero is rejected where it
+  has no defined meaning (`AOAHID_ERR_UNSET_FIELD` or `AOAHID_ERR_PARAM`),
+  including every tuning value listed under [Tuning values](#tuning-values).
 - Optional features use a separate `enable_*` / `has_*` flag that must be
   exactly 0 or 1. A disabled field's declaration must be all zero.
 - There are no initializers or profile templates in the API.
@@ -168,7 +168,7 @@ See [PROTOCOL.md](PROTOCOL.md) for the request details.
 
 `aoahid_device_options` has three kinds of fields.
 
-**Tuning fields** (zero selects a fallback, see below): `control_timeout_ms`,
+**Tuning values**, all required and nonzero (see below): `control_timeout_ms`,
 `send_timeout_ms`, `descriptor_fragment_bytes`, `transfer_pool_slots`,
 `maximum_report_bytes`, `close_drain_timeout_ms`.
 
@@ -181,11 +181,9 @@ See [PROTOCOL.md](PROTOCOL.md) for the request details.
 | `target_ep0_data_policy_bytes` | Largest control-transfer data stage the target accepts. |
 | `host_control_buffer_policy_bytes` | Largest control-transfer data stage the host backend accepts. |
 
-`descriptor_fragment_bytes` and `maximum_report_bytes` (after fallbacks) must be
+`descriptor_fragment_bytes` and `maximum_report_bytes` must be
 at most 65535 and no larger than both the EP0 and host-buffer policies, or open
-fails with `AOAHID_ERR_OVERFLOW`. The library never enlarges a policy: if you
-set an EP0 or host-buffer policy below 1024 bytes, also set
-`maximum_report_bytes` explicitly.
+fails with `AOAHID_ERR_OVERFLOW`. The library never enlarges a policy.
 
 **Target HID parser policies**, all required and nonzero:
 `linux_hid_fields_per_report_policy`, `linux_hid_usages_policy`,
@@ -208,32 +206,31 @@ the values in one Linux revision.
   own bounds checks still run. Raw reports are always checked for an exact
   accepted Report ID and length.
 
-`aoahid_device_open` copies the options and applies fallbacks to the copy; your
-structure is never modified.
+`aoahid_device_open` copies the options; your structure is never modified.
 
-## Tuning fallbacks
+## Tuning values
 
-Only these fields accept zero, and zero selects the value below. The values are
-this library's choices, not USB, AOA, Android, ADB, or libusb requirements.
-libusb treats a zero timeout as "no timeout"; the library replaces zero with a
-bounded value before calling libusb, so pass an explicit nonzero value to
-override it. A timeout is a failure deadline, not a delay: a transfer that
-completes earlier returns immediately.
+These values have no default: zero in a required one fails with
+`AOAHID_ERR_UNSET_FIELD`. They are the caller's choices, not USB, AOA,
+Android, ADB, or libusb requirements. libusb treats a zero timeout as "no
+timeout", which is why zero is not accepted. A timeout is a failure deadline,
+not a delay: a transfer that completes earlier returns immediately.
 
-| Field | Zero selects | Scope |
-|---|---:|---|
-| `aoahid_device_options.control_timeout_ms` | 500 ms | Each synchronous AOA control request (54, 55, 56). |
-| `aoahid_device_options.send_timeout_ms` | 500 ms | Each asynchronous request-57 transfer. A timed-out touch report leaves the contacts it lifted occupied; close and reopen that Node. Keep it well above normal EP0 latency. |
-| `aoahid_device_options.descriptor_fragment_bytes` | 64 bytes | Payload of one request-56 fragment. |
-| `aoahid_device_options.transfer_pool_slots` | 8 | Asynchronous transfers per Device. |
-| `aoahid_device_options.maximum_report_bytes` | 1024 bytes | Largest report per pool slot. |
-| `aoahid_device_options.close_drain_timeout_ms` | 1000 ms | Drain budget for Node, Channel, and Device close and for `aoahid_channel_open`. |
-| `aoahid_accessory_options.control_timeout_ms` | 500 ms | Each of requests 51, 52, 53. |
-| `aoahid_channel_options.in_transfers` | 4 | IN transfers kept submitted (stream read mode only). |
-| `aoahid_channel_options.out_transfers` | 4 | OUT transfers; a full pool makes a write wait. |
-| `aoahid_channel_options.transfer_bytes` | 65536 bytes | Bytes per Bulk transfer, rounded up to `wMaxPacketSize`; the largest IN request in request mode. |
-| `aoahid_node_options`: `has_reserved_slots = 0`, `reserved_slots = 0` | no reservation | The Node shares the Device pool. |
+| Field | Scope |
+|---|---|
+| `aoahid_device_options.control_timeout_ms` | Each synchronous AOA control request (54, 55, 56). |
+| `aoahid_device_options.send_timeout_ms` | Each asynchronous request-57 transfer. A timed-out touch report leaves the contacts it lifted occupied; close and reopen that Node. Keep it well above normal EP0 latency. |
+| `aoahid_device_options.descriptor_fragment_bytes` | Payload of one request-56 fragment. |
+| `aoahid_device_options.transfer_pool_slots` | Asynchronous transfers per Device. |
+| `aoahid_device_options.maximum_report_bytes` | Largest report per pool slot. |
+| `aoahid_device_options.close_drain_timeout_ms` | Drain budget for Node, Channel, and Device close and for `aoahid_channel_open`. |
+| `aoahid_accessory_options.control_timeout_ms` | Each of requests 51, 52, 53. |
+| `aoahid_channel_options.in_transfers` | IN transfers kept submitted; required in stream read mode, not used in request mode. |
+| `aoahid_channel_options.out_transfers` | OUT transfers; a full pool makes a write wait. |
+| `aoahid_channel_options.transfer_bytes` | Bytes per Bulk transfer, rounded up to `wMaxPacketSize`; the largest IN request in request mode. |
 
+Zero keeps its plain meaning in `aoahid_node_options`: `has_reserved_slots = 0`
+and `reserved_slots = 0` is no reservation (the Node shares the Device pool).
 To reserve a slot for a Node, set `has_reserved_slots = 1` and
 `reserved_slots = 1` (a Node has one report in flight, so 0 or 1 is allowed),
 leaving at least one shared slot on the Device.

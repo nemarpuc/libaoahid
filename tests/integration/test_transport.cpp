@@ -736,6 +736,7 @@ aoahid_device_info public_info(const Candidate& candidate) {
 aoahid_accessory_options accessory_options(const char* manufacturer, const char* model) {
     aoahid_accessory_options options{};
     options.struct_size = static_cast<std::uint32_t>(sizeof(options));
+    options.control_timeout_ms = 500U;
     options.strings.manufacturer = manufacturer;
     options.strings.model = model;
     return options;
@@ -1509,7 +1510,7 @@ aoahid_device_options public_device_options() {
     return options;
 }
 
-void test_zero_tuning_fallbacks_and_zero_reservation() {
+void test_tuning_values_required_and_zero_reservation() {
     aoahid_fake_libusb_reset();
     const Candidate candidate = add_candidate(12U, {5U, 2U});
     aoahid_context* context = nullptr;
@@ -1524,27 +1525,31 @@ void test_zero_tuning_fallbacks_and_zero_reservation() {
                                       0U,
                                       candidate.serial.c_str(),
                                       candidate.product.c_str()};
-    aoahid_device_options options = public_device_options();
-    options.control_timeout_ms = 0U;
-    options.send_timeout_ms = 0U;
-    options.descriptor_fragment_bytes = 0U;
-    options.transfer_pool_slots = 0U;
-    options.maximum_report_bytes = 0U;
-    options.close_drain_timeout_ms = 0U;
-
+    // No tuning value has a default: each zero is refused.
     aoahid_device* device = nullptr;
+    for (std::uint32_t aoahid_device_options::*field :
+         {&aoahid_device_options::control_timeout_ms, &aoahid_device_options::send_timeout_ms,
+          &aoahid_device_options::descriptor_fragment_bytes,
+          &aoahid_device_options::transfer_pool_slots, &aoahid_device_options::maximum_report_bytes,
+          &aoahid_device_options::close_drain_timeout_ms}) {
+        aoahid_device_options zero = public_device_options();
+        zero.*field = 0U;
+        AOAHID_CHECK(aoahid_device_open(context, &selected, &zero, &device) ==
+                         AOAHID_ERR_UNSET_FIELD &&
+                     device == nullptr);
+    }
+
+    // The values the test used to get from zero, now given.
+    aoahid_device_options options = public_device_options();
+    options.transfer_pool_slots = 8U;
+    options.close_drain_timeout_ms = 1000U;
     AOAHID_CHECK(aoahid_device_open(context, &selected, &options, &device) == AOAHID_OK);
     AOAHID_CHECK(device != nullptr);
     if (device != nullptr) {
-        AOAHID_CHECK(device->config.control_timeout_ms == 500U);
-        AOAHID_CHECK(device->config.send_timeout_ms == 500U);
-        AOAHID_CHECK(device->config.descriptor_fragment_bytes == 64U);
-        AOAHID_CHECK(device->config.pool_slots == 8U);
-        AOAHID_CHECK(device->config.maximum_report_bytes == 1024U);
-        AOAHID_CHECK(device->close_drain_timeout_ms == 1000U);
+        AOAHID_CHECK(device->config.control_timeout_ms == options.control_timeout_ms);
+        AOAHID_CHECK(device->config.send_timeout_ms == options.send_timeout_ms);
+        AOAHID_CHECK(device->config.pool_slots == options.transfer_pool_slots);
     }
-    // Normalization is applied to a private copy, never to caller memory.
-    AOAHID_CHECK(options.control_timeout_ms == 0U && options.maximum_report_bytes == 0U);
 
     aoahid_keyboard_options keyboard{};
     keyboard.struct_size = sizeof(keyboard);
@@ -1561,13 +1566,13 @@ void test_zero_tuning_fallbacks_and_zero_reservation() {
         const auto records = controls_for(request);
         AOAHID_CHECK(!records.empty());
         for (const auto& record : records)
-            AOAHID_CHECK(record.timeout == 500U);
+            AOAHID_CHECK(record.timeout == options.control_timeout_ms);
     }
 
     AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 1U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(node, 100U) == AOAHID_OK);
     const auto reports = controls_for(57U);
-    AOAHID_CHECK(!reports.empty() && reports.back().timeout == 500U);
+    AOAHID_CHECK(!reports.empty() && reports.back().timeout == options.send_timeout_ms);
 
     AOAHID_CHECK(aoahid_node_close(node) == AOAHID_OK);
     aoahid_spec_release(spec);
@@ -3056,7 +3061,7 @@ void test_transport() {
     test_channel_caller_poll_and_device_close();
     test_open_sends_no_aoa_request();
     test_required_device_policies_precede_usb_io();
-    test_zero_tuning_fallbacks_and_zero_reservation();
+    test_tuning_values_required_and_zero_reservation();
     test_cancel_and_device_isolation();
     test_blocking_event_wait_is_woken_by_cancel();
     test_public_touchpad_button_only_close();

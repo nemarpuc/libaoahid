@@ -66,6 +66,7 @@ int main(int argc, char** argv) {
         accessory.strings.manufacturer = argv[1];
         accessory.strings.model = argv[2];
         accessory.strings.description = "libaoahid verify_accessory";
+        accessory.control_timeout_ms = 500U;
         result = aoahid_accessory_start(context, phone, &accessory);
         aoahid_discovery_destroy(discovery);
         discovery = NULL;
@@ -147,6 +148,10 @@ int main(int argc, char** argv) {
         channel_options.interface_class = 0xFFU;
         channel_options.interface_subclass = 0x42U;
         channel_options.interface_protocol = 0x01U;
+        // Only opened and closed here; the transfer values are this program's choice.
+        channel_options.in_transfers = 4U;
+        channel_options.out_transfers = 4U;
+        channel_options.transfer_bytes = 65536U;
         aoahid_channel* channel = NULL;
         result = aoahid_channel_open(device, &channel_options, &channel);
         if (result != AOAHID_OK) {

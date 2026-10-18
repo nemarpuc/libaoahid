@@ -307,8 +307,9 @@ int find_bulk_interface(libusb_device_handle* handle, const ChannelConfig& confi
 aoahid_result Channel::open(Port* port, const ChannelConfig& config, Channel** out) {
     reset_error();
     *out = nullptr;
-    if (port == nullptr || config.in_transfers == 0U || config.out_transfers == 0U ||
-        config.transfer_bytes == 0U) {
+    // REQUEST reads keep no IN transfers queued, so in_transfers is not used there.
+    if (port == nullptr || (!config.request_reads && config.in_transfers == 0U) ||
+        config.out_transfers == 0U || config.transfer_bytes == 0U) {
         record_error(AOAHID_ERR_PARAM);
         return AOAHID_ERR_PARAM;
     }

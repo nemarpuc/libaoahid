@@ -3,7 +3,22 @@
 All notable changes to libaoahid are recorded here. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.1] - 2026-10-18
+
+Not hardware-verified on a phone: this release changes how options are checked,
+not the transport or the profiles, which stay as hardware-verified in 1.0.0.
+The changes are tested against the fake libusb backend.
+
+### Changed
+
+- **No tuning defaults.** A zero no longer selects a library value. The Device's
+  `control_timeout_ms`, `send_timeout_ms`, `descriptor_fragment_bytes`,
+  `transfer_pool_slots`, `maximum_report_bytes` and `close_drain_timeout_ms`,
+  the accessory's `control_timeout_ms`, and the Channel's `out_transfers`,
+  `transfer_bytes` and (stream read mode) `in_transfers` are required; zero is
+  `AOAHID_ERR_UNSET_FIELD`. Callers that set every value, as the examples do,
+  are unaffected. Node reservation `0/0` still means no reservation, and
+  `read_mode` 0 is still `AOAHID_CHANNEL_READ_STREAM`.
 
 ### Added
 

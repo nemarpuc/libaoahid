@@ -31,7 +31,7 @@ extern "C" {
 
 #define AOAHID_VERSION_MAJOR 1
 #define AOAHID_VERSION_MINOR 0
-#define AOAHID_VERSION_PATCH 0
+#define AOAHID_VERSION_PATCH 1
 
 typedef struct aoahid_context aoahid_context;
 typedef struct aoahid_discovery aoahid_discovery;
@@ -209,21 +209,21 @@ typedef struct aoahid_aoa_strings {
 typedef struct aoahid_device_options {
     uint32_t struct_size;
     uint32_t reserved;
-    /* Tuning fields: zero selects the documented bounded fallback. These are
-     * project policies, not USB/AOA requirements or libusb recommendations. */
-    /* zero -> 500 ms */
+    /* Tuning values, all required (AOAHID_ERR_UNSET_FIELD when zero). They are
+     * the caller's choices, not USB/AOA requirements or libusb recommendations. */
+    /* each control request's deadline, in ms */
     uint32_t control_timeout_ms;
-    /* zero -> 500 ms. After a touch report times out, the lifted contacts in it
-     * stay occupied; close and reopen that Node. Keep this well above normal
-     * EP0 latency. */
+    /* each report's deadline, in ms. After a touch report times out, the lifted
+     * contacts in it stay occupied; close and reopen that Node. Keep this well
+     * above normal EP0 latency. */
     uint32_t send_timeout_ms;
-    /* zero -> 64 bytes */
+    /* bytes per request-56 descriptor fragment */
     uint32_t descriptor_fragment_bytes;
-    /* zero -> 8 slots */
+    /* transfer slots shared by the Device's Nodes */
     uint32_t transfer_pool_slots;
-    /* zero -> 1024 bytes */
+    /* the largest report a Node may send, in bytes */
     uint32_t maximum_report_bytes;
-    /* zero -> 1000 ms */
+    /* bound on the neutral reports sent when the Device closes, in ms */
     uint32_t close_drain_timeout_ms;
     /* Four independent byte policies prevent a Linux descriptor ceiling from
      * being mistaken for the AOA 16-bit descriptor wire field or either
@@ -251,7 +251,7 @@ typedef struct aoahid_accessory_options {
     /* Android matches manufacturer and model against an application's
      * accessory filter; they are product values the caller chooses. */
     aoahid_aoa_strings strings;
-    /* zero -> 500 ms, per request 51/52/53 */
+    /* required: the deadline of each request 51/52/53, in ms */
     uint32_t control_timeout_ms;
 } aoahid_accessory_options;
 
@@ -278,13 +278,14 @@ typedef struct aoahid_channel_options {
     uint8_t interface_subclass;
     uint8_t interface_protocol;
     uint8_t reserved8;
-    /* Tuning fields: zero selects the documented bounded fallback. These are
-     * project policies, not USB, Android, or ADB requirements. */
-    /* zero -> 4 IN transfers kept submitted for reading ahead */
+    /* Transfer values, the caller's choices, not USB, Android, or ADB
+     * requirements. Zero in a required one is AOAHID_ERR_UNSET_FIELD. */
+    /* IN transfers kept submitted for reading ahead; required for
+     * AOAHID_CHANNEL_READ_STREAM, not used by AOAHID_CHANNEL_READ_REQUEST */
     uint32_t in_transfers;
-    /* zero -> 4 OUT transfers */
+    /* required: OUT transfers */
     uint32_t out_transfers;
-    /* zero -> 65536 bytes per transfer; rounded up to wMaxPacketSize */
+    /* required: bytes per transfer; rounded up to wMaxPacketSize */
     uint32_t transfer_bytes;
     /* Exactly zero or one. One ends every write whose length is a nonzero
      * multiple of wMaxPacketSize with an explicit zero-length packet. */
@@ -296,7 +297,7 @@ typedef struct aoahid_channel_options {
 typedef struct aoahid_node_options {
     uint32_t struct_size;
     uint32_t reserved;
-    /* Zero/zero selects the no-reservation fallback. To request a reservation,
+    /* Zero/zero is no reservation: the Node shares the Device pool. To request a reservation,
      * set has_reserved_slots to one. A Node has one in-flight report, so its
      * reservation is limited to zero or one; positive reservations must leave
      * a shared Device-pool slot. */

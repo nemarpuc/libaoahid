@@ -144,30 +144,20 @@ These are choices made by this library, not HID, Linux, or Android limits.
 
 Descriptor size, report size, EP0 size, and host buffer size are separate
 policies (see [API.md](API.md#device-options)) and are not derived from any
-value above. The tuning fields below accept zero as "use the fallback"; the
-values are this library's choices, not USB, Android, or libusb
-recommendations.
+value above. The tuning values below are required (zero is
+`AOAHID_ERR_UNSET_FIELD`) and are the caller's choices, not USB, Android, or
+libusb recommendations; see [API.md](API.md#tuning-values).
 
-| Field | Zero selects |
-|---|---:|
-| `control_timeout_ms` | 500 ms |
-| `send_timeout_ms` | 500 ms |
-| `descriptor_fragment_bytes` | 64 bytes |
-| `transfer_pool_slots` | 8 |
-| `maximum_report_bytes` | 1024 bytes |
-| `close_drain_timeout_ms` | 1000 ms |
-| `aoahid_accessory_options.control_timeout_ms` | 500 ms |
-| `aoahid_channel_options.in_transfers` | 4 |
-| `aoahid_channel_options.out_transfers` | 4 |
-| `aoahid_channel_options.transfer_bytes` | 65536 bytes |
-| `aoahid_node_options` `0/0` | no reserved slot |
+`control_timeout_ms`, `send_timeout_ms`, `descriptor_fragment_bytes`,
+`transfer_pool_slots`, `maximum_report_bytes`, `close_drain_timeout_ms`,
+`aoahid_accessory_options.control_timeout_ms`, and the Channel's
+`out_transfers`, `transfer_bytes` and (stream mode) `in_transfers`.
+`aoahid_node_options` `0/0` is no reserved slot.
 
-A fallback never overrides a policy: `maximum_report_bytes` and
-`descriptor_fragment_bytes` must still fit `target_ep0_data_policy_bytes` and
-`host_control_buffer_policy_bytes`. The 1024-byte report fallback is a buffer
-size, not a claim that any target accepts reports that large.
+`maximum_report_bytes` and `descriptor_fragment_bytes` must fit
+`target_ep0_data_policy_bytes` and `host_control_buffer_policy_bytes`.
 
-These defaults and the Touchscreen, Keyboard, Mouse, Gamepad, and Consumer
+The Touchscreen, Keyboard, Mouse, Gamepad, and Consumer
 Control profiles have been used on the devices listed in
 [PROFILES.md](PROFILES.md#hardware-status). For latency figures see
 [LATENCY.md](LATENCY.md).

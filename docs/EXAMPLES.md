@@ -1,10 +1,9 @@
 # Worked examples
 
 There are deliberately no callable profile presets. The examples show complete
-values that can be copied, reviewed for a target, and edited. They explicitly
-override every host-transport tuning field for readability even where an
-override equals the documented zero-value fallback. Product and target values
-must always be set by the caller; the library never infers them.
+values that can be copied, reviewed for a target, and edited. Every
+host-transport tuning value, product value and target value is set by the
+caller; the library has no defaults and never infers them.
 
 ## Multi-profile lifecycle examples
 
@@ -110,18 +109,17 @@ are meant to be watched rather than run unattended.
 ## Example values
 
 Every number below is visible in each comprehensive example and is selected by
-that caller. A zero-valued native tuning field would instead select the bounded
-fallback recorded in `API.md`; these examples do not rely on that shorthand.
+that caller. A tuning value left at zero is refused (`AOAHID_ERR_UNSET_FIELD`).
 
 | Example value | Role |
 |---|---|
-| 500 ms | Control, send, poll, and blocking-submit budget selected for the example. Control/send happen to equal the native zero fallback; poll and blocking-submit have separate explicit arguments. A timeout is a failure deadline, not added success latency. |
-| 1000 ms | Device close-drain budget, explicitly matching the native zero fallback. |
-| 64 bytes | Descriptor fragment policy, explicitly matching the native zero fallback. The official AOA page fixes ordering and offset, not a fragment size. |
-| 8 pool slots; 1 reserved slot per Node | Capacity and reservation choices for this three-profile example. Eight matches the Device fallback; the one-slot Node reservation is explicit because zero/zero means no reservation. |
+| 500 ms | Control, send, poll, and blocking-submit budget selected for the example. Poll and blocking-submit have separate explicit arguments. A timeout is a failure deadline, not added success latency. |
+| 1000 ms | Device close-drain budget. |
+| 64 bytes | Descriptor fragment policy. The official AOA page fixes ordering and offset, not a fragment size. |
+| 8 pool slots; 1 reserved slot per Node | Capacity and reservation choices for this three-profile example; the one-slot Node reservation is explicit because zero/zero means no reservation. |
 | First-report STALL | The library never retries. The multi-profile examples report a STALL once and send again on their next loop iteration, because a refused report stays pending; `examples/c/verify/verify_common.h` resends explicitly up to 20 times, 1 ms apart. |
 | 4096 descriptor/target policies | Descriptor-size limits chosen by the example. The Linux HID core rejects descriptors larger than `HID_MAX_DESCRIPTOR_SIZE` (4096, `include/linux/hid.h`). They are not universal AOA limits. |
-| 4088 host/report policy | Deliberately conservative host control-buffer value. It overrides the 1024-byte `maximum_report_bytes` fallback and is required as `host_control_buffer_policy_bytes`. |
+| 4088 host/report policy | Deliberately conservative host control-buffer value, used as both `host_control_buffer_policy_bytes` and `maximum_report_bytes`. |
 | 256 fields, stack depth 4, 12288 usages, 65528 report-data bits, 256 report-size bits | Linux HID core parser limits (`include/linux/hid.h`, `drivers/hid/hid-core.c`) for the kernel these examples target; check them against your target kernel. |
 | Keyboard `0x04` through `0x65` | Keyboard a/A through Keyboard Application comes from HUT 1.7 §10; the Usage interval is the only caller choice, since every declared key is a one-bit Variable field. |
 | Mouse axes -127 through 127 at 8 bits; 3 buttons | Complete signed relative range and profile geometry chosen by the caller. |
@@ -151,9 +149,7 @@ relocatable `libusb-1.0.pc` for that dependency.
 ## Creating an option structure
 
 Use zero initialization as storage initialization, then assign every product
-and target field whose meaning applies. A Device tuning field may deliberately
-remain zero to request its documented fallback; the comprehensive examples set
-all eight explicitly. An optional disabled product field must have its enable
+and target field whose meaning applies, and every tuning value. An optional disabled product field must have its enable
 flag set to zero and its associated field storage left as the explicitly unused
 zero form. Example:
 

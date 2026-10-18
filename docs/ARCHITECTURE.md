@@ -157,12 +157,11 @@ Device the consumed graph moves to the Context graveyard and is reaped later.
   widths, Report IDs, and target HID-parser limits are caller inputs. The
   library does not guess them. An unset required value is an error
   (`AOAHID_ERR_UNSET_FIELD` or `AOAHID_ERR_PARAM`), never a silent fallback.
-- **Only documented tuning zeros select fallbacks.** In the options structs,
-  fields marked "zero -> …" in `aoahid.h` (timeouts, fragment size, pool size,
-  maximum report size, drain budget, Channel transfer counts and size) select a
-  bounded project policy. These are library choices, not USB, AOA, or libusb
-  requirements. Normalization happens on an internal copy; caller storage is
-  never modified. Reserved fields must be zero.
+- **No tuning defaults.** Timeouts, fragment size, pool size, maximum report
+  size, drain budget, and Channel transfer counts and size are the caller's
+  values; zero is `AOAHID_ERR_UNSET_FIELD`. (Until 1.0.0 a zero selected a
+  bounded library value; 1.0.1 removed that.) Options are copied; caller
+  storage is never modified. Reserved fields must be zero.
 - **No convenience names.** `tools/symbol-lint/symbol_lint.py` fails if an
   exported function name contains `default`, `preset`, `standard`, or
   `typical` as an underscore-separated word. It also checks that the header

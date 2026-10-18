@@ -176,18 +176,16 @@ outline:
 The C header is [include/aoahid.h](include/aoahid.h). The optional C++ header
 forwards every C function unchanged under namespace `aoahid`. Python ctypes,
 C# P/Invoke, and Rust `-sys` plus typed wrappers live under `bindings/`; they
-preserve the C layout and do not choose overrides. The native C API applies the same documented
-zero-value transport fallbacks for every language binding.
+preserve the C layout and do not choose values.
 
-The device-option fallbacks are 500 ms for control and report transfers, 64
-bytes per descriptor fragment, 8 pool slots, a 1024-byte maximum report buffer,
-and a 1000 ms close-drain budget. The library never retries a transfer; a
-STALLed report stays pending for the caller's resend. These numbers are this
-project's choices, not USB/AOA requirements. A timeout is the failure
-deadline passed to the backend; it does not add delay to a successful transfer.
-Explicit nonzero values remain unchanged. Node reservation `0/0` means no
-reservation. Exact device, descriptor, target-parser, and product-profile
-policies remain mandatory and are never guessed.
+Every tuning value (timeouts, descriptor fragment size, pool slots, maximum
+report size, close-drain budget, Channel transfer counts and size) is the
+caller's; zero is refused with `AOAHID_ERR_UNSET_FIELD`. The library never
+retries a transfer; a STALLed report stays pending for the caller's resend. A
+timeout is the failure deadline passed to the backend; it does not add delay
+to a successful transfer. Node reservation `0/0` means no reservation. Exact
+device, descriptor, target-parser, and product-profile policies remain
+mandatory and are never guessed.
 
 `aoahid_device_open` never switches modes. Devices whose
 firmware accepts AOA HID requests only after `ACCESSORY_START` are reached with
