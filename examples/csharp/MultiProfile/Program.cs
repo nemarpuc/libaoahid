@@ -80,12 +80,9 @@ internal static class Program
     {
         StructSize = checked((uint)Marshal.SizeOf<DeviceOptions>()),
         Reserved = 0,
-        ControlTimeoutMs = timeoutMs,
-        SendTimeoutMs = timeoutMs,
         DescriptorFragmentBytes = 64, // Explicit policy; AOA fixes no fragment size.
         TransferPoolSlots = PoolSlots,
         MaximumReportBytes = HostReportPolicyBytes,
-        CloseDrainTimeoutMs = CloseDrainTimeoutMs,
         ValidateReports = 1,
         AoaDescriptorWirePolicyBytes = DescriptorPolicyBytes,
         LinuxDescriptorPolicyBytes = DescriptorPolicyBytes,
@@ -321,16 +318,16 @@ internal static class Program
         }
         var session = new Session(locator) { Device = device };
         var nodeOptions = NodeConfiguration();
-        status = Native.NodeOpen(device, specs.Keyboard, in nodeOptions, out var keyboard);
+        status = Native.NodeOpen(device, specs.Keyboard, in nodeOptions, timeoutMs, out var keyboard);
         session.Keyboard = keyboard;
         if (status == Result.Ok)
         {
-            status = Native.NodeOpen(device, specs.Mouse, in nodeOptions, out var mouse);
+            status = Native.NodeOpen(device, specs.Mouse, in nodeOptions, timeoutMs, out var mouse);
             session.Mouse = mouse;
         }
         if (status == Result.Ok)
         {
-            status = Native.NodeOpen(device, specs.Touchscreen, in nodeOptions, out var touchscreen);
+            status = Native.NodeOpen(device, specs.Touchscreen, in nodeOptions, timeoutMs, out var touchscreen);
             session.Touchscreen = touchscreen;
         }
         if (status == Result.Ok)
@@ -339,16 +336,16 @@ internal static class Program
             return session;
         }
         ReportError(status, "profile registration");
-        CloseDevice(session);
+        CloseDevice(session, timeoutMs);
         openStatus = status;
         return null;
     }
 
-    private static Result CloseDevice(Session session)
+    private static Result CloseDevice(Session session, uint timeoutMs)
     {
         if (session.Device == nint.Zero)
             return Result.Ok;
-        var status = Native.DeviceClose(session.Device);
+        var status = Native.DeviceClose(session.Device, timeoutMs, CloseDrainTimeoutMs);
         // The first close consumes Device and all Node handles for every result.
         session.Device = nint.Zero;
         session.Keyboard = nint.Zero;
@@ -363,7 +360,7 @@ internal static class Program
     {
         while (session.Touchscreen != nint.Zero)
         {
-            var status = Native.NodeClose(session.Touchscreen);
+            var status = Native.NodeClose(session.Touchscreen, pollMs, CloseDrainTimeoutMs);
             if (status == Result.Ok)
             {
                 session.Touchscreen = nint.Zero;
@@ -386,7 +383,7 @@ internal static class Program
     {
         while (context != nint.Zero)
         {
-            var status = Native.ContextDestroy(context);
+            var status = Native.ContextDestroy(context, pollMs, CloseDrainTimeoutMs);
             if (status != Result.ClosePending)
                 return status; // Every non-pending valid destroy result consumes Context.
             var poll = Native.ContextPoll(context, pollMs);
@@ -416,7 +413,7 @@ internal static class Program
             if (status == Result.NoDevice)
             {
                 disappeared.Add(session.Locator);
-                CloseDevice(session);
+                CloseDevice(session, timeoutMs);
             }
             else if (status == Result.Ok)
             {
@@ -438,7 +435,7 @@ internal static class Program
             if (status == Result.NoDevice)
             {
                 disappeared.Add(session.Locator);
-                CloseDevice(session);
+                CloseDevice(session, timeoutMs);
             }
             else if (status != Result.Ok)
             {
@@ -513,7 +510,7 @@ internal static class Program
             if (status == Result.Ok)
                 ready.Add(session);
             else if (status == Result.NoDevice)
-                CloseDevice(session);
+                CloseDevice(session, timeoutMs);
             else
                 result = status;
         }
@@ -594,7 +591,7 @@ internal static class Program
         finally
         {
             foreach (var session in sessions)
-                CloseDevice(session);
+                CloseDevice(session, timeoutMs);
             if (specs is not null)
                 ReleaseSpecs(specs);
             var close = DestroyContext(context, timeoutMs);
@@ -726,7 +723,7 @@ internal static class Program
         finally
         {
             foreach (var session in sessions)
-                CloseDevice(session);
+                CloseDevice(session, timeoutMs);
             if (specs is not null)
                 ReleaseSpecs(specs);
             var close = DestroyContext(context, timeoutMs);

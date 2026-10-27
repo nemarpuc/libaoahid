@@ -56,17 +56,20 @@ static int verify_fail(const char* what, aoahid_result result) {
     return 1;
 }
 
+/* Every wait is an argument of the call and has no default; plain, generous values for a
+ * first working connection, not a recommendation for a shipped product. */
+#define VERIFY_CONTROL_TIMEOUT_MS 500U
+#define VERIFY_SEND_TIMEOUT_MS 500U
+#define VERIFY_DRAIN_TIMEOUT_MS 1000U
+
 /* The Device options every verify program uses: plain, generous values for a
  * first working connection, not a recommendation for a shipped product. */
 static aoahid_device_options verify_device_options(void) {
     aoahid_device_options device_options = {0};
     device_options.struct_size = (uint32_t)sizeof device_options;
-    device_options.control_timeout_ms = 500U;
-    device_options.send_timeout_ms = 500U;
     device_options.descriptor_fragment_bytes = 4096U;
     device_options.transfer_pool_slots = 4U;
     device_options.maximum_report_bytes = 1024U;
-    device_options.close_drain_timeout_ms = 1000U;
     device_options.aoa_descriptor_wire_policy_bytes = 4096U;
     device_options.linux_descriptor_policy_bytes = 4096U;
     device_options.linux_hid_fields_per_report_policy = 256U;
@@ -114,7 +117,7 @@ static int verify_open_first_device(aoahid_context** out_context, aoahid_device*
     aoahid_discovery* discovery = NULL;
     result = aoahid_discover(*out_context, 500U, &discovery);
     if (result != AOAHID_OK) {
-        aoahid_context_destroy(*out_context);
+        aoahid_context_destroy(*out_context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
         *out_context = NULL;
         return verify_fail("discover", result);
     }
@@ -129,7 +132,7 @@ static int verify_open_first_device(aoahid_context** out_context, aoahid_device*
 #endif
                         "See docs/QUICKSTART.md.\n");
         aoahid_discovery_destroy(discovery);
-        aoahid_context_destroy(*out_context);
+        aoahid_context_destroy(*out_context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
         *out_context = NULL;
         return 1;
     }
@@ -142,7 +145,7 @@ static int verify_open_first_device(aoahid_context** out_context, aoahid_device*
         fprintf(stderr, "device has AOA %u; HID needs version 2\n",
                 info != NULL ? (unsigned)info->protocol_version : 0U);
         aoahid_discovery_destroy(discovery);
-        aoahid_context_destroy(*out_context);
+        aoahid_context_destroy(*out_context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
         *out_context = NULL;
         return 1;
     }
@@ -152,7 +155,7 @@ static int verify_open_first_device(aoahid_context** out_context, aoahid_device*
     result = aoahid_device_open(*out_context, info, &device_options, out_device);
     aoahid_discovery_destroy(discovery);
     if (result != AOAHID_OK) {
-        aoahid_context_destroy(*out_context);
+        aoahid_context_destroy(*out_context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
         *out_context = NULL;
         return verify_fail("device open", result);
     }

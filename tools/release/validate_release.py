@@ -18,9 +18,11 @@ VERSION_RE = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 REPOSITORY_URL = package_source.REPOSITORY_URL
 ABI_NAMESPACE_BY_SOVERSION = {
     # ABI version nodes are persistent loader contracts, not package-version
-    # labels: all compatible 1.x releases retain the AOAHID_1.0 node. A new
-    # SOVERSION changes the SONAME and needs its own entry here.
+    # labels: all compatible 2.x releases retain the AOAHID_2.0 node. A new
+    # SOVERSION changes the SONAME and needs its own entry here. 1.x keeps its
+    # entry so that a 1.x checkout still validates.
     "1": "1.0",
+    "2": "2.0",
 }
 
 

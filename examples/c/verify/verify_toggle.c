@@ -104,18 +104,18 @@ int main(void) {
     aoahid_spec* spec = NULL;
     aoahid_result result = aoahid_spec_create_toggle(&options, &spec);
     if (result != AOAHID_OK) {
-        aoahid_device_close(device);
-        aoahid_context_destroy(context);
+        aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
         return verify_fail("toggle spec create", result);
     }
 
     const aoahid_node_options node_options = {(uint32_t)sizeof(aoahid_node_options), 0U, 1U, 0U};
     aoahid_node* node = NULL;
-    result = aoahid_node_open(device, spec, &node_options, &node);
+    result = aoahid_node_open(device, spec, &node_options, VERIFY_CONTROL_TIMEOUT_MS, &node);
     aoahid_spec_release(spec);
     if (result != AOAHID_OK) {
-        aoahid_device_close(device);
-        aoahid_context_destroy(context);
+        aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
         return verify_fail("toggle node open", result);
     }
 
@@ -140,8 +140,8 @@ int main(void) {
                "    target/build, with the kernel log and getevent output attached\n");
     }
 
-    aoahid_node_close(node);
-    aoahid_device_close(device);
-    aoahid_context_destroy(context);
+    aoahid_node_close(node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+    aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+    aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
     return exit_code;
 }

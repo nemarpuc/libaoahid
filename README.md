@@ -178,9 +178,11 @@ forwards every C function unchanged under namespace `aoahid`. Python ctypes,
 C# P/Invoke, and Rust `-sys` plus typed wrappers live under `bindings/`; they
 preserve the C layout and do not choose values.
 
-Every tuning value (timeouts, descriptor fragment size, pool slots, maximum
-report size, close-drain budget, Channel transfer counts and size) is the
-caller's; zero is refused with `AOAHID_ERR_UNSET_FIELD`. The library never
+Every tuning value (descriptor fragment size, pool slots, maximum report size,
+Channel transfer counts and size) is the caller's, and so is every wait: each
+call that can wait takes its timeout as an argument (see "Timeouts" in
+[docs/API.md](docs/API.md#timeouts)). Zero is refused with
+`AOAHID_ERR_UNSET_FIELD`. The library never
 retries a transfer; a STALLed report stays pending for the caller's resend. A
 timeout is the failure deadline passed to the backend; it does not add delay
 to a successful transfer. Node reservation `0/0` means no reservation. Exact

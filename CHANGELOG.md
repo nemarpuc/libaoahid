@@ -3,6 +3,56 @@
 All notable changes to libaoahid are recorded here. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-10-27
+
+Not hardware-verified on a phone: this release changes how waits are passed and a
+few names, not the transport or the profiles, which stay as hardware-verified in
+1.0.0. The changes are tested against the fake libusb backend (including a
+ThreadSanitizer build) and the bindings against the compiled C ABI.
+
+The ABI changes so that libaoahid and libmimhid follow one rule for waits and use
+the same names for the same things.
+
+### Changed (breaking)
+
+- **Every timeout is an argument of the call; none is set at open.** The three
+  `aoahid_device_options` fields `control_timeout_ms`, `send_timeout_ms` and
+  `close_drain_timeout_ms` are removed, and a zero timeout is refused with
+  `AOAHID_ERR_UNSET_FIELD` before anything is done (nothing is consumed). New
+  signatures:
+  - `aoahid_node_open(device, spec, options, control_timeout_ms, &node)`
+  - `aoahid_node_close(node, control_timeout_ms, drain_timeout_ms)`
+  - `aoahid_node_submit(node, send_timeout_ms)`
+  - `aoahid_raw_submit(node, report, length, send_timeout_ms)`
+  - `aoahid_device_close(device, control_timeout_ms, drain_timeout_ms)`
+  - `aoahid_context_destroy(context, control_timeout_ms, drain_timeout_ms)`
+  - `aoahid_context_destroy_blocking(context, control_timeout_ms, drain_timeout_ms, timeout_ms)`
+  - `aoahid_channel_open(device, options, drain_timeout_ms, &channel)`
+  - `aoahid_channel_close(channel, drain_timeout_ms)`
+
+  `aoahid_node_submit_blocking` keeps its `timeout_ms`; it now also bounds each
+  report it sends (that report's deadline is what is left of it), and a close
+  bounds the neutral reports it sends by what is left of `drain_timeout_ms`. A
+  Device close that finishes in the Context graveyard uses the
+  `control_timeout_ms` of the call that consumed it. `aoahid_discover` and
+  `aoahid_accessory_options.control_timeout_ms` are unchanged. See "Timeouts" in
+  `docs/API.md`.
+- **`aoahid_node_hid_id` is `aoahid_node_id`**, as in libmimhid (C#: `Native.NodeId`).
+- **`aoahid_error_detail` fields `libusb_status` and `hid_id` are `transport_status`
+  and `node_id`**, as in libmimhid. The value and meaning are unchanged; the log
+  keys follow (`transport_status=`, `node_id=`).
+
+- **The shared library's SONAME is `libaoahid.so.2`** (`libaoahid.2.dylib`) and its
+  ELF version node is `AOAHID_2.0`, so a program built against 1.x fails to load
+  against this library instead of calling functions with the old arguments.
+
+### Migration
+
+Pass the waits you gave in `aoahid_device_options` to the calls above, for
+example `aoahid_node_submit(node, 500U)` where `send_timeout_ms` was 500, and
+delete the three fields from the options. The C++ forwarders, the Python, C# and
+Rust bindings and the examples follow the same signatures.
+
 ## [1.0.1] - 2026-10-18
 
 Not hardware-verified on a phone: this release changes how options are checked,

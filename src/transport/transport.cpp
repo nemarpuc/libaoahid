@@ -283,8 +283,10 @@ struct Device::Impl {
         }
     }
 
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     aoahid_result submit_prepared(const PreparedTransfer prepared, const std::size_t report_length,
-                                  const std::uint16_t report_id) noexcept {
+                                  const std::uint16_t report_id,
+                                  const std::uint32_t send_timeout_ms) noexcept {
         auto* slot = static_cast<Slot*>(prepared.slot);
         if (slot == nullptr || slot->owner != this) {
             return AOAHID_ERR_PARAM;
@@ -318,7 +320,7 @@ struct Device::Impl {
             } else {
                 // acquire() already wrote this slot's HID ID and wLength.
                 libusb_fill_control_transfer(slot->transfer, handle, slot->buffer.data(),
-                                             transfer_callback, slot, config.send_timeout_ms);
+                                             transfer_callback, slot, send_timeout_ms);
                 slot->state = SlotState::submitted;
                 const int submit_status = libusb_submit_transfer(slot->transfer);
                 if (submit_status != LIBUSB_SUCCESS) {
@@ -359,7 +361,6 @@ aoahid_result Device::open(Runtime* runtime, const Candidate& candidate, const D
         config.event_mode != runtime->event_mode_ ||
         (config.event_mode != AOAHID_EVENT_CALLER_POLL &&
          config.event_mode != AOAHID_EVENT_INTERNAL_THREAD) ||
-        config.control_timeout_ms == 0U || config.send_timeout_ms == 0U ||
         config.descriptor_fragment_bytes == 0U ||
         config.descriptor_fragment_bytes > std::numeric_limits<std::uint16_t>::max() ||
         config.pool_slots == 0U || config.maximum_report_bytes == 0U ||
@@ -473,7 +474,8 @@ Device::~Device() noexcept {
 }
 
 aoahid_result Device::register_hid(const std::uint16_t hid_id, const std::uint8_t* descriptor,
-                                   const std::size_t descriptor_length) noexcept {
+                                   const std::size_t descriptor_length,
+                                   const std::uint32_t control_timeout_ms) noexcept {
     reset_error();
     if (impl_ == nullptr || descriptor == nullptr || hid_id == 0U || descriptor_length == 0U ||
         descriptor_length > std::numeric_limits<std::uint16_t>::max()) {
@@ -499,11 +501,10 @@ aoahid_result Device::register_hid(const std::uint16_t hid_id, const std::uint8_
         }
     }
 
-    aoahid_result result =
-        control_out(impl_->handle, accessory_register_hid, hid_id,
-                    static_cast<std::uint16_t>(descriptor_length), nullptr, 0U,
-                    ControlOutPolicy{impl_->config.control_timeout_ms,
-                                     static_cast<std::uint32_t>(descriptor_length)});
+    aoahid_result result = control_out(
+        impl_->handle, accessory_register_hid, hid_id,
+        static_cast<std::uint16_t>(descriptor_length), nullptr, 0U,
+        ControlOutPolicy{control_timeout_ms, static_cast<std::uint32_t>(descriptor_length)});
     impl_->observe_control_result(result);
     if (result != AOAHID_OK) {
         const ErrorInfo failure = last_error();
@@ -514,7 +515,7 @@ aoahid_result Device::register_hid(const std::uint16_t hid_id, const std::uint8_
             // surviving for the rest of this USB connection.
             const aoahid_result cleanup =
                 control_out(impl_->handle, accessory_unregister_hid, hid_id, 0U, nullptr, 0U,
-                            ControlOutPolicy{impl_->config.control_timeout_ms});
+                            ControlOutPolicy{control_timeout_ms});
             impl_->observe_control_result(cleanup);
         }
         restore_error(failure);
@@ -530,14 +531,14 @@ aoahid_result Device::register_hid(const std::uint16_t hid_id, const std::uint8_
         result = control_out(impl_->handle, accessory_set_hid_report_desc, hid_id,
                              static_cast<std::uint16_t>(offset), descriptor + offset,
                              static_cast<std::uint16_t>(fragment_length),
-                             ControlOutPolicy{impl_->config.control_timeout_ms});
+                             ControlOutPolicy{control_timeout_ms});
         impl_->observe_control_result(result);
         if (result != AOAHID_OK) {
             ErrorInfo failure = last_error();
             if (result != AOAHID_ERR_NO_DEVICE) {
                 const aoahid_result cleanup =
                     control_out(impl_->handle, accessory_unregister_hid, hid_id, 0U, nullptr, 0U,
-                                ControlOutPolicy{impl_->config.control_timeout_ms});
+                                ControlOutPolicy{control_timeout_ms});
                 impl_->observe_control_result(cleanup);
             }
             record_error(failure.result, failure.native_status, failure.aoa_request, failure.hid_id,
@@ -549,7 +550,8 @@ aoahid_result Device::register_hid(const std::uint16_t hid_id, const std::uint8_
     return AOAHID_OK;
 }
 
-aoahid_result Device::unregister_hid(const std::uint16_t hid_id) noexcept {
+aoahid_result Device::unregister_hid(const std::uint16_t hid_id,
+                                     const std::uint32_t control_timeout_ms) noexcept {
     reset_error();
     if (impl_ == nullptr || hid_id == 0U) {
         record_error(AOAHID_ERR_PARAM, 0, accessory_unregister_hid, hid_id);
@@ -563,9 +565,8 @@ aoahid_result Device::unregister_hid(const std::uint16_t hid_id) noexcept {
             return AOAHID_ERR_NO_DEVICE;
         }
     }
-    const aoahid_result result =
-        control_out(impl_->handle, accessory_unregister_hid, hid_id, 0U, nullptr, 0U,
-                    ControlOutPolicy{impl_->config.control_timeout_ms});
+    const aoahid_result result = control_out(impl_->handle, accessory_unregister_hid, hid_id, 0U,
+                                             nullptr, 0U, ControlOutPolicy{control_timeout_ms});
     impl_->observe_control_result(result);
     return result;
 }
@@ -731,11 +732,13 @@ aoahid_result Device::acquire(const std::uint16_t hid_id, const ReservationToken
 }
 
 aoahid_result Device::submit(const PreparedTransfer prepared, const std::size_t report_length,
-                             const std::uint16_t report_id) noexcept {
+                             const std::uint16_t report_id,
+                             const std::uint32_t send_timeout_ms) noexcept {
     reset_error();
-    const aoahid_result result = impl_ == nullptr
-                                     ? AOAHID_ERR_PARAM
-                                     : impl_->submit_prepared(prepared, report_length, report_id);
+    const aoahid_result result =
+        impl_ == nullptr
+            ? AOAHID_ERR_PARAM
+            : impl_->submit_prepared(prepared, report_length, report_id, send_timeout_ms);
     if (result != AOAHID_OK && last_error().result == AOAHID_OK) {
         record_error(result, 0, accessory_send_hid_event, 0U, 0U,
                      static_cast<std::uint32_t>(std::min<std::size_t>(

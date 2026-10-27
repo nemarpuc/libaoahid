@@ -131,8 +131,8 @@ current_deferred_error(const aoahid_result result, const char* field, const char
     const aoahid_error_detail* detail = aoahid_last_error();
     if (detail != nullptr && detail->code == result) {
         return make_deferred_error(DeferredErrorInput{
-            aoa::transport::ErrorInfo{result, detail->libusb_status, detail->aoa_request,
-                                      detail->hid_id, detail->offset, detail->length,
+            aoa::transport::ErrorInfo{result, detail->transport_status, detail->aoa_request,
+                                      detail->node_id, detail->offset, detail->length,
                                       detail->report_id},
             detail->field == nullptr ? field : detail->field,
             detail->reason == nullptr ? reason : detail->reason, detail->report_id});
@@ -274,9 +274,8 @@ aoahid_result validate_context_options(const aoahid_context_options* options) no
 
 // The tuning values have no default: each is the caller's, and zero means none.
 bool required_tuning_nonzero(const aoahid_device_options& options) noexcept {
-    return options.control_timeout_ms != 0U && options.send_timeout_ms != 0U &&
-           options.descriptor_fragment_bytes != 0U && options.transfer_pool_slots != 0U &&
-           options.maximum_report_bytes != 0U && options.close_drain_timeout_ms != 0U;
+    return options.descriptor_fragment_bytes != 0U && options.transfer_pool_slots != 0U &&
+           options.maximum_report_bytes != 0U;
 }
 
 bool required_product_policies_nonzero(const aoahid_device_options& options) noexcept {
@@ -348,13 +347,20 @@ aoa::transport::Candidate copy_candidate(const aoahid_device_info& info) {
 aoa::transport::DeviceConfig copy_config(const aoahid_device_options& options,
                                          const aoahid_event_mode event_mode) noexcept {
     return aoa::transport::DeviceConfig{event_mode,
-                                        options.control_timeout_ms,
-                                        options.send_timeout_ms,
                                         options.descriptor_fragment_bytes,
                                         options.transfer_pool_slots,
                                         options.maximum_report_bytes,
                                         options.interface_claim_policy,
                                         options.interface_number};
+}
+
+// Every wait is the caller's, per call, and has no default: zero is an error.
+bool timeout_is_set(const std::uint32_t value, const char* field) noexcept {
+    if (value != 0U) {
+        return true;
+    }
+    set_error(AOAHID_ERR_UNSET_FIELD, field, "This timeout must be set; it has no default.");
+    return false;
 }
 
 void refresh_discovery_views(aoahid_discovery* discovery) noexcept {
@@ -609,7 +615,13 @@ aoahid_result poll_until_idle(aoahid_node* node, const std::uint32_t timeout_ms,
             if (!node->dirty && !node->battery_dirty)
                 return AOAHID_OK;
             slot_generation = node->device->slot_generation.load();
-            const aoahid_result submit = aoahid_node_submit(node);
+            // The blocking timeout also bounds each report it sends: what is left of it.
+            const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  deadline - std::chrono::steady_clock::now())
+                                  .count();
+            const std::uint32_t send_timeout_ms = static_cast<std::uint32_t>(std::clamp<long long>(
+                left, 1LL, static_cast<long long>(std::numeric_limits<std::uint32_t>::max())));
+            const aoahid_result submit = aoahid_node_submit(node, send_timeout_ms);
             if (submit != AOAHID_OK && submit != AOAHID_ERR_BUSY)
                 return submit;
             pool_busy = submit == AOAHID_ERR_BUSY &&
@@ -724,7 +736,8 @@ bool touch_frame_in_progress(const aoahid_node* node) noexcept {
 }
 
 aoahid_result close_live_node_until(aoahid_node* node,
-                                    const std::chrono::steady_clock::time_point deadline) {
+                                    const std::chrono::steady_clock::time_point deadline,
+                                    const std::uint32_t control_timeout_ms) {
     if (node == nullptr || node->device == nullptr || node->device->transport == nullptr) {
         set_error(AOAHID_ERR_PARAM, "node.close",
                   "A live node with an attached transport is required.");
@@ -763,7 +776,8 @@ aoahid_result close_live_node_until(aoahid_node* node,
                 return neutral;
             }
         }
-        const aoahid_result unregister = device->transport->unregister_hid(node->hid_id);
+        const aoahid_result unregister =
+            device->transport->unregister_hid(node->hid_id, control_timeout_ms);
         if (unregister != AOAHID_OK && unregister != AOAHID_ERR_NO_DEVICE) {
             return unregister;
         }
@@ -858,7 +872,8 @@ aoa::detail::DeferredError destroy_drained_device(aoahid_device* device) noexcep
         node->closed = true;
         remember_terminal_completion(device, node);
         if (device->transport->present()) {
-            const aoahid_result unregister = device->transport->unregister_hid(node->hid_id);
+            const aoahid_result unregister =
+                device->transport->unregister_hid(node->hid_id, device->close_control_timeout_ms);
             if (unregister != AOAHID_OK && unregister != AOAHID_ERR_NO_DEVICE) {
                 remember_current_close_error(device, unregister, "node.unregister",
                                              "AOA request 55 failed during Device teardown.", node,
@@ -1336,7 +1351,6 @@ aoahid_result AOAHID_CALL aoahid_device_open(aoahid_context* context,
     try {
         device->context = context;
         device->config = copy_config(effective_options, context->options.event_mode);
-        device->close_drain_timeout_ms = effective_options.close_drain_timeout_ms;
         device->aoa_descriptor_policy_bytes = effective_options.aoa_descriptor_wire_policy_bytes;
         device->linux_descriptor_policy_bytes = effective_options.linux_descriptor_policy_bytes;
         device->linux_hid_fields_per_report_policy =
@@ -1389,6 +1403,7 @@ AOAHID_C_RESULT_CATCH("device.open")
 
 aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* spec,
                                            const aoahid_node_options* options,
+                                           const std::uint32_t control_timeout_ms,
                                            aoahid_node** out_node) try {
     AOAHID_SERIALIZED(aoa::detail::serialization_context(device), "aoahid_node_open");
     aoa::detail::clear_error();
@@ -1397,6 +1412,9 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
         return AOAHID_ERR_PARAM;
     }
     *out_node = nullptr;
+    if (!timeout_is_set(control_timeout_ms, "control_timeout_ms")) {
+        return AOAHID_ERR_UNSET_FIELD;
+    }
     if (device == nullptr || device->transport == nullptr || spec == nullptr) {
         set_error(AOAHID_ERR_PARAM, "node.open", "A live Device and immutable Spec are required.");
         return AOAHID_ERR_PARAM;
@@ -1556,7 +1574,7 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
     }
 
     const aoahid_result registered = device->transport->register_hid(
-        node->hid_id, spec->descriptor.data(), spec->descriptor.size());
+        node->hid_id, spec->descriptor.data(), spec->descriptor.size(), control_timeout_ms);
     if (registered != AOAHID_OK) {
         aoa::detail::log_event(
             device->context, AOAHID_LOG_ERROR, "node_register", device, node.get(),
@@ -1583,7 +1601,7 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
 }
 AOAHID_C_RESULT_CATCH("node.open")
 
-std::uint16_t AOAHID_CALL aoahid_node_hid_id(const aoahid_node* node) try {
+std::uint16_t AOAHID_CALL aoahid_node_id(const aoahid_node* node) try {
     aoa::detail::clear_error();
     if (node == nullptr || node->closed) {
         set_error(AOAHID_ERR_PARAM, "node",
@@ -1592,7 +1610,7 @@ std::uint16_t AOAHID_CALL aoahid_node_hid_id(const aoahid_node* node) try {
     }
     return node->hid_id;
 }
-AOAHID_C_VALUE_CATCH("node.hid_id", 0U)
+AOAHID_C_VALUE_CATCH("node.id", 0U)
 
 aoahid_result AOAHID_CALL aoahid_node_manifest(const aoahid_node* node,
                                                aoahid_capability_manifest* manifest) try {
@@ -1605,9 +1623,13 @@ aoahid_result AOAHID_CALL aoahid_node_manifest(const aoahid_node* node,
 }
 AOAHID_C_RESULT_CATCH("node.manifest")
 
-aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node) try {
+aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node,
+                                             const std::uint32_t send_timeout_ms) try {
     AOAHID_SERIALIZED(aoa::detail::serialization_context(node), "aoahid_node_submit");
     aoa::detail::clear_error();
+    if (!timeout_is_set(send_timeout_ms, "send_timeout_ms")) {
+        return AOAHID_ERR_UNSET_FIELD;
+    }
     if (node == nullptr || node->closed || node->device == nullptr || node->spec == nullptr) {
         set_error(AOAHID_ERR_PARAM, "node.submit",
                   "A live Node attached to a Device and Spec is required.");
@@ -1711,8 +1733,8 @@ aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node) try {
     node->submitted_non_neutral = !battery_report && has_non_neutral_state(node);
     node->submitted_report_length = report_length;
     node->submitted_report_id = battery_report ? layout.report_id : report_id(node);
-    const aoahid_result result =
-        node->device->transport->submit(prepared, report_length, node->submitted_report_id);
+    const aoahid_result result = node->device->transport->submit(
+        prepared, report_length, node->submitted_report_id, send_timeout_ms);
     if (result != AOAHID_OK) {
         // Submit-time failures invoke the completion path synchronously. The
         // return value already reports that failure, so do not report it twice.
@@ -1759,9 +1781,13 @@ aoahid_result AOAHID_CALL aoahid_node_submit_blocking(aoahid_node* node,
 AOAHID_C_RESULT_CATCH("node.submit_blocking")
 
 aoahid_result AOAHID_CALL aoahid_raw_submit(aoahid_node* node, const std::uint8_t* report,
-                                            const std::size_t length) try {
+                                            const std::size_t length,
+                                            const std::uint32_t send_timeout_ms) try {
     AOAHID_SERIALIZED(aoa::detail::serialization_context(node), "aoahid_raw_submit");
     aoa::detail::clear_error();
+    if (!timeout_is_set(send_timeout_ms, "send_timeout_ms")) {
+        return AOAHID_ERR_UNSET_FIELD;
+    }
     if (node == nullptr || node->closed || node->device == nullptr ||
         node->device->transport == nullptr || node->spec == nullptr ||
         node->spec->kind != AOAHID_PROFILE_RAW || report == nullptr) {
@@ -1819,7 +1845,8 @@ aoahid_result AOAHID_CALL aoahid_raw_submit(aoahid_node* node, const std::uint8_
     node->submitted_non_neutral = false;
     node->submitted_report_length = length;
     node->submitted_report_id = accepted->report_id.enabled == 1U ? accepted->report_id.value : 0U;
-    result = node->device->transport->submit(prepared, length, node->submitted_report_id);
+    result = node->device->transport->submit(prepared, length, node->submitted_report_id,
+                                             send_timeout_ms);
     if (result != AOAHID_OK) {
         const aoahid_result completion_failure = consume_completion(node, "raw.submit");
         if (completion_failure == AOAHID_OK) {
@@ -1836,9 +1863,15 @@ aoahid_result AOAHID_CALL aoahid_raw_submit(aoahid_node* node, const std::uint8_
 }
 AOAHID_C_RESULT_CATCH("raw.submit")
 
-aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node) try {
+aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node,
+                                            const std::uint32_t control_timeout_ms,
+                                            const std::uint32_t drain_timeout_ms) try {
     AOAHID_SERIALIZED(aoa::detail::serialization_context(node), "aoahid_node_close");
     aoa::detail::clear_error();
+    if (!timeout_is_set(control_timeout_ms, "control_timeout_ms") ||
+        !timeout_is_set(drain_timeout_ms, "drain_timeout_ms")) {
+        return AOAHID_ERR_UNSET_FIELD;
+    }
     if (node == nullptr || node->closed || node->device == nullptr ||
         node->device->closing.load(std::memory_order_acquire)) {
         set_error(AOAHID_ERR_PARAM, "node.close",
@@ -1846,8 +1879,7 @@ aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node) try {
         return AOAHID_ERR_PARAM;
     }
     if (node->transfer_inflight.load(std::memory_order_acquire) || touch_frame_in_progress(node)) {
-        const aoahid_result wait =
-            poll_until_idle(node, node->device->close_drain_timeout_ms, true);
+        const aoahid_result wait = poll_until_idle(node, drain_timeout_ms, true);
         if (wait != AOAHID_OK) {
             if (wait == AOAHID_ERR_TIMEOUT &&
                 node->transfer_inflight.load(std::memory_order_acquire)) {
@@ -1867,8 +1899,7 @@ aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node) try {
     node->battery_dirty = false;
     if (node->device->transport->present()) {
         make_neutral(node);
-        const aoahid_result neutral =
-            poll_until_idle(node, node->device->close_drain_timeout_ms, true);
+        const aoahid_result neutral = poll_until_idle(node, drain_timeout_ms, true);
         if (neutral != AOAHID_OK) {
             if (neutral == AOAHID_ERR_TIMEOUT &&
                 node->transfer_inflight.load(std::memory_order_acquire)) {
@@ -1880,7 +1911,8 @@ aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node) try {
             }
             return neutral;
         }
-        const aoahid_result unregister = node->device->transport->unregister_hid(node->hid_id);
+        const aoahid_result unregister =
+            node->device->transport->unregister_hid(node->hid_id, control_timeout_ms);
         if (unregister != AOAHID_OK && unregister != AOAHID_ERR_NO_DEVICE) {
             return finish_transport_result(unregister, "node.unregister",
                                            "AOA request 55 failed while closing the Node.", node,
@@ -1904,7 +1936,10 @@ aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node) try {
 }
 AOAHID_C_RESULT_CATCH("node.close")
 
-static aoahid_result device_close_impl(aoahid_device* device, bool* consumed) try {
+static aoahid_result device_close_impl(aoahid_device* device, bool* consumed,
+                                       // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                       const std::uint32_t control_timeout_ms,
+                                       const std::uint32_t drain_timeout_ms) try {
     aoa::detail::clear_error();
     if (consumed == nullptr) {
         set_error(AOAHID_ERR_INTERNAL, "device.close",
@@ -1933,6 +1968,9 @@ static aoahid_result device_close_impl(aoahid_device* device, bool* consumed) tr
         auto& devices = context->devices;
         devices.erase(std::remove(devices.begin(), devices.end(), device), devices.end());
         *consumed = true;
+        // The Context graveyard may finish this teardown after the call returns.
+        device->close_control_timeout_ms = control_timeout_ms;
+        device->close_drain_timeout_ms = drain_timeout_ms;
     }
 
     try {
@@ -1940,7 +1978,8 @@ static aoahid_result device_close_impl(aoahid_device* device, bool* consumed) tr
                               std::chrono::milliseconds(device->close_drain_timeout_ms);
         while (!device->nodes.empty()) {
             aoahid_node* closing_node = device->nodes.back();
-            const aoahid_result result = close_live_node_until(closing_node, deadline);
+            const aoahid_result result =
+                close_live_node_until(closing_node, deadline, control_timeout_ms);
             if (result != AOAHID_OK) {
                 const bool drain_budget_only =
                     result == AOAHID_ERR_TIMEOUT &&
@@ -2022,8 +2061,8 @@ static aoahid_result device_close_impl(aoahid_device* device, bool* consumed) tr
     set_error(AOAHID_CLOSE_PENDING, "device.close",
               "The Device was consumed and moved to the Context graveyard until terminal callbacks "
               "drain.",
-              prior.libusb_status, prior.aoa_request, prior.hid_id, prior.report_id, prior.offset,
-              prior.length);
+              prior.transport_status, prior.aoa_request, prior.node_id, prior.report_id,
+              prior.offset, prior.length);
     // Publication is the last operation that may touch the Device. In
     // internal-thread mode the event thread may reap it immediately.
     park_in_graveyard(context, device);
@@ -2031,10 +2070,17 @@ static aoahid_result device_close_impl(aoahid_device* device, bool* consumed) tr
 }
 AOAHID_C_RESULT_CATCH("device.close")
 
-aoahid_result AOAHID_CALL aoahid_device_close(aoahid_device* device) try {
+aoahid_result AOAHID_CALL aoahid_device_close(aoahid_device* device,
+                                              const std::uint32_t control_timeout_ms,
+                                              const std::uint32_t drain_timeout_ms) try {
     AOAHID_SERIALIZED(aoa::detail::serialization_context(device), "aoahid_device_close");
+    aoa::detail::clear_error();
+    if (device != nullptr && (!timeout_is_set(control_timeout_ms, "control_timeout_ms") ||
+                              !timeout_is_set(drain_timeout_ms, "drain_timeout_ms"))) {
+        return AOAHID_ERR_UNSET_FIELD;
+    }
     bool consumed = false;
-    return device_close_impl(device, &consumed);
+    return device_close_impl(device, &consumed, control_timeout_ms, drain_timeout_ms);
 }
 AOAHID_C_RESULT_CATCH("device.close")
 
@@ -2063,6 +2109,7 @@ AOAHID_C_RESULT_CATCH("device.latched_error")
 
 aoahid_result AOAHID_CALL aoahid_channel_open(aoahid_device* device,
                                               const aoahid_channel_options* options,
+                                              const std::uint32_t drain_timeout_ms,
                                               aoahid_channel** out_channel) try {
     AOAHID_SERIALIZED(aoa::detail::serialization_context(device), "aoahid_channel_open");
     aoa::detail::clear_error();
@@ -2071,6 +2118,9 @@ aoahid_result AOAHID_CALL aoahid_channel_open(aoahid_device* device,
         return AOAHID_ERR_PARAM;
     }
     *out_channel = nullptr;
+    if (!timeout_is_set(drain_timeout_ms, "drain_timeout_ms")) {
+        return AOAHID_ERR_UNSET_FIELD;
+    }
     if (device == nullptr || device->transport == nullptr || device->context == nullptr) {
         set_error(AOAHID_ERR_PARAM, "channel.open", "A live Device is required.");
         return AOAHID_ERR_PARAM;
@@ -2122,10 +2172,9 @@ aoahid_result AOAHID_CALL aoahid_channel_open(aoahid_device* device,
     // Reserve first so publishing an opened Channel cannot fail.
     device->channels.reserve(device->channels.size() + 1U);
     aoahid_result poll = AOAHID_OK;
-    if (!wait_for_report_drain(device,
-                               std::chrono::steady_clock::now() +
-                                   std::chrono::milliseconds(device->close_drain_timeout_ms),
-                               &poll)) {
+    if (!wait_for_report_drain(
+            device, std::chrono::steady_clock::now() + std::chrono::milliseconds(drain_timeout_ms),
+            &poll)) {
         if (poll != AOAHID_OK) {
             return finish_transport_result(poll, "context.poll", "libusb event handling failed.");
         }
@@ -2151,9 +2200,13 @@ aoahid_result AOAHID_CALL aoahid_channel_open(aoahid_device* device,
 }
 AOAHID_C_RESULT_CATCH("channel.open")
 
-aoahid_result AOAHID_CALL aoahid_channel_close(aoahid_channel* channel) try {
+aoahid_result AOAHID_CALL aoahid_channel_close(aoahid_channel* channel,
+                                               const std::uint32_t drain_timeout_ms) try {
     AOAHID_SERIALIZED(aoa::detail::serialization_context(channel), "aoahid_channel_close");
     aoa::detail::clear_error();
+    if (channel != nullptr && !timeout_is_set(drain_timeout_ms, "drain_timeout_ms")) {
+        return AOAHID_ERR_UNSET_FIELD;
+    }
     if (channel == nullptr || channel->device == nullptr || channel->transport == nullptr ||
         channel->device->closing.load(std::memory_order_acquire)) {
         set_error(AOAHID_ERR_PARAM, "channel.close",
@@ -2162,8 +2215,8 @@ aoahid_result AOAHID_CALL aoahid_channel_close(aoahid_channel* channel) try {
     }
     aoahid_device* device = channel->device;
     channel->transport->lose();
-    const auto deadline = std::chrono::steady_clock::now() +
-                          std::chrono::milliseconds(device->close_drain_timeout_ms);
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(drain_timeout_ms);
     while (!channel->transport->drained()) {
         const std::uint32_t remaining = remaining_milliseconds(deadline);
         if (remaining == 0U) {
@@ -2245,7 +2298,9 @@ aoahid_result AOAHID_CALL aoahid_channel_read(aoahid_channel* channel, std::uint
 }
 AOAHID_C_RESULT_CATCH("channel.read")
 
-static aoahid_result context_destroy_impl(aoahid_context* context, bool* context_consumed) {
+static aoahid_result context_destroy_impl(aoahid_context* context, bool* context_consumed,
+                                          const std::uint32_t control_timeout_ms,
+                                          const std::uint32_t drain_timeout_ms) {
     *context_consumed = false;
     aoa::detail::clear_error();
     if (context == nullptr) {
@@ -2259,7 +2314,8 @@ static aoahid_result context_destroy_impl(aoahid_context* context, bool* context
             break;
         }
         bool device_consumed = false;
-        const aoahid_result close = device_close_impl(device, &device_consumed);
+        const aoahid_result close =
+            device_close_impl(device, &device_consumed, control_timeout_ms, drain_timeout_ms);
         if (!device_consumed) {
             const aoahid_result retained_result = close == AOAHID_OK ? AOAHID_ERR_INTERNAL : close;
             const aoa::detail::DeferredError error = current_deferred_error(
@@ -2335,17 +2391,30 @@ static aoahid_result context_destroy_impl(aoahid_context* context, bool* context
     return terminal_result;
 }
 
-aoahid_result AOAHID_CALL aoahid_context_destroy(aoahid_context* context) try {
+aoahid_result AOAHID_CALL aoahid_context_destroy(aoahid_context* context,
+                                                 const std::uint32_t control_timeout_ms,
+                                                 const std::uint32_t drain_timeout_ms) try {
     AOAHID_SERIALIZED_PROBE(context, "aoahid_context_destroy");
+    aoa::detail::clear_error();
+    if (context != nullptr && (!timeout_is_set(control_timeout_ms, "control_timeout_ms") ||
+                               !timeout_is_set(drain_timeout_ms, "drain_timeout_ms"))) {
+        return AOAHID_ERR_UNSET_FIELD;
+    }
     bool consumed = false;
-    return context_destroy_impl(context, &consumed);
+    return context_destroy_impl(context, &consumed, control_timeout_ms, drain_timeout_ms);
 }
 AOAHID_C_RESULT_CATCH("context.destroy")
 
-aoahid_result AOAHID_CALL aoahid_context_destroy_blocking(aoahid_context* context,
-                                                          const std::uint32_t timeout_ms) try {
+aoahid_result AOAHID_CALL aoahid_context_destroy_blocking(
+    aoahid_context* context, const std::uint32_t control_timeout_ms,
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    const std::uint32_t drain_timeout_ms, const std::uint32_t timeout_ms) try {
     AOAHID_SERIALIZED_PROBE(context, "aoahid_context_destroy_blocking");
     aoa::detail::clear_error();
+    if (context != nullptr && (!timeout_is_set(control_timeout_ms, "control_timeout_ms") ||
+                               !timeout_is_set(drain_timeout_ms, "drain_timeout_ms"))) {
+        return AOAHID_ERR_UNSET_FIELD;
+    }
     if (context == nullptr || timeout_ms == 0U) {
         set_error(AOAHID_ERR_PARAM, context == nullptr ? "context.destroy" : "timeout_ms",
                   context == nullptr ? "The Context handle is null."
@@ -2356,7 +2425,8 @@ aoahid_result AOAHID_CALL aoahid_context_destroy_blocking(aoahid_context* contex
     aoa::detail::DeferredError observed{};
     do {
         bool consumed = false;
-        const aoahid_result result = context_destroy_impl(context, &consumed);
+        const aoahid_result result =
+            context_destroy_impl(context, &consumed, control_timeout_ms, drain_timeout_ms);
         if (consumed) {
             return observed.pending ? publish_deferred_error(observed) : result;
         }

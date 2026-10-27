@@ -143,8 +143,8 @@ impl NodeRef {
         self.0.as_ptr()
     }
 
-    pub fn submit(self) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_node_submit(self.as_ptr()) })
+    pub fn submit(self, send_timeout_ms: u32) -> Result<(), Error> {
+        result(unsafe { sys::aoahid_node_submit(self.as_ptr(), send_timeout_ms) })
     }
 
     pub fn submit_blocking(self, timeout_ms: u32) -> Result<(), Error> {
@@ -168,8 +168,8 @@ macro_rules! node_type {
                 self.0.as_ptr()
             }
 
-            pub fn submit(self) -> Result<(), Error> {
-                self.0.submit()
+            pub fn submit(self, send_timeout_ms: u32) -> Result<(), Error> {
+                self.0.submit(send_timeout_ms)
             }
 
             pub fn submit_blocking(self, timeout_ms: u32) -> Result<(), Error> {
@@ -306,8 +306,10 @@ impl DigitizerNodeRef {
 }
 
 impl RawNodeRef {
-    pub fn report(self, bytes: &[u8]) -> Result<(), Error> {
-        result(unsafe { sys::aoahid_raw_submit(self.as_ptr(), bytes.as_ptr(), bytes.len()) })
+    pub fn report(self, bytes: &[u8], send_timeout_ms: u32) -> Result<(), Error> {
+        result(unsafe {
+            sys::aoahid_raw_submit(self.as_ptr(), bytes.as_ptr(), bytes.len(), send_timeout_ms)
+        })
     }
 }
 

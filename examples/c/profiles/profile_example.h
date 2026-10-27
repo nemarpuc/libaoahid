@@ -84,6 +84,7 @@ static int aoahid_example_run(const char* name, aoahid_profile_kind expected_kin
     printf("  2. aoahid_discover()         then aoahid_discovery_count() to pick a device\n");
     printf("  3. aoahid_device_open()      current USB mode; sends no AOA request\n");
     printf("  4. aoahid_node_open()        registers this Spec as its own AOA HID ID\n");
+    printf("     (every call that waits takes its timeout as an argument; none has a default)\n");
     step = 5U;
     for (index = 0U; send_sequence != NULL && send_sequence[index] != NULL; ++index) {
         /* A leading space marks a continuation of the previous step rather

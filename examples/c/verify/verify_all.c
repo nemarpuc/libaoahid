@@ -301,17 +301,20 @@ int main(void) {
     {
         const aoahid_node_options node_options = {(uint32_t)sizeof(aoahid_node_options), 0U, 1U,
                                                   0U};
-        result = aoahid_node_open(device, touch_spec, &node_options, &touch_node);
+        result = aoahid_node_open(device, touch_spec, &node_options, VERIFY_CONTROL_TIMEOUT_MS,
+                                  &touch_node);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("touchscreen node open", result);
             goto cleanup;
         }
-        result = aoahid_node_open(device, keyboard_spec, &node_options, &keyboard_node);
+        result = aoahid_node_open(device, keyboard_spec, &node_options, VERIFY_CONTROL_TIMEOUT_MS,
+                                  &keyboard_node);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("keyboard node open", result);
             goto cleanup;
         }
-        result = aoahid_node_open(device, mouse_spec, &node_options, &mouse_node);
+        result = aoahid_node_open(device, mouse_spec, &node_options, VERIFY_CONTROL_TIMEOUT_MS,
+                                  &mouse_node);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("mouse node open", result);
             goto cleanup;
@@ -342,11 +345,11 @@ int main(void) {
 
 cleanup:
     if (touch_node != NULL)
-        aoahid_node_close(touch_node);
+        aoahid_node_close(touch_node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
     if (keyboard_node != NULL)
-        aoahid_node_close(keyboard_node);
+        aoahid_node_close(keyboard_node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
     if (mouse_node != NULL)
-        aoahid_node_close(mouse_node);
+        aoahid_node_close(mouse_node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
     if (touch_spec != NULL)
         aoahid_spec_release(touch_spec);
     if (keyboard_spec != NULL)
@@ -354,8 +357,8 @@ cleanup:
     if (mouse_spec != NULL)
         aoahid_spec_release(mouse_spec);
     if (device != NULL)
-        aoahid_device_close(device);
+        aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
     if (context != NULL)
-        aoahid_context_destroy(context);
+        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
     return exit_code;
 }

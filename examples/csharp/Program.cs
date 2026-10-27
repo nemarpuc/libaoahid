@@ -59,5 +59,5 @@ if (status == Result.Ok)
     }
     Native.DiscoveryDestroy(discovery);
 }
-var closeStatus = Native.ContextDestroyBlocking(context, timeoutMs);
+var closeStatus = Native.ContextDestroyBlocking(context, timeoutMs, timeoutMs, timeoutMs);
 return status != Result.Ok ? (int)status : (int)closeStatus;

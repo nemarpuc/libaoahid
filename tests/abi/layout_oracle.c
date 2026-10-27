@@ -90,9 +90,9 @@ int main(void) {
     AOAHID_FIELD(aoahid_error_detail, code);
     AOAHID_FIELD(aoahid_error_detail, field);
     AOAHID_FIELD(aoahid_error_detail, reason);
-    AOAHID_FIELD(aoahid_error_detail, libusb_status);
+    AOAHID_FIELD(aoahid_error_detail, transport_status);
     AOAHID_FIELD(aoahid_error_detail, aoa_request);
-    AOAHID_FIELD(aoahid_error_detail, hid_id);
+    AOAHID_FIELD(aoahid_error_detail, node_id);
     AOAHID_FIELD(aoahid_error_detail, report_id);
     AOAHID_FIELD(aoahid_error_detail, offset);
     AOAHID_FIELD(aoahid_error_detail, length);
@@ -127,12 +127,9 @@ int main(void) {
     AOAHID_BEGIN(aoahid_device_options);
     AOAHID_FIELD(aoahid_device_options, struct_size);
     AOAHID_FIELD(aoahid_device_options, reserved);
-    AOAHID_FIELD(aoahid_device_options, control_timeout_ms);
-    AOAHID_FIELD(aoahid_device_options, send_timeout_ms);
     AOAHID_FIELD(aoahid_device_options, descriptor_fragment_bytes);
     AOAHID_FIELD(aoahid_device_options, transfer_pool_slots);
     AOAHID_FIELD(aoahid_device_options, maximum_report_bytes);
-    AOAHID_FIELD(aoahid_device_options, close_drain_timeout_ms);
     AOAHID_FIELD(aoahid_device_options, aoa_descriptor_wire_policy_bytes);
     AOAHID_FIELD(aoahid_device_options, linux_descriptor_policy_bytes);
     AOAHID_FIELD(aoahid_device_options, linux_hid_fields_per_report_policy);

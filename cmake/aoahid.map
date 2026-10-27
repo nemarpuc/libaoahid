@@ -1,4 +1,4 @@
-AOAHID_1.0 {
+AOAHID_2.0 {
   global:
     aoahid_*;
   local:

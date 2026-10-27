@@ -12,6 +12,11 @@
 #include <cstring>
 #include <thread>
 
+// Every wait is an argument of the call and has no default; these are the tests' own choices.
+inline constexpr std::uint32_t kControlTimeoutMs = 20U;
+inline constexpr std::uint32_t kSendTimeoutMs = 20U;
+inline constexpr std::uint32_t kDrainTimeoutMs = 20U;
+
 namespace {
 
 aoahid_context* make_context() noexcept {
@@ -70,7 +75,8 @@ int run_ok() {
     std::thread later([first] { static_cast<void>(aoahid_context_poll(first, 0U)); });
     later.join();
     const bool destroyed =
-        aoahid_context_destroy(first) == AOAHID_OK && aoahid_context_destroy(second) == AOAHID_OK;
+        aoahid_context_destroy(first, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK &&
+        aoahid_context_destroy(second, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK;
     return destroyed ? 0 : 1;
 }
 

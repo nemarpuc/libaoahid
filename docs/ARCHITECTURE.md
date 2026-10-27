@@ -50,7 +50,7 @@ AOA HID IDs are chosen by the host. The library allocates them from a
 monotonic counter starting at 1, kept per physical identity (USB bus plus port
 path) within a Context, so IDs are not reused while the Context lives, even if
 the device re-enumerates. Exhausting the 16-bit space returns
-`AOAHID_ERR_OVERFLOW`. `aoahid_node_hid_id` returns the ID of a Node.
+`AOAHID_ERR_OVERFLOW`. `aoahid_node_id` returns the ID of a Node.
 
 ## Event modes and threading
 
@@ -91,7 +91,7 @@ with every other call on the Context. It does not check:
 - `aoahid_channel_read` and `aoahid_channel_write` in internal-thread mode
   (one reader and one writer may run beside other calls there), or a Channel
   read racing its own close;
-- `aoahid_node_hid_id` and `aoahid_node_manifest`, which only have to be kept
+- `aoahid_node_id` and `aoahid_node_manifest`, which only have to be kept
   apart from the Node's teardown;
 - the Spec functions and the discovery snapshot readers;
 - a call on a null or closed handle;
@@ -144,8 +144,8 @@ descriptor in request 56 fragments (`descriptor_fragment_bytes`, zero selects
 64). If registration fails after the device may have accepted request 54, a
 best-effort request 55 is sent so no half-registered ID is left behind.
 
-`aoahid_node_close` waits up to `close_drain_timeout_ms` (zero selects
-1000 ms) for in-flight work, finishes any touch frame, sends the neutral
+`aoahid_node_close` waits up to its `drain_timeout_ms` argument (zero is
+`AOAHID_ERR_UNSET_FIELD`) for in-flight work, finishes any touch frame, sends the neutral
 reports the profile requires, and then sends request 55. There is no
 release-all call: callers should release what they pressed before closing.
 If a callback misses the budget, close returns `AOAHID_CLOSE_PENDING`; for a

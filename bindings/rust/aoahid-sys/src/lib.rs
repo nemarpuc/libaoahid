@@ -33,9 +33,9 @@ pub type aoahid_axis_role = i32;
 pub type aoahid_dpad_representation = i32;
 pub type aoahid_usage_semantic = i32;
 
-pub const AOAHID_VERSION_MAJOR: u32 = 1;
+pub const AOAHID_VERSION_MAJOR: u32 = 2;
 pub const AOAHID_VERSION_MINOR: u32 = 0;
-pub const AOAHID_VERSION_PATCH: u32 = 1;
+pub const AOAHID_VERSION_PATCH: u32 = 0;
 pub const AOAHID_OK: i32 = 0;
 pub const AOAHID_ERR_PARAM: i32 = 1;
 pub const AOAHID_ERR_UNSET_FIELD: i32 = 2;
@@ -120,8 +120,8 @@ macro_rules! c_struct {
 }
 
 c_struct!(aoahid_error_detail {
-    code: i32, field: *const c_char, reason: *const c_char, libusb_status: i32,
-    aoa_request: i32, hid_id: u16, report_id: u16, offset: u32, length: u32,
+    code: i32, field: *const c_char, reason: *const c_char, transport_status: i32,
+    aoa_request: i32, node_id: u16, report_id: u16, offset: u32, length: u32,
 });
 c_struct!(aoahid_context_options {
     struct_size: u32, reserved: u32, event_mode: aoahid_event_mode,
@@ -140,12 +140,9 @@ c_struct!(aoahid_aoa_strings {
 c_struct!(aoahid_device_options {
     struct_size: u32,
     reserved: u32,
-    control_timeout_ms: u32,
-    send_timeout_ms: u32,
     descriptor_fragment_bytes: u32,
     transfer_pool_slots: u32,
     maximum_report_bytes: u32,
-    close_drain_timeout_ms: u32,
     aoa_descriptor_wire_policy_bytes: u32,
     linux_descriptor_policy_bytes: u32,
     linux_hid_fields_per_report_policy: u32,
@@ -393,9 +390,15 @@ extern "C" {
         out_context: *mut *mut aoahid_context,
     ) -> aoahid_result;
     pub fn aoahid_context_poll(context: *mut aoahid_context, timeout_ms: u32) -> aoahid_result;
-    pub fn aoahid_context_destroy(context: *mut aoahid_context) -> aoahid_result;
+    pub fn aoahid_context_destroy(
+        context: *mut aoahid_context,
+        control_timeout_ms: u32,
+        drain_timeout_ms: u32,
+    ) -> aoahid_result;
     pub fn aoahid_context_destroy_blocking(
         context: *mut aoahid_context,
+        control_timeout_ms: u32,
+        drain_timeout_ms: u32,
         timeout_ms: u32,
     ) -> aoahid_result;
     pub fn aoahid_discover(
@@ -420,14 +423,22 @@ extern "C" {
         options: *const aoahid_device_options,
         out_device: *mut *mut aoahid_device,
     ) -> aoahid_result;
-    pub fn aoahid_device_close(device: *mut aoahid_device) -> aoahid_result;
+    pub fn aoahid_device_close(
+        device: *mut aoahid_device,
+        control_timeout_ms: u32,
+        drain_timeout_ms: u32,
+    ) -> aoahid_result;
     pub fn aoahid_device_latched_error(device: *mut aoahid_device) -> aoahid_result;
     pub fn aoahid_channel_open(
         device: *mut aoahid_device,
         options: *const aoahid_channel_options,
+        drain_timeout_ms: u32,
         out_channel: *mut *mut aoahid_channel,
     ) -> aoahid_result;
-    pub fn aoahid_channel_close(channel: *mut aoahid_channel) -> aoahid_result;
+    pub fn aoahid_channel_close(
+        channel: *mut aoahid_channel,
+        drain_timeout_ms: u32,
+    ) -> aoahid_result;
     pub fn aoahid_channel_write(
         channel: *mut aoahid_channel,
         data: *const u8,
@@ -495,15 +506,20 @@ extern "C" {
         device: *mut aoahid_device,
         spec: *mut aoahid_spec,
         options: *const aoahid_node_options,
+        control_timeout_ms: u32,
         out_node: *mut *mut aoahid_node,
     ) -> aoahid_result;
-    pub fn aoahid_node_close(node: *mut aoahid_node) -> aoahid_result;
-    pub fn aoahid_node_hid_id(node: *const aoahid_node) -> u16;
+    pub fn aoahid_node_close(
+        node: *mut aoahid_node,
+        control_timeout_ms: u32,
+        drain_timeout_ms: u32,
+    ) -> aoahid_result;
+    pub fn aoahid_node_id(node: *const aoahid_node) -> u16;
     pub fn aoahid_node_manifest(
         node: *const aoahid_node,
         manifest: *mut aoahid_capability_manifest,
     ) -> aoahid_result;
-    pub fn aoahid_node_submit(node: *mut aoahid_node) -> aoahid_result;
+    pub fn aoahid_node_submit(node: *mut aoahid_node, send_timeout_ms: u32) -> aoahid_result;
     pub fn aoahid_node_submit_blocking(node: *mut aoahid_node, timeout_ms: u32) -> aoahid_result;
     pub fn aoahid_keyboard_key(node: *mut aoahid_node, usage: u16, down: u32) -> aoahid_result;
     pub fn aoahid_mouse_move(node: *mut aoahid_node, dx: i32, dy: i32) -> aoahid_result;
@@ -561,5 +577,6 @@ extern "C" {
         node: *mut aoahid_node,
         report: *const u8,
         length: usize,
+        send_timeout_ms: u32,
     ) -> aoahid_result;
 }

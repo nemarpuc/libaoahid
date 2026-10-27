@@ -69,7 +69,7 @@ def main() -> int:
                 f"aoa={device.protocol_version} {product} {serial}"
             )
         library.aoahid_discovery_destroy(discovery)
-    close_status = library.aoahid_context_destroy_blocking(context, timeout_ms)
+    close_status = library.aoahid_context_destroy_blocking(context, timeout_ms, timeout_ms, timeout_ms)
     return int(status if status != AOAHID_OK else close_status)
 
 

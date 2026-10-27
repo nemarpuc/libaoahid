@@ -118,7 +118,7 @@ Both waits wake every 10 ms to check for a Context error.
 
 `src/api/c_api.cpp` marks the
 Device closing, closes every Node (neutral report, request 55, reservation)
-inside one `close_drain_timeout_ms` budget, loses every Channel, cancels all
+inside one `drain_timeout_ms` budget (an argument of `aoahid_device_close`), loses every Channel, cancels all
 transfers, and waits for them to drain.
 
 - Drained means `outstanding == 0 && callbacks_active == 0`

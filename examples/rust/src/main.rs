@@ -70,16 +70,13 @@ fn context_options() -> sys::aoahid_context_options {
     }
 }
 
-fn device_options(timeout_ms: u32) -> sys::aoahid_device_options {
+fn device_options() -> sys::aoahid_device_options {
     sys::aoahid_device_options {
         struct_size: struct_size::<sys::aoahid_device_options>(),
         reserved: 0,
-        control_timeout_ms: timeout_ms,
-        send_timeout_ms: timeout_ms,
         descriptor_fragment_bytes: 64, // Explicit policy; AOA fixes no fragment size.
         transfer_pool_slots: POOL_SLOTS,
         maximum_report_bytes: HOST_REPORT_POLICY_BYTES,
-        close_drain_timeout_ms: CLOSE_DRAIN_TIMEOUT_MS,
         aoa_descriptor_wire_policy_bytes: DESCRIPTOR_POLICY_BYTES,
         linux_descriptor_policy_bytes: DESCRIPTOR_POLICY_BYTES,
         // These policies mirror Linux HID core limits
@@ -348,7 +345,7 @@ unsafe fn open_session(
         );
         return Err(sys::AOAHID_ERR_NOT_AOA);
     }
-    let options = device_options(timeout_ms);
+    let options = device_options();
     let mut session = Session {
         locator,
         device: ptr::null_mut(),
@@ -366,16 +363,24 @@ unsafe fn open_session(
         session.device,
         specs.keyboard,
         &nodes,
+        timeout_ms,
         &mut session.keyboard,
     );
     if status == sys::AOAHID_OK {
-        status = sys::aoahid_node_open(session.device, specs.mouse, &nodes, &mut session.mouse);
+        status = sys::aoahid_node_open(
+            session.device,
+            specs.mouse,
+            &nodes,
+            timeout_ms,
+            &mut session.mouse,
+        );
     }
     if status == sys::AOAHID_OK {
         status = sys::aoahid_node_open(
             session.device,
             specs.touchscreen,
             &nodes,
+            timeout_ms,
             &mut session.touchscreen,
         );
     }
@@ -384,16 +389,16 @@ unsafe fn open_session(
     } else {
         // Own and print the failing call's TLS strings before Device close clears them.
         report_error(status, "profile registration");
-        close_device(&mut session);
+        close_device(&mut session, timeout_ms);
         Err(status)
     }
 }
 
-fn close_device(session: &mut Session) -> sys::aoahid_result {
+fn close_device(session: &mut Session, timeout_ms: u32) -> sys::aoahid_result {
     if session.device.is_null() {
         return sys::AOAHID_OK;
     }
-    let status = unsafe { sys::aoahid_device_close(session.device) };
+    let status = unsafe { sys::aoahid_device_close(session.device, timeout_ms, CLOSE_DRAIN_TIMEOUT_MS) };
     // The first Device close consumes it and every Node handle for every result.
     session.device = ptr::null_mut();
     session.keyboard = ptr::null_mut();
@@ -414,7 +419,7 @@ fn close_touchscreen(
     poll_ms: u32,
 ) -> sys::aoahid_result {
     while !session.touchscreen.is_null() {
-        let status = unsafe { sys::aoahid_node_close(session.touchscreen) };
+        let status = unsafe { sys::aoahid_node_close(session.touchscreen, poll_ms, CLOSE_DRAIN_TIMEOUT_MS) };
         if status == sys::AOAHID_OK {
             session.touchscreen = ptr::null_mut();
             return status;
@@ -433,7 +438,7 @@ fn close_touchscreen(
 
 fn destroy_context(context: *mut sys::aoahid_context, poll_ms: u32) -> sys::aoahid_result {
     loop {
-        let status = unsafe { sys::aoahid_context_destroy(context) };
+        let status = unsafe { sys::aoahid_context_destroy(context, poll_ms, CLOSE_DRAIN_TIMEOUT_MS) };
         if status != sys::AOAHID_CLOSE_PENDING {
             return status; // Every non-pending valid destroy result consumes Context.
         }
@@ -480,7 +485,7 @@ fn update_then_submit(
         ]);
         if status == sys::AOAHID_ERR_NO_DEVICE {
             disappeared.push(session.locator.clone());
-            close_device(session);
+            close_device(session, timeout_ms);
         } else if status == sys::AOAHID_OK {
             ready.push(index);
         } else {
@@ -499,7 +504,7 @@ fn update_then_submit(
         ]);
         if status == sys::AOAHID_ERR_NO_DEVICE {
             disappeared.push(session.locator.clone());
-            close_device(session);
+            close_device(session, timeout_ms);
         } else if status != sys::AOAHID_OK {
             report_error(status, "profile submit");
             if result == sys::AOAHID_OK {
@@ -583,7 +588,7 @@ fn continue_without_touch(
         if status == sys::AOAHID_OK {
             ready.push(index);
         } else if status == sys::AOAHID_ERR_NO_DEVICE {
-            close_device(session);
+            close_device(session, timeout_ms);
         } else {
             result = status;
         }
@@ -674,7 +679,7 @@ fn drive_context(
         }
     }
     for session in &mut sessions {
-        close_device(session);
+        close_device(session, timeout_ms);
     }
     release_specs(&mut specs);
     result

@@ -39,7 +39,7 @@ structure layout does not change when a compiler uses short enums.
 AOA HID IDs are allocated per Context and per physical port (bus plus port
 path), starting at 1, and are never reused within that Context. Android
 tears down a disconnected device's HID objects asynchronously, so reusing an
-ID right after a reconnect could collide with an old registration. `aoahid_node_hid_id` returns the ID.
+ID right after a reconnect could collide with an old registration. `aoahid_node_id` returns the ID.
 
 `aoahid_spec_descriptor` and `aoahid_spec_manifest` pointers stay valid while
 the Spec reference is held. `aoahid_node_manifest` pointers stay valid until the
@@ -88,7 +88,7 @@ allows; calls the caller must serialize are still the caller's responsibility.
 | Channel | `aoahid_channel_open`, `aoahid_channel_close`, `aoahid_channel_write`, `aoahid_channel_read` |
 | Spec factories | `aoahid_spec_create_keyboard`, `_mouse`, `_toggle`, `_gamepad`, `_touchscreen`, `_touchpad`, `_pen`, `_digitizer`, `_raw` |
 | Spec access | `aoahid_spec_retain`, `aoahid_spec_release`, `aoahid_spec_descriptor`, `aoahid_spec_manifest` |
-| Node | `aoahid_node_open`, `aoahid_node_close`, `aoahid_node_hid_id`, `aoahid_node_manifest`, `aoahid_node_submit`, `aoahid_node_submit_blocking` |
+| Node | `aoahid_node_open`, `aoahid_node_close`, `aoahid_node_id`, `aoahid_node_manifest`, `aoahid_node_submit`, `aoahid_node_submit_blocking` |
 | Profile state | `aoahid_keyboard_key`, `aoahid_mouse_move`, `aoahid_mouse_scroll`, `aoahid_mouse_button`, `aoahid_toggle_usage`, `aoahid_gamepad_button`, `aoahid_gamepad_axis`, `aoahid_gamepad_dpad`, `aoahid_touchscreen_contact`, `aoahid_touchpad_contact`, `aoahid_touchpad_button`, `aoahid_pen_update`, `aoahid_digitizer_update`, `aoahid_battery_update`, `aoahid_raw_submit` |
 
 `aoahid_version()` returns `(major << 24) | (minor << 16) | patch`; the header
@@ -168,9 +168,10 @@ See [PROTOCOL.md](PROTOCOL.md) for the request details.
 
 `aoahid_device_options` has three kinds of fields.
 
-**Tuning values**, all required and nonzero (see below): `control_timeout_ms`,
-`send_timeout_ms`, `descriptor_fragment_bytes`, `transfer_pool_slots`,
-`maximum_report_bytes`, `close_drain_timeout_ms`.
+**Tuning values**, all required and nonzero (see below):
+`descriptor_fragment_bytes`, `transfer_pool_slots`, `maximum_report_bytes`.
+The waits (control, send, drain) are not options: every call that can wait
+takes its timeout as an argument (see "Timeouts" below).
 
 **Size policies**, all required and nonzero:
 
@@ -208,22 +209,38 @@ the values in one Linux revision.
 
 `aoahid_device_open` copies the options; your structure is never modified.
 
+## Timeouts
+
+No wait has a default and none is kept in the Device: every call that can wait
+takes its timeout in milliseconds as an argument, and zero is refused with
+`AOAHID_ERR_UNSET_FIELD` before anything is done (nothing is consumed). libusb
+treats a zero timeout as "no timeout", which is why zero is not accepted. A
+timeout is a failure deadline, not a delay: a transfer that completes earlier
+returns immediately. libmimhid follows the same rule with the same argument
+names.
+
+| Argument | Calls | Scope |
+|---|---|---|
+| `control_timeout_ms` | `aoahid_node_open`, `aoahid_node_close`, `aoahid_device_close`, `aoahid_context_destroy`, `aoahid_context_destroy_blocking` | Each synchronous AOA control request (54, 55, 56). `aoahid_discover` and `aoahid_accessory_options.control_timeout_ms` bound requests 51, 52, 53. |
+| `send_timeout_ms` | `aoahid_node_submit`, `aoahid_raw_submit` | The deadline of the queued asynchronous request-57 transfer; a failure is returned by a later call. A timed-out touch report leaves the contacts it lifted occupied; close and reopen that Node. Keep it well above normal EP0 latency. |
+| `drain_timeout_ms` | `aoahid_node_close`, `aoahid_device_close`, `aoahid_context_destroy*`, `aoahid_channel_open`, `aoahid_channel_close` | How long a close (or the wait for in-flight reports before a Channel opens) waits for in-flight reports and for the neutral reports it sends. |
+| `timeout_ms` | `aoahid_node_submit_blocking`, `aoahid_channel_read`, `aoahid_channel_write`, `aoahid_context_poll`, `aoahid_context_destroy_blocking` | The whole call. `aoahid_node_submit_blocking` also bounds each report it sends: that report's deadline is what is left of `timeout_ms`; so does the neutral-report wait of a close with `drain_timeout_ms`. |
+
+A close that does not finish inside the call (`AOAHID_CLOSE_PENDING`) finishes in
+the Context graveyard with the `control_timeout_ms` of the call that consumed
+the Device.
+
 ## Tuning values
 
 These values have no default: zero in a required one fails with
 `AOAHID_ERR_UNSET_FIELD`. They are the caller's choices, not USB, AOA,
-Android, ADB, or libusb requirements. libusb treats a zero timeout as "no
-timeout", which is why zero is not accepted. A timeout is a failure deadline,
-not a delay: a transfer that completes earlier returns immediately.
+Android, ADB, or libusb requirements.
 
 | Field | Scope |
 |---|---|
-| `aoahid_device_options.control_timeout_ms` | Each synchronous AOA control request (54, 55, 56). |
-| `aoahid_device_options.send_timeout_ms` | Each asynchronous request-57 transfer. A timed-out touch report leaves the contacts it lifted occupied; close and reopen that Node. Keep it well above normal EP0 latency. |
 | `aoahid_device_options.descriptor_fragment_bytes` | Payload of one request-56 fragment. |
 | `aoahid_device_options.transfer_pool_slots` | Asynchronous transfers per Device. |
 | `aoahid_device_options.maximum_report_bytes` | Largest report per pool slot. |
-| `aoahid_device_options.close_drain_timeout_ms` | Drain budget for Node, Channel, and Device close and for `aoahid_channel_open`. |
 | `aoahid_accessory_options.control_timeout_ms` | Each of requests 51, 52, 53. |
 | `aoahid_channel_options.in_transfers` | IN transfers kept submitted; required in stream read mode, not used in request mode. |
 | `aoahid_channel_options.out_transfers` | OUT transfers; a full pool makes a write wait. |
@@ -237,9 +254,9 @@ leaving at least one shared slot on the Device.
 
 ## Bulk Channels
 
-`aoahid_channel_open(device, &options, &channel)`:
+`aoahid_channel_open(device, &options, drain_timeout_ms, &channel)`:
 
-1. waits, within the Device's `close_drain_timeout_ms`, until no HID report
+1. waits, within `drain_timeout_ms`, until no HID report
    transfer is in flight (`AOAHID_ERR_TIMEOUT` otherwise). libusb's WinUSB
    backend claims an interface around each control transfer and releases it
    afterwards, which would otherwise undo the Channel's claim;
@@ -310,8 +327,8 @@ Read and write take no lock and do not allocate.
 
 ## Submission
 
-`aoahid_node_submit` serializes the Node's pending state into a pool slot and
-queues request 57 asynchronously, then returns. In caller-poll mode it may run
+`aoahid_node_submit(node, send_timeout_ms)` serializes the Node's pending state into a
+pool slot and queues request 57 asynchronously, then returns. In caller-poll mode it may run
 one non-waiting poll afterwards. If nothing changed it returns `AOAHID_OK`
 without sending.
 
@@ -364,7 +381,7 @@ I/O or allocates.
 | Pen | `aoahid_pen_update(node, &sample)` |
 | Digitizer | `aoahid_digitizer_update(node, &sample)` |
 | Battery report (any profile with `enable_battery`) | `aoahid_battery_update(node, strength)` |
-| Raw | `aoahid_raw_submit(node, report, length)` (validates, copies, and queues request 57 directly) |
+| Raw | `aoahid_raw_submit(node, report, length, send_timeout_ms)` (validates, copies, and queues request 57 directly) |
 
 `down` and the D-pad directions must be exactly 0 or 1. Buttons are
 one-based. What each call derives, and which values stay the caller's choice,
@@ -447,7 +464,7 @@ Ownership after close differs by handle:
 | `aoahid_channel_close` | Only on `AOAHID_OK`. `AOAHID_CLOSE_PENDING` leaves it valid. |
 | `aoahid_device_close` | Always, on the first valid call, together with every child Node and Channel. On `AOAHID_CLOSE_PENDING` the objects move to the Context graveyard and are freed once their transfers complete. |
 | `aoahid_context_destroy` | On every result except `AOAHID_CLOSE_PENDING` and `AOAHID_ERR_PARAM`. |
-| `aoahid_context_destroy_blocking(context, timeout_ms)` | On every result except `AOAHID_ERR_PARAM` (null Context or zero timeout) and a deadline expiry, which returns `AOAHID_ERR_TIMEOUT` with `last_error()->field == "context.destroy"`. A timeout recorded earlier during teardown is also returned as `AOAHID_ERR_TIMEOUT`, but with its original field, and in that case the Context is consumed. |
+| `aoahid_context_destroy_blocking(context, control_timeout_ms, drain_timeout_ms, timeout_ms)` | On every result except `AOAHID_ERR_PARAM` (null Context or zero deadline), `AOAHID_ERR_UNSET_FIELD` (a zero control or drain timeout) and a deadline expiry, which returns `AOAHID_ERR_TIMEOUT` with `last_error()->field == "context.destroy"`. A timeout recorded earlier during teardown is also returned as `AOAHID_ERR_TIMEOUT`, but with its original field, and in that case the Context is consumed. |
 
 A consumed pointer must never be passed to the API again. An error returned
 after ownership was consumed (for example a failed unregister) is reported for
@@ -458,10 +475,10 @@ information only.
 `aoahid_last_error()` returns the calling thread's diagnostic record without
 changing it. Every other function replaces the record: success resets it to
 `AOAHID_OK`; a failure fills `code`, `field`, `reason`, and, where they apply,
-`libusb_status`, `aoa_request`, `hid_id`, `report_id`, `offset`, and `length`.
+`transport_status` (the libusb status), `aoa_request`, `node_id` (the AOA HID ID of the Node involved), `report_id`, `offset`, and `length`.
 The strings stay valid until the thread's next call into the library.
 Functions that return a value rather than a result (`aoahid_discovery_count`,
-`aoahid_discovery_get`, `aoahid_node_hid_id`, `aoahid_version`) use 0 or null as
+`aoahid_discovery_get`, `aoahid_node_id`, `aoahid_version`) use 0 or null as
 the failure value, and `void` functions report failure only through
 `aoahid_last_error()`.
 

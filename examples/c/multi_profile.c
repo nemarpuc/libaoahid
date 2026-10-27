@@ -155,12 +155,9 @@ static aoahid_device_options device_options(void) {
     aoahid_device_options options = {0};
     options.struct_size = sizeof(options);
     options.reserved = 0U;
-    options.control_timeout_ms = k_control_timeout_ms;
-    options.send_timeout_ms = k_control_timeout_ms;
     options.descriptor_fragment_bytes = 64U; /* Explicit policy; AOA fixes no fragment size. */
     options.transfer_pool_slots = k_pool_slots;
     options.maximum_report_bytes = k_host_report_policy_bytes;
-    options.close_drain_timeout_ms = k_close_drain_timeout_ms;
     options.validate_reports = 1U;
     options.aoa_descriptor_wire_policy_bytes = k_descriptor_policy_bytes;
     options.linux_descriptor_policy_bytes = k_descriptor_policy_bytes;
@@ -331,19 +328,21 @@ static aoahid_result open_session(aoahid_context* context, const aoahid_device_i
     const aoahid_node_options nodes = node_options();
     aoahid_result status = aoahid_device_open(context, info, &open_options, &value->device);
     if (status == AOAHID_OK)
-        status = aoahid_node_open(value->device, definitions->keyboard, &nodes, &value->keyboard);
+        status = aoahid_node_open(value->device, definitions->keyboard, &nodes,
+                                  k_control_timeout_ms, &value->keyboard);
     if (status == AOAHID_OK)
-        status = aoahid_node_open(value->device, definitions->mouse, &nodes, &value->mouse);
+        status = aoahid_node_open(value->device, definitions->mouse, &nodes, k_control_timeout_ms,
+                                  &value->mouse);
     if (status == AOAHID_OK)
-        status =
-            aoahid_node_open(value->device, definitions->touchscreen, &nodes, &value->touchscreen);
+        status = aoahid_node_open(value->device, definitions->touchscreen, &nodes,
+                                  k_control_timeout_ms, &value->touchscreen);
     if (status != AOAHID_OK) {
         /* Copy/report TLS diagnostics before cleanup makes another public call. */
         (void)failed(status, value->device == NULL ? "device open" : "profile registration");
     }
     if (status != AOAHID_OK && value->device != NULL) {
         /* The first Device close consumes it and every opened Node for every result. */
-        (void)aoahid_device_close(value->device);
+        (void)aoahid_device_close(value->device, k_control_timeout_ms, k_close_drain_timeout_ms);
         value->device = NULL;
         value->keyboard = NULL;
         value->mouse = NULL;
@@ -355,7 +354,8 @@ static aoahid_result open_session(aoahid_context* context, const aoahid_device_i
 static aoahid_result close_device(session* value) {
     if (value->device == NULL)
         return AOAHID_OK;
-    const aoahid_result status = aoahid_device_close(value->device);
+    const aoahid_result status =
+        aoahid_device_close(value->device, k_control_timeout_ms, k_close_drain_timeout_ms);
     /* CLOSE_PENDING transfers the complete graph to Context; never close again. */
     value->device = NULL;
     value->keyboard = NULL;
@@ -368,7 +368,8 @@ static aoahid_result close_device(session* value) {
 
 static aoahid_result close_touchscreen(aoahid_context* context, session* value) {
     while (value->touchscreen != NULL) {
-        const aoahid_result status = aoahid_node_close(value->touchscreen);
+        const aoahid_result status =
+            aoahid_node_close(value->touchscreen, k_control_timeout_ms, k_close_drain_timeout_ms);
         if (status == AOAHID_OK) {
             value->touchscreen = NULL;
             return status;
@@ -385,7 +386,8 @@ static aoahid_result close_touchscreen(aoahid_context* context, session* value) 
 
 static aoahid_result destroy_context(aoahid_context* context) {
     for (;;) {
-        const aoahid_result status = aoahid_context_destroy(context);
+        const aoahid_result status =
+            aoahid_context_destroy(context, k_control_timeout_ms, k_close_drain_timeout_ms);
         if (status != AOAHID_CLOSE_PENDING)
             return status; /* Every non-pending valid destroy result consumes Context. */
         const aoahid_result poll = aoahid_context_poll(context, k_control_timeout_ms);

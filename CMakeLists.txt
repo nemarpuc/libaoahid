@@ -2,7 +2,7 @@
 # Copyright (c) 2026 libaoahid contributors
 cmake_minimum_required(VERSION 3.20)
 
-project(libaoahid VERSION 1.0.1
+project(libaoahid VERSION 2.0.0
     DESCRIPTION "Explicit host-side Android Open Accessory HID input library"
     HOMEPAGE_URL "https://github.com/nemarpuc/libaoahid"
     LANGUAGES C CXX)
@@ -260,7 +260,7 @@ function(aoahid_configure_library target kind objects)
       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   set_target_properties(${target} PROPERTIES
       VERSION ${PROJECT_VERSION}
-      SOVERSION 1
+      SOVERSION 2
       CXX_STANDARD 20
       CXX_STANDARD_REQUIRED YES)
   if(AOAHID_INSTRUMENT_LINK_OPTIONS)

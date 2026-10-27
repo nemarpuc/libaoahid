@@ -8,7 +8,7 @@ static const char* const k_send_sequence[] = {
     "aoahid_mouse_move(node, 10, -5)   pending totals are 64-bit and signed",
     "aoahid_mouse_scroll(node, 1, 0)   Wheel and AC Pan are independent",
     "aoahid_mouse_button(node, 0, 1)   button index 0 is Button 1",
-    "aoahid_node_submit(node)          only the submitted fragment is consumed", NULL};
+    "aoahid_node_submit(node, send_ms)  only the submitted fragment is consumed", NULL};
 
 int main(void) {
     aoahid_mouse_options options = {0};

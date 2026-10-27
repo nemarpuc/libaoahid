@@ -148,10 +148,11 @@ value above. The tuning values below are required (zero is
 `AOAHID_ERR_UNSET_FIELD`) and are the caller's choices, not USB, Android, or
 libusb recommendations; see [API.md](API.md#tuning-values).
 
-`control_timeout_ms`, `send_timeout_ms`, `descriptor_fragment_bytes`,
-`transfer_pool_slots`, `maximum_report_bytes`, `close_drain_timeout_ms`,
+`descriptor_fragment_bytes`, `transfer_pool_slots`, `maximum_report_bytes`,
 `aoahid_accessory_options.control_timeout_ms`, and the Channel's
-`out_transfers`, `transfer_bytes` and (stream mode) `in_transfers`.
+`out_transfers`, `transfer_bytes` and (stream mode) `in_transfers`. The waits
+(`control_timeout_ms`, `send_timeout_ms`, `drain_timeout_ms`) are arguments of
+the calls that wait, with no default; see [API.md](API.md#timeouts).
 `aoahid_node_options` `0/0` is no reserved slot.
 
 `maximum_report_bytes` and `descriptor_fragment_bytes` must fit

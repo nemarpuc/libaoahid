@@ -10,6 +10,11 @@
 #include <cstdint>
 #include <cstring>
 
+// Every wait is an argument of the call and has no default; these are the tests' own choices.
+inline constexpr std::uint32_t kControlTimeoutMs = 20U;
+inline constexpr std::uint32_t kSendTimeoutMs = 20U;
+inline constexpr std::uint32_t kDrainTimeoutMs = 20U;
+
 namespace {
 
 aoahid_context_options context_options() {
@@ -23,12 +28,9 @@ aoahid_context_options context_options() {
 aoahid_device_options device_options() {
     aoahid_device_options options{};
     options.struct_size = sizeof(options);
-    options.control_timeout_ms = 20U;
-    options.send_timeout_ms = 20U;
     options.descriptor_fragment_bytes = 64U;
     options.transfer_pool_slots = 1U;
     options.maximum_report_bytes = 64U;
-    options.close_drain_timeout_ms = 20U;
     options.validate_reports = 1U;
     options.aoa_descriptor_wire_policy_bytes = 1024U;
     options.linux_descriptor_policy_bytes = 1024U;
@@ -127,16 +129,17 @@ void test_structured_logging_excludes_payload() {
     AOAHID_CHECK(aoahid_spec_create_raw(&raw_options, &spec) == AOAHID_OK);
     const aoahid_node_options node_options{sizeof(aoahid_node_options), 0U, 1U, 0U};
     aoahid_node* node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(device, spec, &node_options, &node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, spec, &node_options, kControlTimeoutMs, &node) ==
+                 AOAHID_OK);
     static constexpr std::array<std::uint8_t, 7U> sensitive_report{1U,  'S', 'E', 'C',
                                                                    'R', 'E', 'T'};
-    AOAHID_CHECK(aoahid_raw_submit(node, sensitive_report.data(), sensitive_report.size()) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_raw_submit(node, sensitive_report.data(), sensitive_report.size(),
+                                   kSendTimeoutMs) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(node, 20U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(node, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
     aoahid_spec_release(spec);
-    AOAHID_CHECK(aoahid_device_close(device) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_context_destroy(context) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
     AOAHID_CHECK(capture.error_count == 0U);
     AOAHID_CHECK(capture.info_count >= 4U);
     // Prompt 0 rule 3 keeps the send/completion path free of logging calls.
@@ -169,39 +172,45 @@ void test_physical_identity_hid_id_domains() {
     // A failed registration retires its ID in only the first physical domain.
     aoahid_fake_libusb_queue_control_result(LIBUSB_ERROR_PIPE);
     aoahid_node* rejected = nullptr;
-    AOAHID_CHECK(aoahid_node_open(first_device, spec, &node_options, &rejected) ==
-                 AOAHID_ERR_STALL);
+    AOAHID_CHECK(aoahid_node_open(first_device, spec, &node_options, kControlTimeoutMs,
+                                  &rejected) == AOAHID_ERR_STALL);
     AOAHID_CHECK(rejected == nullptr);
     const aoahid_error_detail* registration_error = aoahid_last_error();
     AOAHID_CHECK(registration_error->code == AOAHID_ERR_STALL);
     AOAHID_CHECK(registration_error->field != nullptr && registration_error->reason != nullptr);
-    AOAHID_CHECK(registration_error->libusb_status == LIBUSB_ERROR_PIPE);
+    AOAHID_CHECK(registration_error->transport_status == LIBUSB_ERROR_PIPE);
     AOAHID_CHECK(registration_error->aoa_request == 54);
-    AOAHID_CHECK(registration_error->hid_id == 1U);
+    AOAHID_CHECK(registration_error->node_id == 1U);
     AOAHID_CHECK(registration_error->offset == 0U);
     AOAHID_CHECK(registration_error->length == 21U);
 
     aoahid_node* first_node = nullptr;
     aoahid_node* second_node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(first_device, spec, &node_options, &first_node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(first_device, spec, &node_options, kControlTimeoutMs,
+                                  &first_node) == AOAHID_OK);
     AOAHID_CHECK(aoahid_last_error()->code == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_open(second_device, spec, &node_options, &second_node) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_hid_id(first_node) == 2U);
-    AOAHID_CHECK(aoahid_node_hid_id(second_node) == 1U);
+    AOAHID_CHECK(aoahid_node_open(second_device, spec, &node_options, kControlTimeoutMs,
+                                  &second_node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_id(first_node) == 2U);
+    AOAHID_CHECK(aoahid_node_id(second_node) == 1U);
 
-    AOAHID_CHECK(aoahid_node_close(first_node) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_device_close(first_device) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(first_node, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_device_close(first_device, kControlTimeoutMs, kDrainTimeoutMs) ==
+                 AOAHID_OK);
     first_device = open_device(context, first);
     first_node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(first_device, spec, &node_options, &first_node) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_hid_id(first_node) == 3U);
+    AOAHID_CHECK(aoahid_node_open(first_device, spec, &node_options, kControlTimeoutMs,
+                                  &first_node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_id(first_node) == 3U);
 
-    AOAHID_CHECK(aoahid_node_close(first_node) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(second_node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(first_node, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(second_node, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
     aoahid_spec_release(spec);
-    AOAHID_CHECK(aoahid_device_close(first_device) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_device_close(second_device) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_context_destroy(context) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_device_close(first_device, kControlTimeoutMs, kDrainTimeoutMs) ==
+                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_device_close(second_device, kControlTimeoutMs, kDrainTimeoutMs) ==
+                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
     aoahid_fake_libusb_reset();
 }
 

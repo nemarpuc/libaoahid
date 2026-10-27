@@ -61,18 +61,18 @@ int main(void) {
     aoahid_spec* spec = NULL;
     aoahid_result result = aoahid_spec_create_keyboard(&options, &spec);
     if (result != AOAHID_OK) {
-        aoahid_device_close(device);
-        aoahid_context_destroy(context);
+        aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
         return verify_fail("keyboard spec create", result);
     }
 
     const aoahid_node_options node_options = {(uint32_t)sizeof(aoahid_node_options), 0U, 1U, 0U};
     aoahid_node* node = NULL;
-    result = aoahid_node_open(device, spec, &node_options, &node);
+    result = aoahid_node_open(device, spec, &node_options, VERIFY_CONTROL_TIMEOUT_MS, &node);
     aoahid_spec_release(spec);
     if (result != AOAHID_OK) {
-        aoahid_device_close(device);
-        aoahid_context_destroy(context);
+        aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
         return verify_fail("keyboard node open", result);
     }
 
@@ -84,17 +84,17 @@ int main(void) {
     for (int round = 0; round < 3; ++round) {
         for (const char* p = message; *p != '\0'; ++p) {
             if (type_char(node, *p) != 0) {
-                aoahid_node_close(node);
-                aoahid_device_close(device);
-                aoahid_context_destroy(context);
+                aoahid_node_close(node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+                aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+                aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
                 return 1;
             }
         }
     }
 
     printf("done. Expected result: \"%s\" typed 3 times.\n", "hello from libaoahid");
-    aoahid_node_close(node);
-    aoahid_device_close(device);
-    aoahid_context_destroy(context);
+    aoahid_node_close(node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+    aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+    aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
     return 0;
 }

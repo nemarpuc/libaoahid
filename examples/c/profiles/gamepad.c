@@ -11,7 +11,7 @@ static const char* const k_send_sequence[] = {
     "aoahid_gamepad_axis(node, 0, 0)   axis index 0, caller-declared range",
     "aoahid_gamepad_dpad(node, 1, 0, 0, 0)         booleans become a canonical Hat value",
     "aoahid_gamepad_button(node, 0, 1)     button index 0 is Button 1",
-    "aoahid_node_submit(node)              opposite D-pad pairs are rejected", NULL};
+    "aoahid_node_submit(node, send_ms)     opposite D-pad pairs are rejected", NULL};
 
 int main(void) {
     const aoahid_gamepad_axis_option axes[] = {

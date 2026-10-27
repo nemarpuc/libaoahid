@@ -7,9 +7,9 @@
 
 static const char* const k_send_sequence[] = {
     "aoahid_touchscreen_contact(node, 0, 1, 500, 500, NULL)   contact id 0, tip down",
-    "aoahid_node_submit(node)                   Contact Count and Scan Time are derived",
+    "aoahid_node_submit(node, send_ms)          Contact Count and Scan Time are derived",
     "aoahid_touchscreen_contact(node, 0, 0, 500, 500, NULL)   tip up keeps the same stable id",
-    "aoahid_node_submit(node)                   closes the frame", NULL};
+    "aoahid_node_submit(node, send_ms)          closes the frame", NULL};
 
 int main(void) {
     aoahid_touchscreen_options options = {0};

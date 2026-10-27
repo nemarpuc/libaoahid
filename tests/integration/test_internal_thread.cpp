@@ -12,6 +12,11 @@
 #include <cstdio>
 #include <cstring>
 
+// Every wait is an argument of the call and has no default; these are the tests' own choices.
+inline constexpr std::uint32_t kControlTimeoutMs = 100U;
+inline constexpr std::uint32_t kSendTimeoutMs = 100U;
+inline constexpr std::uint32_t kDrainTimeoutMs = 1000U;
+
 namespace {
 
 bool require_ok(const aoahid_result result, const char* operation) noexcept {
@@ -29,12 +34,9 @@ bool require_ok(const aoahid_result result, const char* operation) noexcept {
 aoahid_device_options make_device_options() noexcept {
     aoahid_device_options options{};
     options.struct_size = static_cast<std::uint32_t>(sizeof(options));
-    options.control_timeout_ms = 100U;
-    options.send_timeout_ms = 100U;
     options.descriptor_fragment_bytes = 64U;
     options.transfer_pool_slots = 2U;
     options.maximum_report_bytes = 64U;
-    options.close_drain_timeout_ms = 1000U;
     options.validate_reports = 1U;
     options.aoa_descriptor_wire_policy_bytes = 1024U;
     options.linux_descriptor_policy_bytes = 1024U;
@@ -174,7 +176,7 @@ int main() {
         return 1;
     }
     const aoahid_error_detail* event_error = aoahid_last_error();
-    if (event_error == nullptr || event_error->libusb_status != LIBUSB_ERROR_IO ||
+    if (event_error == nullptr || event_error->transport_status != LIBUSB_ERROR_IO ||
         event_error->field == nullptr ||
         std::strcmp(event_error->field, "context.event_pump") != 0) {
         std::fputs("internal event failure metadata was not retained exactly\n", stderr);
@@ -217,7 +219,8 @@ int main() {
     // Node destruction takes that mutex as a callback-exit barrier.
     for (std::size_t iteration = 0U; iteration < 128U; ++iteration) {
         aoahid_node* node = nullptr;
-        if (!require_ok(aoahid_node_open(device, spec, &node_options, &node), "node_open")) {
+        if (!require_ok(aoahid_node_open(device, spec, &node_options, kControlTimeoutMs, &node),
+                        "node_open")) {
             return 1;
         }
         if (node->active_completion_mutex != &node->completion_mutex) {
@@ -226,14 +229,16 @@ int main() {
         }
         if (!require_ok(aoahid_mouse_move(node, 17, -9), "mouse_move") ||
             !require_ok(aoahid_mouse_scroll(node, 1, -1), "mouse_scroll") ||
-            !require_ok(aoahid_node_submit(node), "node_submit") ||
-            !require_ok(aoahid_node_close(node), "node_close")) {
+            !require_ok(aoahid_node_submit(node, kSendTimeoutMs), "node_submit") ||
+            !require_ok(aoahid_node_close(node, kControlTimeoutMs, kDrainTimeoutMs),
+                        "node_close")) {
             return 1;
         }
     }
     aoahid_spec_release(spec);
 
-    const aoahid_result first_device_close = aoahid_device_close(device);
+    const aoahid_result first_device_close =
+        aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs);
     // Node completion has a narrower callback-exit barrier than Device
     // reclamation: after the Node callback publishes its terminal state, the
     // transport may still be leaving that callback.  Device close consumes the
@@ -243,7 +248,9 @@ int main() {
         static_cast<void>(require_ok(first_device_close, "device_close"));
         return 1;
     }
-    if (!require_ok(aoahid_context_destroy_blocking(context, 1000U), "context_destroy_blocking")) {
+    if (!require_ok(
+            aoahid_context_destroy_blocking(context, kControlTimeoutMs, kDrainTimeoutMs, 1000U),
+            "context_destroy_blocking")) {
         return 1;
     }
     if (aoahid_fake_libusb_pending_transfer_count() != 0U) {
@@ -266,7 +273,8 @@ int main() {
         std::fputs("failed to read pre-teardown event statistics\n", stderr);
         return 1;
     }
-    if (!require_ok(aoahid_context_destroy_blocking(teardown_context, 2'000U),
+    if (!require_ok(aoahid_context_destroy_blocking(teardown_context, kControlTimeoutMs,
+                                                    kDrainTimeoutMs, 2'000U),
                     "teardown_context_destroy")) {
         return 1;
     }
@@ -315,7 +323,7 @@ int main() {
         return 1;
     }
     aoahid_node* delayed_node = nullptr;
-    if (!require_ok(aoahid_node_open(device, spec, &node_options, &delayed_node),
+    if (!require_ok(aoahid_node_open(device, spec, &node_options, kControlTimeoutMs, &delayed_node),
                     "fallback_node_open")) {
         return 1;
     }
@@ -323,8 +331,9 @@ int main() {
     static constexpr std::array<std::uint8_t, 2U> raw_payload{1U, 1U};
     aoahid_fake_libusb_queue_async_completion(LIBUSB_TRANSFER_COMPLETED,
                                               static_cast<int>(raw_payload.size()), 1'000U);
-    if (!require_ok(aoahid_raw_submit(delayed_node, raw_payload.data(), raw_payload.size()),
-                    "fallback_raw_submit")) {
+    if (!require_ok(
+            aoahid_raw_submit(delayed_node, raw_payload.data(), raw_payload.size(), kSendTimeoutMs),
+            "fallback_raw_submit")) {
         return 1;
     }
     const std::size_t polls_before_recoverable_error = aoahid_fake_libusb_event_handle_count();
@@ -338,12 +347,13 @@ int main() {
         std::fputs("failed event thread did not exit while retaining a join handle\n", stderr);
         return 1;
     }
-    if (aoahid_device_close(device) != AOAHID_CLOSE_PENDING) {
+    if (aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs) != AOAHID_CLOSE_PENDING) {
         std::fputs("failed-pump Device did not move to the graveyard\n", stderr);
         return 1;
     }
     const std::size_t polls_before_fallback = aoahid_fake_libusb_event_handle_count();
-    if (aoahid_context_destroy_blocking(context, 1000U) != AOAHID_ERR_INTERNAL) {
+    if (aoahid_context_destroy_blocking(context, kControlTimeoutMs, kDrainTimeoutMs, 1000U) !=
+        AOAHID_ERR_INTERNAL) {
         std::fputs("blocking destroy did not return the original terminal pump error\n", stderr);
         return 1;
     }

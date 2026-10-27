@@ -36,9 +36,9 @@ class ErrorDetail(c.Structure):
         ("code", I32),
         ("field", CHAR_PTR),
         ("reason", CHAR_PTR),
-        ("libusb_status", I32),
+        ("transport_status", I32),
         ("aoa_request", I32),
-        ("hid_id", U16),
+        ("node_id", U16),
         ("report_id", U16),
         ("offset", U32),
         ("length", U32),
@@ -85,12 +85,9 @@ class DeviceOptions(c.Structure):
     _fields_ = [
         ("struct_size", U32),
         ("reserved", U32),
-        ("control_timeout_ms", U32),
-        ("send_timeout_ms", U32),
         ("descriptor_fragment_bytes", U32),
         ("transfer_pool_slots", U32),
         ("maximum_report_bytes", U32),
-        ("close_drain_timeout_ms", U32),
         ("aoa_descriptor_wire_policy_bytes", U32),
         ("linux_descriptor_policy_bytes", U32),
         ("linux_hid_fields_per_report_policy", U32),
@@ -478,9 +475,9 @@ GOLDEN_STRUCTS = {
 
 
 GOLDEN_CONSTANTS = {
-    "AOAHID_VERSION_MAJOR": 1,
+    "AOAHID_VERSION_MAJOR": 2,
     "AOAHID_VERSION_MINOR": 0,
-    "AOAHID_VERSION_PATCH": 1,
+    "AOAHID_VERSION_PATCH": 0,
     "AOAHID_OK": 0,
     "AOAHID_ERR_PARAM": 1,
     "AOAHID_ERR_UNSET_FIELD": 2,

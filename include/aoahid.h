@@ -29,9 +29,9 @@
 extern "C" {
 #endif
 
-#define AOAHID_VERSION_MAJOR 1
+#define AOAHID_VERSION_MAJOR 2
 #define AOAHID_VERSION_MINOR 0
-#define AOAHID_VERSION_PATCH 1
+#define AOAHID_VERSION_PATCH 0
 
 typedef struct aoahid_context aoahid_context;
 typedef struct aoahid_discovery aoahid_discovery;
@@ -163,9 +163,9 @@ typedef struct aoahid_error_detail {
     int32_t code;
     const char* field;
     const char* reason;
-    int32_t libusb_status;
+    int32_t transport_status;
     int32_t aoa_request;
-    uint16_t hid_id;
+    uint16_t node_id;
     uint16_t report_id;
     uint32_t offset;
     uint32_t length;
@@ -206,25 +206,30 @@ typedef struct aoahid_aoa_strings {
     const char* serial;
 } aoahid_aoa_strings;
 
+/* ---- Timeouts ---------------------------------------------------------------------------
+ * No wait in this library has a default and none is kept in the Device: every call that can
+ * wait takes its timeout in milliseconds as an argument, and zero is refused with
+ * AOAHID_ERR_UNSET_FIELD before anything is done (nothing is consumed). The waits are:
+ *  - control: how long each control request on endpoint 0 (AOA requests 51 to 56) may take;
+ *  - send: how long a report transfer may take before it fails with AOAHID_ERR_TIMEOUT. After a
+ *    touch report times out, the lifted contacts in it stay occupied; close and reopen that
+ *    Node. Keep it well above normal endpoint 0 latency;
+ *  - drain: how long a close waits for in-flight reports and the neutral reports it sends.
+ * libmimhid follows the same rule with the same argument names. */
+
 typedef struct aoahid_device_options {
     uint32_t struct_size;
     uint32_t reserved;
     /* Tuning values, all required (AOAHID_ERR_UNSET_FIELD when zero). They are
-     * the caller's choices, not USB/AOA requirements or libusb recommendations. */
-    /* each control request's deadline, in ms */
-    uint32_t control_timeout_ms;
-    /* each report's deadline, in ms. After a touch report times out, the lifted
-     * contacts in it stay occupied; close and reopen that Node. Keep this well
-     * above normal EP0 latency. */
-    uint32_t send_timeout_ms;
+     * the caller's choices, not USB/AOA requirements or libusb recommendations.
+     * No wait is kept here: every call that can wait takes its timeout in
+     * milliseconds as an argument (see "Timeouts" below). */
     /* bytes per request-56 descriptor fragment */
     uint32_t descriptor_fragment_bytes;
     /* transfer slots shared by the Device's Nodes */
     uint32_t transfer_pool_slots;
     /* the largest report a Node may send, in bytes */
     uint32_t maximum_report_bytes;
-    /* bound on the neutral reports sent when the Device closes, in ms */
-    uint32_t close_drain_timeout_ms;
     /* Four independent byte policies prevent a Linux descriptor ceiling from
      * being mistaken for the AOA 16-bit descriptor wire field or either
      * control-transfer buffer. None is a default or a discovered limit. */
@@ -710,20 +715,24 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_context_poll(aoahid_context* context
  * AOAHID_ERR_PARAM for a null handle also consumes nothing. Every other result
  * from a valid call is terminal and consumes Context and all child graphs; the
  * pointer then becomes invalid and must never be passed to any API again.
- * Blocking: Performs bounded child close work, synchronous unregister requests,
- * graveyard reaping, and an event-thread join; it does not wait indefinitely for
- * outstanding callbacks and returns AOAHID_CLOSE_PENDING instead.
+ * Blocking: Closes every Device still open on Context as aoahid_device_close does,
+ * with control_timeout_ms for each unregister request and drain_timeout_ms for each
+ * Device's neutral reports; then graveyard reaping and an event-thread join. It does not
+ * wait indefinitely for outstanding callbacks and returns AOAHID_CLOSE_PENDING instead.
  * Synchronization: Belongs to the Context domain; the caller serializes it
  * against all other calls and must not invoke it from that Context's log sink.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for a null Context (a pointer from an
  * earlier consuming call is invalid input and is not diagnostically detectable);
+ * AOAHID_ERR_UNSET_FIELD for a zero timeout (nothing is consumed);
  * AOAHID_CLOSE_PENDING when ownership cannot yet be released;
  * AOAHID_ERR_UNSUPPORTED, AOAHID_ERR_ACCESS, AOAHID_ERR_BUSY,
  * AOAHID_ERR_NO_DEVICE, AOAHID_ERR_STALL, AOAHID_ERR_TIMEOUT,
  * AOAHID_ERR_SHORT_TRANSFER, AOAHID_ERR_IO, or AOAHID_ERR_OVERFLOW for retained
  * close/event/transport failure after terminal cleanup; AOAHID_ERR_INTERNAL for
  * an invariant, allocation, or unexpected ABI-boundary failure. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_context_destroy(aoahid_context* context);
+AOAHID_API aoahid_result AOAHID_CALL aoahid_context_destroy(aoahid_context* context,
+                                                            uint32_t control_timeout_ms,
+                                                            uint32_t drain_timeout_ms);
 
 /* aoahid_context_destroy_blocking
  * Ownership: A null call or zero-deadline call consumes nothing.
@@ -734,10 +743,13 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_context_destroy(aoahid_context* cont
  * consume Context. Every other result from a valid call is also terminal. After
  * consumption the pointer is invalid and must never be passed again.
  * Blocking: Repeatedly pumps or waits for teardown until timeout_ms; synchronous
- * control transfers and thread joining performed by teardown are part of the call.
+ * control transfers (control_timeout_ms each), neutral-report draining
+ * (drain_timeout_ms per Device) and thread joining performed by teardown are part of
+ * the call.
  * Synchronization: Belongs to the Context domain; the caller serializes it
  * against all other calls and must not call it from the Context event/log thread.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for a null Context or zero deadline;
+ * AOAHID_ERR_UNSET_FIELD for a zero control or drain timeout (nothing is consumed);
  * AOAHID_ERR_TIMEOUT either for the retaining deadline case identified above or
  * for a terminal retained timeout whose diagnostic identifies its source;
  * AOAHID_ERR_UNSUPPORTED, AOAHID_ERR_ACCESS, AOAHID_ERR_BUSY,
@@ -746,6 +758,8 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_context_destroy(aoahid_context* cont
  * failure; AOAHID_ERR_INTERNAL for an invariant, allocation, or unexpected
  * ABI-boundary failure. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_context_destroy_blocking(aoahid_context* context,
+                                                                     uint32_t control_timeout_ms,
+                                                                     uint32_t drain_timeout_ms,
                                                                      uint32_t timeout_ms);
 
 /* aoahid_discover
@@ -857,20 +871,25 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_device_open(aoahid_context* context,
  * and every child Node and Channel for every returned result, including
  * AOAHID_CLOSE_PENDING; all those pointers become invalid and must never be
  * passed again.
- * Blocking: Bounded by configured drain/control timeouts while it completes
- * frames, sends neutral/unregister requests, cancels transfers, and runs callbacks.
+ * Blocking: Bounded by drain_timeout_ms for the neutral reports and control_timeout_ms for
+ * each unregister request while it completes frames, cancels transfers, and runs callbacks.
+ * A teardown that outlives the call finishes in the Context graveyard with the same
+ * control_timeout_ms.
  * Synchronization: Belongs to the parent Context domain and must be serialized
  * against every Device, Node, and Context call; never call it from the log sink.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for null or for a still-live Device that
  * has no valid transport/Context or has already entered closing. A pointer from
  * an earlier consuming call is invalid input and is not diagnostically detectable;
+ * AOAHID_ERR_UNSET_FIELD for a zero timeout (nothing is consumed);
  * AOAHID_CLOSE_PENDING when the consumed graph moves to the Context graveyard;
  * AOAHID_ERR_UNSUPPORTED, AOAHID_ERR_ACCESS, AOAHID_ERR_BUSY,
  * AOAHID_ERR_NO_DEVICE, AOAHID_ERR_STALL, AOAHID_ERR_TIMEOUT,
  * AOAHID_ERR_SHORT_TRANSFER, AOAHID_ERR_IO, or AOAHID_ERR_OVERFLOW for retained
  * teardown/transport failure after ownership is consumed; AOAHID_ERR_INTERNAL
  * for an invariant, allocation, or unexpected ABI-boundary failure. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_device_close(aoahid_device* device);
+AOAHID_API aoahid_result AOAHID_CALL aoahid_device_close(aoahid_device* device,
+                                                         uint32_t control_timeout_ms,
+                                                         uint32_t drain_timeout_ms);
 
 /* aoahid_device_latched_error
  * Ownership: Borrows a live Device and consumes the reported non-NO_DEVICE
@@ -891,7 +910,7 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_device_latched_error(aoahid_device* 
  * receives one Channel owned by the caller and Device; it shares the Device's
  * USB handle. out_channel is null on every failure. aoahid_device_close also
  * closes every Channel still open on the Device.
- * Blocking: Waits up to the Device's close drain budget for in-flight report
+ * Blocking: Waits up to drain_timeout_ms for in-flight report
  * transfers (in caller-poll mode driving libusb events), selects configuration
  * 1 only when the device is unconfigured (AOA 1.0), reads the active
  * configuration descriptor, claims the selected interface, allocates a fixed
@@ -900,7 +919,7 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_device_latched_error(aoahid_device* 
  * Synchronization: Belongs to the parent Context domain and must be serialized
  * with all Device, Node, Channel open/close, and Context application calls.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid handles/options or a closing
- * Device; AOAHID_ERR_UNSET_FIELD for a nonzero reserved field or a
+ * Device; AOAHID_ERR_UNSET_FIELD for a zero drain_timeout_ms, a nonzero reserved field or a
  * zero_length_termination other than zero or one; AOAHID_ERR_UNSUPPORTED when
  * no interface has the class triple and a Bulk IN/OUT pair, or for a mapped
  * backend status; AOAHID_ERR_ACCESS, AOAHID_ERR_BUSY, AOAHID_ERR_NO_DEVICE, or
@@ -911,24 +930,27 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_device_latched_error(aoahid_device* 
  * unexpected failure. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_channel_open(aoahid_device* device,
                                                          const aoahid_channel_options* options,
+                                                         uint32_t drain_timeout_ms,
                                                          aoahid_channel** out_channel);
 
 /* aoahid_channel_close
  * Ownership: Only AOAHID_OK consumes Channel. AOAHID_CLOSE_PENDING leaves the
  * lost Channel caller-owned for a retry or later Device close. After AOAHID_OK
  * the Channel pointer is invalid and must never be passed again.
- * Blocking: Cancels every transfer and waits up to the Device's close drain
- * budget for their completions, then, within the same budget, for in-flight
+ * Blocking: Cancels every transfer and waits up to drain_timeout_ms for their
+ * completions, then, within the same budget, for in-flight
  * report transfers before releasing the interface; in caller-poll mode this
  * call drives libusb events.
  * Synchronization: Belongs to the parent Context domain; never run it
  * concurrently with a read or write on the same Channel.
- * Returns: AOAHID_OK; AOAHID_ERR_PARAM for null; AOAHID_CLOSE_PENDING when a
+ * Returns: AOAHID_OK; AOAHID_ERR_PARAM for null; AOAHID_ERR_UNSET_FIELD for a zero
+ * drain_timeout_ms; AOAHID_CLOSE_PENDING when a
  * cancelled transfer misses the close budget; AOAHID_ERR_UNSUPPORTED,
  * AOAHID_ERR_ACCESS, AOAHID_ERR_BUSY, AOAHID_ERR_NO_DEVICE, AOAHID_ERR_STALL,
  * AOAHID_ERR_TIMEOUT, AOAHID_ERR_IO, or AOAHID_ERR_OVERFLOW for a caller-poll
  * event-pump failure; AOAHID_ERR_INTERNAL for unexpected failure. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_channel_close(aoahid_channel* channel);
+AOAHID_API aoahid_result AOAHID_CALL aoahid_channel_close(aoahid_channel* channel,
+                                                          uint32_t drain_timeout_ms);
 
 /* aoahid_channel_write
  * Ownership: Borrows data; bytes are copied into the Channel pool before
@@ -1156,14 +1178,16 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_spec_manifest(const aoahid_spec* spe
  * Ownership: Borrows Device/options, retains Spec, and on success returns one
  * Node owned by the caller and Device. out_node is null on every failure.
  * Blocking: Allocates immutable state/pool reservation and synchronously sends
- * register request 54 plus descriptor fragments in request 56.
+ * register request 54 plus descriptor fragments in request 56, each waiting up to
+ * control_timeout_ms.
  * Note: Android registers the HID asynchronously after the last fragment, so a
  * report sent right after this returns may STALL or be lost unseen; wait
  * briefly before the first input (see docs/API.md).
  * Synchronization: Belongs to the parent Context domain and must be serialized
  * with all Device, Node, and Context application calls.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for invalid handles/options/reservation;
- * AOAHID_ERR_UNSET_FIELD for missing reservation intent; AOAHID_ERR_UNSUPPORTED,
+ * AOAHID_ERR_UNSET_FIELD for missing reservation intent or a zero control_timeout_ms;
+ * AOAHID_ERR_UNSUPPORTED,
  * AOAHID_ERR_ACCESS, AOAHID_ERR_BUSY, AOAHID_ERR_NO_DEVICE, AOAHID_ERR_STALL,
  * AOAHID_ERR_TIMEOUT, AOAHID_ERR_SHORT_TRANSFER, or AOAHID_ERR_IO for deferred,
  * reservation, or registration transport failure; AOAHID_ERR_OVERFLOW for HID
@@ -1171,6 +1195,7 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_spec_manifest(const aoahid_spec* spe
  * AOAHID_ERR_INTERNAL for allocation, state initialization, or unexpected failure. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* spec,
                                                       const aoahid_node_options* options,
+                                                      uint32_t control_timeout_ms,
                                                       aoahid_node** out_node);
 
 /* aoahid_node_close
@@ -1178,22 +1203,25 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoa
  * error, including AOAHID_CLOSE_PENDING, leaves Node live and caller-owned for a
  * retry or later Device close. After AOAHID_OK the Node pointer is invalid and
  * must never be passed again.
- * Blocking: Waits up to the configured close drain budget, finishes any touch
- * frame, sends required neutral reports, and synchronously sends request 55.
+ * Blocking: Waits up to drain_timeout_ms, finishes any touch frame, sends required
+ * neutral reports (each bounded by what is left of drain_timeout_ms), and synchronously
+ * sends request 55 (waiting up to control_timeout_ms).
  * Synchronization: Belongs to the parent Context domain and must be serialized
  * against all Context/Device/Node calls; never call it from the log sink.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for null or for a still-live closed or
  * detached Node. A pointer consumed by an earlier AOAHID_OK is invalid input and
- * is not diagnostically detectable;
+ * is not diagnostically detectable; AOAHID_ERR_UNSET_FIELD for a zero timeout;
  * AOAHID_CLOSE_PENDING when a terminal callback misses the close budget;
  * AOAHID_ERR_UNSUPPORTED, AOAHID_ERR_ACCESS, AOAHID_ERR_BUSY,
  * AOAHID_ERR_NO_DEVICE, AOAHID_ERR_STALL, AOAHID_ERR_TIMEOUT,
  * AOAHID_ERR_SHORT_TRANSFER, AOAHID_ERR_IO, or AOAHID_ERR_OVERFLOW for deferred,
  * completion, neutral, unregister, or reservation failure; AOAHID_ERR_INTERNAL
  * for serialization, invariant, allocation, or unexpected failure. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node);
+AOAHID_API aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node,
+                                                       uint32_t control_timeout_ms,
+                                                       uint32_t drain_timeout_ms);
 
-/* aoahid_node_hid_id
+/* aoahid_node_id
  * Ownership: Borrows a live Node and creates no reference.
  * Blocking: Does not block, allocate, or perform I/O.
  * Synchronization: Belongs to the parent Context domain and must be serialized
@@ -1201,7 +1229,7 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node);
  * Returns: The nonzero AOA HID ID on success. Zero is the failure sentinel with
  * AOAHID_ERR_PARAM for a null/closed Node or AOAHID_ERR_INTERNAL for an
  * unexpected ABI-boundary failure in last_error. */
-AOAHID_API uint16_t AOAHID_CALL aoahid_node_hid_id(const aoahid_node* node);
+AOAHID_API uint16_t AOAHID_CALL aoahid_node_id(const aoahid_node* node);
 
 /* aoahid_node_manifest
  * Ownership: Borrows Node, fills caller-owned manifest storage, and returns a
@@ -1220,21 +1248,26 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_node_manifest(const aoahid_node* nod
  * so no caller buffer ownership changes.
  * Blocking: Does not wait for transfer completion. It may run one zero-timeout
  * caller-poll pump after acceptance and otherwise returns after queueing.
+ * send_timeout_ms is the queued report transfer's deadline: a transfer that has not
+ * completed by then fails, and the failure is reported by a later call.
  * Synchronization: Belongs to the parent Context domain. Callers serialize state
  * and submit calls; internal-thread completion publishes concurrently.
  * Returns: AOAHID_OK for clean state or accepted submission; AOAHID_ERR_PARAM for
- * an invalid Node/internal report argument; AOAHID_ERR_UNSUPPORTED for Raw Node
+ * an invalid Node/internal report argument; AOAHID_ERR_UNSET_FIELD for a zero
+ * send_timeout_ms; AOAHID_ERR_UNSUPPORTED for Raw Node
  * use or mapped backend status; AOAHID_ERR_ACCESS, AOAHID_ERR_BUSY,
  * AOAHID_ERR_NO_DEVICE, AOAHID_ERR_STALL, AOAHID_ERR_TIMEOUT,
  * AOAHID_ERR_SHORT_TRANSFER, AOAHID_ERR_IO, or AOAHID_ERR_OVERFLOW for deferred,
  * prior-completion, pool, or submit failure; AOAHID_ERR_INTERNAL for serializer,
  * validation, allocation, or unexpected failure. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node);
+AOAHID_API aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node,
+                                                        uint32_t send_timeout_ms);
 
 /* aoahid_node_submit_blocking
  * Ownership: Borrows Node and changes no handle ownership.
  * Blocking: Pumps/waits until every dirty report fragment completes or the
- * timeout expires; in caller-poll mode this call drives libusb events.
+ * timeout expires; in caller-poll mode this call drives libusb events. The timeout
+ * also bounds each report it sends: that report's deadline is what is left of it.
  * Synchronization: Belongs to the parent Context domain and must be serialized
  * against all Context/Device/Node application calls.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for an invalid Node/report path;
@@ -1458,18 +1491,20 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_battery_update(aoahid_node* node, in
  * Ownership: Borrows a Raw Node and report; the bytes are copied into the
  * library-owned pool before return and no ownership changes.
  * Blocking: Does not wait for completion; it validates/copies and returns after
- * the asynchronous request-57 transfer is accepted or rejected.
+ * the asynchronous request-57 transfer is accepted or rejected. send_timeout_ms is
+ * that transfer's deadline, as for aoahid_node_submit.
  * Synchronization: Belongs to the parent Context domain. Callers serialize raw
  * submissions; internal-thread completion may publish concurrently.
  * Returns: AOAHID_OK for accepted submission; AOAHID_ERR_PARAM for invalid
  * Node/profile/buffer, unaccepted ID/length, or nonzero trailing padding;
+ * AOAHID_ERR_UNSET_FIELD for a zero send_timeout_ms;
  * AOAHID_ERR_UNSUPPORTED, AOAHID_ERR_ACCESS, AOAHID_ERR_BUSY,
  * AOAHID_ERR_NO_DEVICE, AOAHID_ERR_STALL, AOAHID_ERR_TIMEOUT,
  * AOAHID_ERR_SHORT_TRANSFER, AOAHID_ERR_IO, or AOAHID_ERR_OVERFLOW for deferred,
  * prior-completion, pool, or submit failure; AOAHID_ERR_INTERNAL for allocation
  * or unexpected ABI-boundary failure. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_raw_submit(aoahid_node* node, const uint8_t* report,
-                                                       size_t length);
+                                                       size_t length, uint32_t send_timeout_ms);
 
 #ifdef __cplusplus
 }

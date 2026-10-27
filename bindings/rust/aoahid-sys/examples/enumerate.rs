@@ -79,7 +79,7 @@ fn main() {
         }
         unsafe { aoahid_discovery_destroy(discovery) };
     }
-    let close = unsafe { aoahid_context_destroy_blocking(context, timeout_ms) };
+    let close = unsafe { aoahid_context_destroy_blocking(context, timeout_ms, timeout_ms, timeout_ms) };
     std::process::exit(if discover == AOAHID_OK {
         close
     } else {

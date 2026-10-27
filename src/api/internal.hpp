@@ -326,6 +326,9 @@ struct aoahid_device {
     aoahid_context* context{};
     aoa::transport::Device* transport{};
     aoa::transport::DeviceConfig config{};
+    // The waits of the close call that consumed this Device, kept for a teardown
+    // the Context graveyard finishes later.
+    std::uint32_t close_control_timeout_ms{};
     std::uint32_t close_drain_timeout_ms{};
     std::uint32_t aoa_descriptor_policy_bytes{};
     std::uint32_t linux_descriptor_policy_bytes{};

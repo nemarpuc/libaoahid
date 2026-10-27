@@ -106,16 +106,13 @@ def context_options() -> ContextOptions:  # noqa: F405
     return options
 
 
-def device_options(control_timeout_ms: int) -> DeviceOptions:  # noqa: F405
+def device_options() -> DeviceOptions:  # noqa: F405
     options = DeviceOptions()  # noqa: F405
     options.struct_size = c.sizeof(DeviceOptions)  # noqa: F405
     options.reserved = 0
-    options.control_timeout_ms = control_timeout_ms
-    options.send_timeout_ms = control_timeout_ms
     options.descriptor_fragment_bytes = 64  # Explicit policy; AOA fixes no fragment size.
     options.transfer_pool_slots = POOL_SLOTS
     options.maximum_report_bytes = HOST_REPORT_POLICY_BYTES
-    options.close_drain_timeout_ms = CLOSE_DRAIN_TIMEOUT_MS
     options.validate_reports = 1
     options.aoa_descriptor_wire_policy_bytes = DESCRIPTOR_POLICY_BYTES
     options.linux_descriptor_policy_bytes = DESCRIPTOR_POLICY_BYTES
@@ -264,7 +261,7 @@ def open_session(
         print(f"device open: AOA {info.protocol_version} has no HID; version 2 is required")
         return None, AOAHID_ERR_NOT_AOA  # noqa: F405
     device = DeviceP()  # noqa: F405
-    options = device_options(control_timeout_ms)
+    options = device_options()
     status = library.aoahid_device_open(context, c.byref(info), c.byref(options), c.byref(device))
     if status != AOAHID_OK:  # noqa: F405
         report_error(library, status, "device open")
@@ -274,19 +271,25 @@ def open_session(
     selected_node_options = node_options()
     for index, spec in enumerate(registrations):
         status = library.aoahid_node_open(
-            device, spec, c.byref(selected_node_options), c.byref(nodes[index])
+            device,
+            spec,
+            c.byref(selected_node_options),
+            control_timeout_ms,
+            c.byref(nodes[index]),
         )
         if status != AOAHID_OK:  # noqa: F405
             report_error(library, status, "profile registration")
-            library.aoahid_device_close(device)  # The first close consumes every opened node.
+            library.aoahid_device_close(
+                device, control_timeout_ms, CLOSE_DRAIN_TIMEOUT_MS
+            )  # The first close consumes every opened node.
             return None, int(status)
     return Session(locator, device, nodes[0], nodes[1], nodes[2]), AOAHID_OK  # noqa: F405
 
 
-def close_device(library: c.CDLL, session: Session) -> int:
+def close_device(library: c.CDLL, session: Session, control_timeout_ms: int) -> int:
     if not session.device:
         return AOAHID_OK  # noqa: F405
-    status = library.aoahid_device_close(session.device)
+    status = library.aoahid_device_close(session.device, control_timeout_ms, CLOSE_DRAIN_TIMEOUT_MS)
     # Device ownership is consumed even when callbacks move it to the Context graveyard.
     session.device = DeviceP()  # noqa: F405
     session.keyboard = NodeP()  # noqa: F405
@@ -299,7 +302,7 @@ def close_device(library: c.CDLL, session: Session) -> int:
 
 def close_touchscreen(library: c.CDLL, context: ContextP, session: Session, poll_ms: int) -> int:  # noqa: F405
     while session.touchscreen:
-        status = library.aoahid_node_close(session.touchscreen)
+        status = library.aoahid_node_close(session.touchscreen, poll_ms, CLOSE_DRAIN_TIMEOUT_MS)
         if status == AOAHID_OK:  # noqa: F405
             session.touchscreen = NodeP()  # noqa: F405
             return status
@@ -316,7 +319,7 @@ def close_touchscreen(library: c.CDLL, context: ContextP, session: Session, poll
 
 def destroy_context(library: c.CDLL, context: ContextP, poll_ms: int) -> int:  # noqa: F405
     while context:
-        status = library.aoahid_context_destroy(context)
+        status = library.aoahid_context_destroy(context, poll_ms, CLOSE_DRAIN_TIMEOUT_MS)
         if status != AOAHID_CLOSE_PENDING:  # noqa: F405
             return status  # Every non-pending result consumes a valid Context.
         poll = library.aoahid_context_poll(context, poll_ms)
@@ -389,7 +392,7 @@ def update_then_submit(
         )
         if status == AOAHID_ERR_NO_DEVICE:  # noqa: F405
             disappeared.append(session.locator)
-            close_device(library, session)
+            close_device(library, session, timeout_ms)
         elif status != AOAHID_OK:  # noqa: F405
             report_error(library, status, "profile update")
             if result == AOAHID_OK:  # noqa: F405
@@ -403,7 +406,7 @@ def update_then_submit(
         )
         if status == AOAHID_ERR_NO_DEVICE:  # noqa: F405
             disappeared.append(session.locator)
-            close_device(library, session)
+            close_device(library, session, timeout_ms)
         elif status != AOAHID_OK:  # noqa: F405
             report_error(library, status, "profile submit")
             if result == AOAHID_OK:  # noqa: F405
@@ -466,7 +469,7 @@ def continue_without_touch(library: c.CDLL, context: ContextP, sessions: list[Se
         if status == AOAHID_OK:  # noqa: F405
             ready.append(session)
         elif status == AOAHID_ERR_NO_DEVICE:  # noqa: F405
-            close_device(library, session)
+            close_device(library, session, timeout_ms)
         else:
             report_error(library, status, "keyboard/mouse continuation")
             result = status
@@ -532,7 +535,7 @@ def run_shared(library_path: str, timeout_ms: int) -> int:
         result = error.status
     finally:
         for session in sessions:
-            close_device(library, session)
+            close_device(library, session, timeout_ms)
         if specs is not None:
             release_specs(library, specs)
         close = destroy_context(library, context, timeout_ms)
@@ -621,7 +624,7 @@ def run_worker(library_path: str, locator: Locator, timeout_ms: int) -> int:
         result = error.status
     finally:
         for session in sessions:
-            close_device(library, session)
+            close_device(library, session, timeout_ms)
         if specs is not None:
             release_specs(library, specs)
         close = destroy_context(library, context, timeout_ms)

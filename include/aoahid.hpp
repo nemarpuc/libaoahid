@@ -25,12 +25,17 @@ namespace aoahid {
                                                 uint32_t timeout_ms) noexcept {
     return aoahid_context_poll(context, timeout_ms);
 }
-[[nodiscard]] inline aoahid_result context_destroy(aoahid_context* context) noexcept {
-    return aoahid_context_destroy(context);
+[[nodiscard]] inline aoahid_result context_destroy(aoahid_context* context,
+                                                   uint32_t control_timeout_ms,
+                                                   uint32_t drain_timeout_ms) noexcept {
+    return aoahid_context_destroy(context, control_timeout_ms, drain_timeout_ms);
 }
 [[nodiscard]] inline aoahid_result context_destroy_blocking(aoahid_context* context,
+                                                            uint32_t control_timeout_ms,
+                                                            uint32_t drain_timeout_ms,
                                                             uint32_t timeout_ms) noexcept {
-    return aoahid_context_destroy_blocking(context, timeout_ms);
+    return aoahid_context_destroy_blocking(context, control_timeout_ms, drain_timeout_ms,
+                                           timeout_ms);
 }
 [[nodiscard]] inline aoahid_result discover(aoahid_context* context, uint32_t control_timeout_ms,
                                             aoahid_discovery** out_discovery) noexcept {
@@ -57,19 +62,22 @@ accessory_start(aoahid_context* context, const aoahid_device_info* selected,
                                                aoahid_device** out_device) noexcept {
     return aoahid_device_open(context, selected, options, out_device);
 }
-[[nodiscard]] inline aoahid_result device_close(aoahid_device* device) noexcept {
-    return aoahid_device_close(device);
+[[nodiscard]] inline aoahid_result device_close(aoahid_device* device, uint32_t control_timeout_ms,
+                                                uint32_t drain_timeout_ms) noexcept {
+    return aoahid_device_close(device, control_timeout_ms, drain_timeout_ms);
 }
 [[nodiscard]] inline aoahid_result device_latched_error(aoahid_device* device) noexcept {
     return aoahid_device_latched_error(device);
 }
 [[nodiscard]] inline aoahid_result channel_open(aoahid_device* device,
                                                 const aoahid_channel_options* options,
+                                                uint32_t drain_timeout_ms,
                                                 aoahid_channel** out_channel) noexcept {
-    return aoahid_channel_open(device, options, out_channel);
+    return aoahid_channel_open(device, options, drain_timeout_ms, out_channel);
 }
-[[nodiscard]] inline aoahid_result channel_close(aoahid_channel* channel) noexcept {
-    return aoahid_channel_close(channel);
+[[nodiscard]] inline aoahid_result channel_close(aoahid_channel* channel,
+                                                 uint32_t drain_timeout_ms) noexcept {
+    return aoahid_channel_close(channel, drain_timeout_ms);
 }
 [[nodiscard]] inline aoahid_result channel_write(aoahid_channel* channel, const uint8_t* data,
                                                  size_t length, size_t* out_written,
@@ -130,21 +138,24 @@ inline void spec_release(aoahid_spec* spec) noexcept { aoahid_spec_release(spec)
 }
 [[nodiscard]] inline aoahid_result node_open(aoahid_device* device, aoahid_spec* spec,
                                              const aoahid_node_options* options,
+                                             uint32_t control_timeout_ms,
                                              aoahid_node** out_node) noexcept {
-    return aoahid_node_open(device, spec, options, out_node);
+    return aoahid_node_open(device, spec, options, control_timeout_ms, out_node);
 }
-[[nodiscard]] inline aoahid_result node_close(aoahid_node* node) noexcept {
-    return aoahid_node_close(node);
+[[nodiscard]] inline aoahid_result node_close(aoahid_node* node, uint32_t control_timeout_ms,
+                                              uint32_t drain_timeout_ms) noexcept {
+    return aoahid_node_close(node, control_timeout_ms, drain_timeout_ms);
 }
-[[nodiscard]] inline uint16_t node_hid_id(const aoahid_node* node) noexcept {
-    return aoahid_node_hid_id(node);
+[[nodiscard]] inline uint16_t node_id(const aoahid_node* node) noexcept {
+    return aoahid_node_id(node);
 }
 [[nodiscard]] inline aoahid_result node_manifest(const aoahid_node* node,
                                                  aoahid_capability_manifest* manifest) noexcept {
     return aoahid_node_manifest(node, manifest);
 }
-[[nodiscard]] inline aoahid_result node_submit(aoahid_node* node) noexcept {
-    return aoahid_node_submit(node);
+[[nodiscard]] inline aoahid_result node_submit(aoahid_node* node,
+                                               uint32_t send_timeout_ms) noexcept {
+    return aoahid_node_submit(node, send_timeout_ms);
 }
 [[nodiscard]] inline aoahid_result node_submit_blocking(aoahid_node* node,
                                                         uint32_t timeout_ms) noexcept {
@@ -207,8 +218,8 @@ digitizer_update(aoahid_node* node, const aoahid_digitizer_sample* sample) noexc
     return aoahid_battery_update(node, strength);
 }
 [[nodiscard]] inline aoahid_result raw_submit(aoahid_node* node, const uint8_t* report,
-                                              size_t length) noexcept {
-    return aoahid_raw_submit(node, report, length);
+                                              size_t length, uint32_t send_timeout_ms) noexcept {
+    return aoahid_raw_submit(node, report, length, send_timeout_ms);
 }
 
 } // namespace aoahid

@@ -510,7 +510,7 @@ jobs:
                   # @rpath) or an OS library; no build-machine path remains.
                   otool -L "$file" | tail -n +2 | awk '{ print $1 }' | while read -r dependency; do
                     case "$dependency" in
-                      @rpath/libaoahid.1.dylib|@rpath/libusb-1.0.0.dylib|/usr/lib/*|/System/Library/*) ;;
+                      @rpath/libaoahid.2.dylib|@rpath/libusb-1.0.0.dylib|/usr/lib/*|/System/Library/*) ;;
                       *) echo "$file depends on $dependency" >&2; exit 1 ;;
                     esac
                   done

@@ -15,9 +15,9 @@ from typing import Union
 
 
 # All public enum domains in aoahid.h are exactly int32_t.
-AOAHID_VERSION_MAJOR = 1
+AOAHID_VERSION_MAJOR = 2
 AOAHID_VERSION_MINOR = 0
-AOAHID_VERSION_PATCH = 1
+AOAHID_VERSION_PATCH = 0
 AOAHID_OK = 0
 AOAHID_ERR_PARAM = 1
 AOAHID_ERR_UNSET_FIELD = 2
@@ -130,9 +130,9 @@ class ErrorDetail(c.Structure):
         ("code", c.c_int32),
         ("field", c.c_char_p),
         ("reason", c.c_char_p),
-        ("libusb_status", c.c_int32),
+        ("transport_status", c.c_int32),
         ("aoa_request", c.c_int32),
-        ("hid_id", c.c_uint16),
+        ("node_id", c.c_uint16),
         ("report_id", c.c_uint16),
         ("offset", c.c_uint32),
         ("length", c.c_uint32),
@@ -181,12 +181,9 @@ class DeviceOptions(c.Structure):
     _fields_ = [
         ("struct_size", c.c_uint32),
         ("reserved", c.c_uint32),
-        ("control_timeout_ms", c.c_uint32),
-        ("send_timeout_ms", c.c_uint32),
         ("descriptor_fragment_bytes", c.c_uint32),
         ("transfer_pool_slots", c.c_uint32),
         ("maximum_report_bytes", c.c_uint32),
-        ("close_drain_timeout_ms", c.c_uint32),
         ("aoa_descriptor_wire_policy_bytes", c.c_uint32),
         ("linux_descriptor_policy_bytes", c.c_uint32),
         ("linux_hid_fields_per_report_policy", c.c_uint32),
@@ -592,18 +589,18 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
     declare("aoahid_version", [], c.c_uint32)
     declare("aoahid_context_create", [c.POINTER(ContextOptions), c.POINTER(ContextP)], result)
     declare("aoahid_context_poll", [ContextP, c.c_uint32], result)
-    declare("aoahid_context_destroy", [ContextP], result)
-    declare("aoahid_context_destroy_blocking", [ContextP, c.c_uint32], result)
+    declare("aoahid_context_destroy", [ContextP, c.c_uint32, c.c_uint32], result)
+    declare("aoahid_context_destroy_blocking", [ContextP, c.c_uint32, c.c_uint32, c.c_uint32], result)
     declare("aoahid_discover", [ContextP, c.c_uint32, c.POINTER(DiscoveryP)], result)
     declare("aoahid_discovery_count", [DiscoveryP], c.c_size_t)
     declare("aoahid_discovery_get", [DiscoveryP, c.c_size_t], c.POINTER(DeviceInfo))
     declare("aoahid_discovery_destroy", [DiscoveryP], None)
     declare("aoahid_accessory_start", [ContextP, c.POINTER(DeviceInfo), c.POINTER(AccessoryOptions)], result)
     declare("aoahid_device_open", [ContextP, c.POINTER(DeviceInfo), c.POINTER(DeviceOptions), c.POINTER(DeviceP)], result)
-    declare("aoahid_device_close", [DeviceP], result)
+    declare("aoahid_device_close", [DeviceP, c.c_uint32, c.c_uint32], result)
     declare("aoahid_device_latched_error", [DeviceP], result)
-    declare("aoahid_channel_open", [DeviceP, c.POINTER(ChannelOptions), c.POINTER(ChannelP)], result)
-    declare("aoahid_channel_close", [ChannelP], result)
+    declare("aoahid_channel_open", [DeviceP, c.POINTER(ChannelOptions), c.c_uint32, c.POINTER(ChannelP)], result)
+    declare("aoahid_channel_close", [ChannelP, c.c_uint32], result)
     declare("aoahid_channel_write", [ChannelP, c.POINTER(c.c_uint8), c.c_size_t, c.POINTER(c.c_size_t), c.c_uint32], result)
     declare("aoahid_channel_read", [ChannelP, c.POINTER(c.c_uint8), c.c_size_t, c.POINTER(c.c_size_t), c.c_uint32], result)
 
@@ -625,11 +622,11 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
     declare("aoahid_spec_descriptor", [SpecP, c.POINTER(c.POINTER(c.c_uint8)), c.POINTER(c.c_size_t)], result)
     declare("aoahid_spec_manifest", [SpecP, c.POINTER(CapabilityManifest)], result)
 
-    declare("aoahid_node_open", [DeviceP, SpecP, c.POINTER(NodeOptions), c.POINTER(NodeP)], result)
-    declare("aoahid_node_close", [NodeP], result)
-    declare("aoahid_node_hid_id", [NodeP], c.c_uint16)
+    declare("aoahid_node_open", [DeviceP, SpecP, c.POINTER(NodeOptions), c.c_uint32, c.POINTER(NodeP)], result)
+    declare("aoahid_node_close", [NodeP, c.c_uint32, c.c_uint32], result)
+    declare("aoahid_node_id", [NodeP], c.c_uint16)
     declare("aoahid_node_manifest", [NodeP, c.POINTER(CapabilityManifest)], result)
-    declare("aoahid_node_submit", [NodeP], result)
+    declare("aoahid_node_submit", [NodeP, c.c_uint32], result)
     declare("aoahid_node_submit_blocking", [NodeP, c.c_uint32], result)
     declare("aoahid_keyboard_key", [NodeP, c.c_uint16, c.c_uint32], result)
     declare("aoahid_mouse_move", [NodeP, c.c_int32, c.c_int32], result)
@@ -645,7 +642,7 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
     declare("aoahid_pen_update", [NodeP, c.POINTER(PenSample)], result)
     declare("aoahid_digitizer_update", [NodeP, c.POINTER(DigitizerSample)], result)
     declare("aoahid_battery_update", [NodeP, c.c_int32], result)
-    declare("aoahid_raw_submit", [NodeP, c.POINTER(c.c_uint8), c.c_size_t], result)
+    declare("aoahid_raw_submit", [NodeP, c.POINTER(c.c_uint8), c.c_size_t, c.c_uint32], result)
     return library
 
 

@@ -69,9 +69,9 @@ public struct ErrorDetail
     public int Code;
     public nint Field;
     public nint Reason;
-    public int LibusbStatus;
+    public int TransportStatus;
     public int AoaRequest;
-    public ushort HidId;
+    public ushort NodeId;
     public ushort ReportId;
     public uint Offset;
     public uint Length;
@@ -119,12 +119,9 @@ public struct DeviceOptions
 {
     public uint StructSize;
     public uint Reserved;
-    public uint ControlTimeoutMs;
-    public uint SendTimeoutMs;
     public uint DescriptorFragmentBytes;
     public uint TransferPoolSlots;
     public uint MaximumReportBytes;
-    public uint CloseDrainTimeoutMs;
     public uint AoaDescriptorWirePolicyBytes;
     public uint LinuxDescriptorPolicyBytes;
     public uint LinuxHidFieldsPerReportPolicy;
@@ -485,9 +482,9 @@ public static class Native
 {
     private const string Library = "aoahid";
     private const CallingConvention Call = CallingConvention.Cdecl;
-    public const uint AOAHID_VERSION_MAJOR = 1;
+    public const uint AOAHID_VERSION_MAJOR = 2;
     public const uint AOAHID_VERSION_MINOR = 0;
-    public const uint AOAHID_VERSION_PATCH = 1;
+    public const uint AOAHID_VERSION_PATCH = 0;
 
     public static readonly IReadOnlyDictionary<string, int> AbiConstants =
         new Dictionary<string, int>
@@ -606,9 +603,9 @@ public static class Native
     [DllImport(Library, EntryPoint = "aoahid_context_poll", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ContextPoll(nint context, uint timeoutMs);
     [DllImport(Library, EntryPoint = "aoahid_context_destroy", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result ContextDestroy(nint context);
+    public static extern Result ContextDestroy(nint context, uint controlTimeoutMs, uint drainTimeoutMs);
     [DllImport(Library, EntryPoint = "aoahid_context_destroy_blocking", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result ContextDestroyBlocking(nint context, uint timeoutMs);
+    public static extern Result ContextDestroyBlocking(nint context, uint controlTimeoutMs, uint drainTimeoutMs, uint timeoutMs);
     [DllImport(Library, EntryPoint = "aoahid_discover", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result Discover(nint context, uint controlTimeoutMs, out nint discovery);
     [DllImport(Library, EntryPoint = "aoahid_discovery_count", ExactSpelling = true, CallingConvention = Call)]
@@ -622,14 +619,14 @@ public static class Native
     [DllImport(Library, EntryPoint = "aoahid_device_open", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DeviceOpen(nint context, in DeviceInfo selected, in DeviceOptions options, out nint device);
     [DllImport(Library, EntryPoint = "aoahid_device_close", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result DeviceClose(nint device);
+    public static extern Result DeviceClose(nint device, uint controlTimeoutMs, uint drainTimeoutMs);
     [DllImport(Library, EntryPoint = "aoahid_device_latched_error", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DeviceLatchedError(nint device);
 
     [DllImport(Library, EntryPoint = "aoahid_channel_open", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result ChannelOpen(nint device, in ChannelOptions options, out nint channel);
+    public static extern Result ChannelOpen(nint device, in ChannelOptions options, uint drainTimeoutMs, out nint channel);
     [DllImport(Library, EntryPoint = "aoahid_channel_close", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result ChannelClose(nint channel);
+    public static extern Result ChannelClose(nint channel, uint drainTimeoutMs);
     [DllImport(Library, EntryPoint = "aoahid_channel_write", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ChannelWrite(nint channel, nint data, nuint length, out nuint written, uint timeoutMs);
     [DllImport(Library, EntryPoint = "aoahid_channel_read", ExactSpelling = true, CallingConvention = Call)]
@@ -663,15 +660,15 @@ public static class Native
     public static extern Result SpecManifest(nint spec, ref CapabilityManifest manifest);
 
     [DllImport(Library, EntryPoint = "aoahid_node_open", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result NodeOpen(nint device, nint spec, in NodeOptions options, out nint node);
+    public static extern Result NodeOpen(nint device, nint spec, in NodeOptions options, uint controlTimeoutMs, out nint node);
     [DllImport(Library, EntryPoint = "aoahid_node_close", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result NodeClose(nint node);
-    [DllImport(Library, EntryPoint = "aoahid_node_hid_id", ExactSpelling = true, CallingConvention = Call)]
-    public static extern ushort NodeHidId(nint node);
+    public static extern Result NodeClose(nint node, uint controlTimeoutMs, uint drainTimeoutMs);
+    [DllImport(Library, EntryPoint = "aoahid_node_id", ExactSpelling = true, CallingConvention = Call)]
+    public static extern ushort NodeId(nint node);
     [DllImport(Library, EntryPoint = "aoahid_node_manifest", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result NodeManifest(nint node, ref CapabilityManifest manifest);
     [DllImport(Library, EntryPoint = "aoahid_node_submit", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result NodeSubmit(nint node);
+    public static extern Result NodeSubmit(nint node, uint sendTimeoutMs);
     [DllImport(Library, EntryPoint = "aoahid_node_submit_blocking", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result NodeSubmitBlocking(nint node, uint timeoutMs);
 
@@ -707,5 +704,5 @@ public static class Native
     [DllImport(Library, EntryPoint = "aoahid_battery_update", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result BatteryUpdate(nint node, int strength);
     [DllImport(Library, EntryPoint = "aoahid_raw_submit", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result RawSubmit(nint node, nint report, nuint length);
+    public static extern Result RawSubmit(nint node, nint report, nuint length, uint sendTimeoutMs);
 }

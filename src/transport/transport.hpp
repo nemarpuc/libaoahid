@@ -36,8 +36,6 @@ struct Candidate {
 
 struct DeviceConfig {
     aoahid_event_mode event_mode{};
-    std::uint32_t control_timeout_ms{};
-    std::uint32_t send_timeout_ms{};
     std::uint32_t descriptor_fragment_bytes{};
     std::uint32_t pool_slots{};
     std::uint32_t maximum_report_bytes{};
@@ -166,15 +164,16 @@ class Device final {
     Device& operator=(const Device&) = delete;
 
     aoahid_result register_hid(std::uint16_t hid_id, const std::uint8_t* descriptor,
-                               std::size_t descriptor_length) noexcept;
-    aoahid_result unregister_hid(std::uint16_t hid_id) noexcept;
+                               std::size_t descriptor_length,
+                               std::uint32_t control_timeout_ms) noexcept;
+    aoahid_result unregister_hid(std::uint16_t hid_id, std::uint32_t control_timeout_ms) noexcept;
     aoahid_result set_reservation(std::uint16_t hid_id, std::size_t count, ReservationToken* out);
     aoahid_result clear_reservation(ReservationToken token) noexcept;
     aoahid_result acquire(std::uint16_t hid_id, ReservationToken reservation,
                           std::size_t report_length, void* user, Completion completion,
                           PreparedTransfer* out) noexcept;
     aoahid_result submit(PreparedTransfer prepared, std::size_t report_length,
-                         std::uint16_t report_id) noexcept;
+                         std::uint16_t report_id, std::uint32_t send_timeout_ms) noexcept;
     void abandon(PreparedTransfer prepared) noexcept;
     aoahid_result cancel_all() noexcept;
     bool drained() const noexcept;

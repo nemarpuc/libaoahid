@@ -175,7 +175,7 @@ void log_event(const aoahid_context* context, const aoahid_log_level level, cons
         line.append_integer(device->product_id, 16);
     }
     if (node != nullptr) {
-        append_key(line, "hid_id");
+        append_key(line, "node_id");
         line.append_integer(node->hid_id);
         if (node->spec != nullptr && node->spec->layout.has_report_id) {
             append_key(line, "report_id");
@@ -198,7 +198,7 @@ void log_event(const aoahid_context* context, const aoahid_log_level level, cons
     const char* name = result_name(status.result);
     line.append(name == nullptr ? "AOAHID_RESULT_UNKNOWN" : name);
     if (status.native_status != 0) {
-        append_key(line, "libusb_status");
+        append_key(line, "transport_status");
         line.append_integer(status.native_status);
     }
     emit_log(context, level, line.data());

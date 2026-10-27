@@ -8,10 +8,11 @@
 
 static const char* const k_send_sequence[] = {
     "aoahid_battery_update(node, 80)   set the level; nothing is sent yet",
-    "aoahid_node_submit(node)    no key is pending, so this sends the battery report",
+    "aoahid_node_submit(node, send_ms)  no key is pending, so this sends the battery report",
     "aoahid_keyboard_key(node, 0x04, 1) + aoahid_battery_update(node, 79)",
-    "aoahid_node_submit(node)    the key report goes first",
-    "aoahid_node_submit(node)    then the battery report; the same level again sends nothing",
+    "aoahid_node_submit(node, send_ms)  the key report goes first",
+    "aoahid_node_submit(node, send_ms)  then the battery report; the same level again sends "
+    "nothing",
     NULL};
 
 int main(void) {
