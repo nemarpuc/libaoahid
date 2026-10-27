@@ -283,8 +283,8 @@ struct Device::Impl {
         }
     }
 
-    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     aoahid_result submit_prepared(const PreparedTransfer prepared, const std::size_t report_length,
+                                  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                   const std::uint16_t report_id,
                                   const std::uint32_t send_timeout_ms) noexcept {
         auto* slot = static_cast<Slot*>(prepared.slot);
