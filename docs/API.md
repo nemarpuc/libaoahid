@@ -36,7 +36,7 @@ structure layout does not change when a compiler uses short enums.
 The initializers are `static inline` functions in `aoahid.h`, so they are not
 in the binary ABI and the language bindings do not have them; a binding sets
 the same fields itself. `aoahid.hpp` adds functions that return an initialized
-structure (`aoahid::device_options()`, ...).
+structure (`aoahid::device_options`, ...).
 
 | Initializer | What it fills in |
 |---|---|
@@ -465,8 +465,8 @@ namespace `aoahid`, without the `aoahid_` prefix (`aoahid_keyboard_key` is
 `aoahid::keyboard_key`). Types, arguments, and results are those of the C API.
 It adds two things:
 
-- one function per initializer that returns the initialized structure:
-  `auto options = aoahid::device_options();`
+- one function per initializer that returns the initialized structure
+  (`aoahid::device_options` returns what `aoahid_device_options_init` fills in);
 - `aoahid::SpecPtr` and `aoahid::DiscoveryPtr`, `std::unique_ptr` types that
   release a Spec reference or destroy a discovery snapshot. Context, Device,
   Node and Channel stay plain pointers: closing them takes timeouts and may

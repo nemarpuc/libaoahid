@@ -76,7 +76,7 @@ closing and initial values, and use the same names for the same things.
   are `static inline` in the header, so the binary ABI has nothing new; the
   library still never puts a value of its own in place of a zero. The values
   are listed in "Initial values" in `docs/API.md`.
-- `aoahid.hpp` returns initialized structures (`aoahid::device_options()`, ...)
+- `aoahid.hpp` returns initialized structures (`aoahid::device_options`, ...)
   and has `aoahid::SpecPtr` and `aoahid::DiscoveryPtr`, `std::unique_ptr` types
   that release a Spec or a discovery snapshot.
 
