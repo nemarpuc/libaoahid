@@ -126,9 +126,8 @@ is decoded again against the Spec before request 57 is sent.
 ### Transfer pool
 
 `aoahid_device_open` allocates a fixed number of slots
-(`transfer_pool_slots`, zero selects 8). Each slot holds one libusb transfer
-and a buffer of the 8-byte setup packet plus `maximum_report_bytes` (zero
-selects 1024). The setup fields that never change are written once; per
+(`transfer_pool_slots`). Each slot holds one libusb transfer and a buffer of
+the 8-byte setup packet plus `maximum_report_bytes`. The setup fields that never change are written once; per
 submission only the HID ID (wValue) and length (wLength) are stored. No
 allocation happens on the send path.
 
@@ -140,16 +139,17 @@ shared slot. When no usable slot is free, submission returns `AOAHID_ERR_BUSY`.
 ### Registration and close
 
 `aoahid_node_open` synchronously sends request 54 (register) and the
-descriptor in request 56 fragments (`descriptor_fragment_bytes`, zero selects
-64). If registration fails after the device may have accepted request 54, a
+descriptor in request 56 fragments of `descriptor_fragment_bytes`. If registration fails after the device may have accepted request 54, a
 best-effort request 55 is sent so no half-registered ID is left behind.
 
 `aoahid_node_close` waits up to its `drain_timeout_ms` argument (zero is
 `AOAHID_ERR_UNSET_FIELD`) for in-flight work, finishes any touch frame, sends the neutral
-reports the profile requires, and then sends request 55. There is no
-release-all call: callers should release what they pressed before closing.
-If a callback misses the budget, close returns `AOAHID_CLOSE_PENDING`; for a
-Device the consumed graph moves to the Context graveyard and is reaped later.
+reports the profile requires (every key and button up, contacts lifted, axes at
+rest), and then sends request 55. A failed step does not stop the next one. If
+a report is still in flight at the deadline, the Node close returns
+`AOAHID_CLOSE_PENDING` and the Node stays the caller's; a Device close instead
+moves the consumed graph to the Context graveyard, which reaps it once the
+callbacks have run.
 
 ## Design rules
 
@@ -157,11 +157,13 @@ Device the consumed graph moves to the Context graveyard and is reaped later.
   widths, Report IDs, and target HID-parser limits are caller inputs. The
   library does not guess them. An unset required value is an error
   (`AOAHID_ERR_UNSET_FIELD` or `AOAHID_ERR_PARAM`), never a silent fallback.
-- **No tuning defaults.** Timeouts, fragment size, pool size, maximum report
-  size, drain budget, and Channel transfer counts and size are the caller's
-  values; zero is `AOAHID_ERR_UNSET_FIELD`. (Until 1.0.0 a zero selected a
-  bounded library value; 1.0.1 removed that.) Options are copied; caller
-  storage is never modified. Reserved fields must be zero.
+- **Initial values in the header, none in the library.** The `*_init`
+  functions in `aoahid.h` fill options in; the library itself never puts a
+  value in place of a zero. Timeouts, fragment size, pool size, maximum report
+  size, drain budget, and Channel transfer counts and size are required; zero
+  is `AOAHID_ERR_UNSET_FIELD`. Every enumeration starts at 1, so a zeroed
+  enumeration field is refused too. Options are copied; caller storage is never
+  modified. Reserved fields must be zero.
 - **No convenience names.** `tools/symbol-lint/symbol_lint.py` fails if an
   exported function name contains `default`, `preset`, `standard`, or
   `typical` as an underscore-separated word. It also checks that the header
@@ -173,8 +175,9 @@ Device the consumed graph moves to the Context graveyard and is reaped later.
 
 - Every fallible function returns `aoahid_result` (`int32_t`). `AOAHID_OK` is
   0; errors are the `AOAHID_ERR_*` constants; `AOAHID_CLOSE_PENDING` means a
-  close could not finish within its budget and ownership rules differ per
-  function (see the header).
+  close could not finish within its budget and the handle is still the
+  caller's. Every close and destroy follows the same ownership rule (see
+  "Closing" at the top of the header).
 - `aoahid_last_error()` returns a thread-local `aoahid_error_detail`: code,
   the field name, a reason string, the raw libusb status, the AOA request
   number, HID ID, Report ID, and offset/length where relevant.
@@ -192,8 +195,8 @@ Device the consumed graph moves to the Context graveyard and is reaped later.
   `sizeof` the struct in the release the caller links against; a mismatch
   returns `AOAHID_ERR_PARAM`. Most also carry a `reserved` field that must be
   zero.
-- Handles are opaque pointers. The header has no initializers or preset
-  values.
+- Handles are opaque pointers. The `*_init` functions are `static inline` in
+  the header, so they add nothing to the binary ABI.
 - `AOAHID_VERSION_MAJOR/MINOR/PATCH` and `aoahid_version()` report the version.
 - Layout is guarded by `tests/abi` (C and C++ ABI tests, a layout oracle, and
   `check_abi_golden.py`) and by `tools/check_bindings.py`, which checks that the

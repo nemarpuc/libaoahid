@@ -92,7 +92,7 @@ typedef struct aoahid_channel aoahid_channel;
  * Every enumeration is an int32_t typedef with anonymous constants, so structure layout does not
  * depend on how a compiler sizes an enum. */
 
-/* The numbers match libmimhid's result codes, which is why 5 is not used here. */
+/* A result libmimhid also has keeps the same number there. 5 is not used. */
 typedef int32_t aoahid_result;
 enum {
     AOAHID_OK = 0,
@@ -881,7 +881,7 @@ AOAHID_API const char* AOAHID_CALL aoahid_result_name(aoahid_result result);
  * Ownership: Nothing.
  * Blocking: None.
  * Synchronization: Any thread.
- * Returns: (major << 16) | (minor << 8) | patch of the loaded library; AOAHID_OK and the
+ * Returns: (major << 24) | (minor << 16) | patch of the loaded library; AOAHID_OK and the
  * AOAHID_ERR_* codes do not apply. */
 AOAHID_API uint32_t AOAHID_CALL aoahid_version(void);
 
@@ -969,10 +969,10 @@ AOAHID_API const aoahid_device_info* AOAHID_CALL
 aoahid_discovery_get(const aoahid_discovery* discovery, size_t index);
 
 /* aoahid_discovery_destroy
- * Ownership: Frees the snapshot and every entry it returned. Null does nothing.
+ * Ownership: Frees the snapshot and every entry it returned.
  * Blocking: None.
  * Synchronization: Not during any other call on the snapshot.
- * Returns: Nothing; AOAHID_OK is recorded, and no AOAHID_ERR_* applies. */
+ * Returns: Nothing. AOAHID_OK is recorded, or AOAHID_ERR_PARAM for null (nothing is done). */
 AOAHID_API void AOAHID_CALL aoahid_discovery_destroy(aoahid_discovery* discovery);
 
 /* aoahid_accessory_start
@@ -1182,10 +1182,10 @@ AOAHID_API void AOAHID_CALL aoahid_spec_retain(aoahid_spec* spec);
 
 /* aoahid_spec_release
  * Ownership: Gives up one of the caller's references; the last one frees the Spec. A Node keeps
- * its own reference until it closes. Null does nothing.
+ * its own reference until it closes.
  * Blocking: None.
  * Synchronization: Any thread, as long as the last release does not race any other use.
- * Returns: Nothing; AOAHID_OK is recorded, and no AOAHID_ERR_* applies. */
+ * Returns: Nothing. AOAHID_OK is recorded, or AOAHID_ERR_PARAM for null (nothing is done). */
 AOAHID_API void AOAHID_CALL aoahid_spec_release(aoahid_spec* spec);
 
 /* aoahid_spec_descriptor

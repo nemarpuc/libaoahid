@@ -15,15 +15,51 @@ structure layout does not change when a compiler uses short enums.
 ## Structure rules
 
 - Every top-level options structure starts with `struct_size` and `reserved`.
-  Set `struct_size = sizeof(struct_type)` and every `reserved*` field to zero.
+  `struct_size` is `sizeof(struct_type)` and every `reserved*` field is zero.
   A size mismatch fails with `AOAHID_ERR_PARAM`, so an old binary and a new
   header never silently reinterpret a structure.
-- Set every field yourself; nothing has a default. Zero is rejected where it
-  has no defined meaning (`AOAHID_ERR_UNSET_FIELD` or `AOAHID_ERR_PARAM`),
-  including every tuning value listed under [Tuning values](#tuning-values).
-- Optional features use a separate `enable_*` / `has_*` flag that must be
-  exactly 0 or 1. A disabled field's declaration must be all zero.
-- There are no initializers or profile templates in the API.
+- Each options structure has an initializer, `aoahid_<structure>_init`, that
+  sets `struct_size`, zeroes the rest and fills in values that work with a
+  current Android phone (see [Initial values](#initial-values)). Start from it
+  and change only what you need.
+- A required field left zero is refused with `AOAHID_ERR_UNSET_FIELD`; the
+  library never puts a value of its own in its place. Every enumeration starts
+  at 1, so a zeroed enumeration field is always refused rather than read as a
+  choice. Where zero is a real value (a logical minimum, a neutral axis value,
+  interface class 0, a count of optional barrel buttons) the field has no
+  "unset" meaning, and what is optional has its own `enable_*` flag or count.
+- `enable_*`, `has_*` and the other flags are exactly 0 or 1. A disabled
+  field's declaration must be all zero.
+
+## Initial values
+
+The initializers are `static inline` functions in `aoahid.h`, so they are not
+in the binary ABI and the language bindings do not have them; a binding sets
+the same fields itself. `aoahid.hpp` adds functions that return an initialized
+structure (`aoahid::device_options()`, ...).
+
+| Initializer | What it fills in |
+|---|---|
+| `aoahid_context_options_init` | `AOAHID_EVENT_INTERNAL_THREAD`, `AOAHID_LOG_DISABLED`. |
+| `aoahid_device_options_init` | 4096-byte descriptor fragments, AOA wire limit, EP0 and host control limits; 4 transfer slots; reports up to 1024 bytes; the Linux HID limits of [LIMITS.md](LIMITS.md) (4096, 256, 4, 256, 12288, 65528); `AOAHID_INTERFACE_CLAIM_NONE` with `interface_number = -1`; `validate_reports = 0`. |
+| `aoahid_accessory_options_init` | Manufacturer and model `"libaoahid"`; no other string. Set your own when you ship an app that filters accessories. |
+| `aoahid_channel_options_init` | The ADB interface `0xFF/0x42/0x01`, `AOAHID_CHANNEL_READ_REQUEST`, 2 OUT transfers of up to 1 MiB, zero-length termination on. |
+| `aoahid_node_options_init` | No reserved slot. |
+| `aoahid_keyboard_options_init` | Usages `0x04` (Keyboard a) to `0xDD` (Keypad Hexadecimal), plus the modifiers. |
+| `aoahid_mouse_options_init` | 5 buttons; X and Y -32767..32767 in 16 bits; wheel and pan -127..127 in 8 bits. |
+| `aoahid_toggle_options_init` | Consumer Control (`0x0C/0x01`, field page `0x0C`). The Usages and their three parallel arrays are yours to set. |
+| `aoahid_gamepad_options_init` | Axes X, Y, Z, Rz (-127..127 in 8 bits, at rest at 0), 12 buttons from Button 1, an eight-way Hat. |
+| `aoahid_touchscreen_options_init` | 10 contacts in one report; Contact ID 0..15 in 4 bits; X and Y 0..32767 in 16 bits; Contact Count 0..10 in 4 bits. |
+| `aoahid_touchpad_options_init` | As the touchscreen with 5 contacts, plus one click button. |
+| `aoahid_pen_options_init`, `aoahid_digitizer_options_init` | X and Y 0..32767 in 16 bits; pressure 0..4095 in 12 bits; one Barrel Switch; hover. |
+| `aoahid_raw_options_init`, `aoahid_capability_manifest_init` | `struct_size` only. |
+
+`aoahid_integer_field_make(minimum, maximum, bits)` builds one field without
+physical units.
+
+The timeouts are arguments, not options. `AOAHID_CONTROL_TIMEOUT_MS` (500),
+`AOAHID_SEND_TIMEOUT_MS` (500) and `AOAHID_DRAIN_TIMEOUT_MS` (1000) are values
+that work with the same phones; the library never uses them by itself.
 
 ## Handles and ownership
 
@@ -33,8 +69,8 @@ structure layout does not change when a compiler uses short enums.
 | `aoahid_discovery` | A point-in-time device list and every string/pointer returned by `aoahid_discovery_get`. | Independent of the Context once created. |
 | `aoahid_device` | One USB handle, a fixed transfer pool, its Nodes and Channels. | Closed by `aoahid_device_close`, which also closes its children. |
 | `aoahid_spec` | An immutable descriptor and report layout. Reference-counted (`aoahid_spec_retain` / `aoahid_spec_release`); usable on any number of Devices and Contexts. | Until the last reference is released. |
-| `aoahid_node` | Mutable profile state and one AOA HID registration. Retains its Spec. | Until `aoahid_node_close` returns `AOAHID_OK` or its Device closes. |
-| `aoahid_channel` | One claimed Bulk interface on the Device's USB handle, its own transfer pool, and read-ahead state. | Until `aoahid_channel_close` returns `AOAHID_OK` or its Device closes. |
+| `aoahid_node` | Mutable profile state and one AOA HID registration. Retains its Spec. | Until `aoahid_node_close` returns anything but `AOAHID_CLOSE_PENDING`, or its Device closes. |
+| `aoahid_channel` | One claimed Bulk interface on the Device's USB handle, its own transfer pool, and read-ahead state. | Until `aoahid_channel_close` returns anything but `AOAHID_CLOSE_PENDING`, or its Device closes. |
 
 AOA HID IDs are allocated per Context and per physical port (bus plus port
 path), starting at 1, and are never reused within that Context. Android
@@ -47,7 +83,8 @@ Node closes.
 
 ## Event modes and threading
 
-`aoahid_context_options.event_mode` has no default:
+`aoahid_context_options.event_mode` is one of two modes
+(`aoahid_context_options_init` selects the internal thread):
 
 - `AOAHID_EVENT_CALLER_POLL`: the library creates no thread and takes no
   send-path lock. The application serializes every call on the Context and
@@ -100,7 +137,7 @@ also defines `AOAHID_VERSION_MAJOR`, `_MINOR`, and `_PATCH`.
 
 1. `aoahid_context_create`.
 2. `aoahid_discover(context, control_timeout_ms, &discovery)` (a zero timeout
-   is `AOAHID_ERR_PARAM`). It sends AOA request 51 to every USB device and
+   is `AOAHID_ERR_UNSET_FIELD`). It sends AOA request 51 to every USB device and
    lists only those that answer with a nonzero protocol version, reported in
    `aoahid_device_info.protocol_version`. HID needs version 2 or later; the
    library does not enforce that, so check it. To avoid sending request 51,
@@ -139,7 +176,8 @@ not say whether HID needs `ACCESSORY_START`, so a device that STALLs HID
 registration in its current mode can be switched first. The library exposes
 the switch as one call and leaves the rest to the application:
 
-1. `aoahid_accessory_start(context, info, &options)` sends request 51, request
+1. `aoahid_accessory_start(context, info, &options, control_timeout_ms)` sends
+   request 51, request
    52 for each non-null string in `options.strings` (string IDs 0-5), and
    request 53 (START), then closes the device and returns. `manufacturer` and
    `model` are required and must be non-empty; Android matches them against an
@@ -166,7 +204,8 @@ See [PROTOCOL.md](PROTOCOL.md) for the request details.
 
 ## Device options
 
-`aoahid_device_options` has three kinds of fields.
+`aoahid_device_options` has three kinds of fields; `aoahid_device_options_init`
+fills in all of them.
 
 **Tuning values**, all required and nonzero (see below):
 `descriptor_fragment_bytes`, `transfer_pool_slots`, `maximum_report_bytes`.
@@ -178,7 +217,6 @@ takes its timeout as an argument (see "Timeouts" below).
 | Field | Meaning |
 |---|---|
 | `aoa_descriptor_wire_policy_bytes` | Largest descriptor to send over AOA (at most 65535, the 16-bit AOA length field). |
-| `linux_descriptor_policy_bytes` | Largest descriptor the target kernel accepts. |
 | `target_ep0_data_policy_bytes` | Largest control-transfer data stage the target accepts. |
 | `host_control_buffer_policy_bytes` | Largest control-transfer data stage the host backend accepts. |
 
@@ -186,10 +224,10 @@ takes its timeout as an argument (see "Timeouts" below).
 at most 65535 and no larger than both the EP0 and host-buffer policies, or open
 fails with `AOAHID_ERR_OVERFLOW`. The library never enlarges a policy.
 
-**Target HID parser policies**, all required and nonzero:
-`linux_hid_fields_per_report_policy`, `linux_hid_usages_policy`,
-`linux_hid_global_stack_depth_policy`, `linux_hid_report_size_policy_bits`,
-`linux_hid_report_data_policy_bits`. Every Spec records its own requirements
+**Target HID parser limits**, all required and nonzero, in
+`linux_hid` (`aoahid_linux_hid_policy`): `descriptor_bytes`,
+`fields_per_report`, `global_stack_depth`, `report_size_bits`, `usages` and
+`report_data_bits`. Every Spec records its own requirements
 for these while it is built; `aoahid_node_open` compares them with the Device's
 policies and returns `AOAHID_ERR_OVERFLOW` before request 54 if one is
 exceeded. Pick values for the kernel you target; [LIMITS.md](LIMITS.md) lists
@@ -211,9 +249,9 @@ the values in one Linux revision.
 
 ## Timeouts
 
-No wait has a default and none is kept in the Device: every call that can wait
-takes its timeout in milliseconds as an argument, and zero is refused with
-`AOAHID_ERR_UNSET_FIELD` before anything is done (nothing is consumed). libusb
+No wait is kept in the library: every call that can wait takes its timeout in
+milliseconds as an argument, and zero is refused with `AOAHID_ERR_UNSET_FIELD`
+before anything is done (nothing is consumed). libusb
 treats a zero timeout as "no timeout", which is why zero is not accepted. A
 timeout is a failure deadline, not a delay: a transfer that completes earlier
 returns immediately. libmimhid follows the same rule with the same argument
@@ -221,27 +259,26 @@ names.
 
 | Argument | Calls | Scope |
 |---|---|---|
-| `control_timeout_ms` | `aoahid_node_open`, `aoahid_node_close`, `aoahid_device_close`, `aoahid_context_destroy`, `aoahid_context_destroy_blocking` | Each synchronous AOA control request (54, 55, 56). `aoahid_discover` and `aoahid_accessory_options.control_timeout_ms` bound requests 51, 52, 53. |
+| `control_timeout_ms` | `aoahid_discover`, `aoahid_accessory_start`, `aoahid_node_open`, `aoahid_node_close`, `aoahid_device_close`, `aoahid_context_destroy`, `aoahid_context_destroy_blocking` | Each synchronous AOA control request (51 to 56). |
 | `send_timeout_ms` | `aoahid_node_submit`, `aoahid_raw_submit` | The deadline of the queued asynchronous request-57 transfer; a failure is returned by a later call. A timed-out touch report leaves the contacts it lifted occupied; close and reopen that Node. Keep it well above normal EP0 latency. |
 | `drain_timeout_ms` | `aoahid_node_close`, `aoahid_device_close`, `aoahid_context_destroy*`, `aoahid_channel_open`, `aoahid_channel_close` | How long a close (or the wait for in-flight reports before a Channel opens) waits for in-flight reports and for the neutral reports it sends. |
 | `timeout_ms` | `aoahid_node_submit_blocking`, `aoahid_channel_read`, `aoahid_channel_write`, `aoahid_context_poll`, `aoahid_context_destroy_blocking` | The whole call. `aoahid_node_submit_blocking` also bounds each report it sends: that report's deadline is what is left of `timeout_ms`; so does the neutral-report wait of a close with `drain_timeout_ms`. |
 
-A close that does not finish inside the call (`AOAHID_CLOSE_PENDING`) finishes in
-the Context graveyard with the `control_timeout_ms` of the call that consumed
-the Device.
+A Device teardown that cannot finish inside `aoahid_device_close` (a transfer
+callback has not run yet) is finished by the Context with the
+`control_timeout_ms` of that call.
 
 ## Tuning values
 
-These values have no default: zero in a required one fails with
-`AOAHID_ERR_UNSET_FIELD`. They are the caller's choices, not USB, AOA,
-Android, ADB, or libusb requirements.
+Zero in a required one fails with `AOAHID_ERR_UNSET_FIELD`; the initializers
+fill all of them in. They are the caller's choices, not USB, AOA, Android, ADB,
+or libusb requirements.
 
 | Field | Scope |
 |---|---|
 | `aoahid_device_options.descriptor_fragment_bytes` | Payload of one request-56 fragment. |
 | `aoahid_device_options.transfer_pool_slots` | Asynchronous transfers per Device. |
 | `aoahid_device_options.maximum_report_bytes` | Largest report per pool slot. |
-| `aoahid_accessory_options.control_timeout_ms` | Each of requests 51, 52, 53. |
 | `aoahid_channel_options.in_transfers` | IN transfers kept submitted; required in stream read mode, not used in request mode. |
 | `aoahid_channel_options.out_transfers` | OUT transfers; a full pool makes a write wait. |
 | `aoahid_channel_options.transfer_bytes` | Bytes per Bulk transfer, rounded up to `wMaxPacketSize`; the largest IN request in request mode. |
@@ -392,8 +429,8 @@ is in [PROFILES.md](PROFILES.md). In short:
   `AOAHID_ERR_BUSY` until the pending edge is sent. This applies to keys,
   buttons, toggles, D-pad, touch contacts, and pen tool state.
 - **Keyboard.** `usage` is a modifier (`0xE0`-`0xE7`) or a Usage in the Spec's
-  range. There is no release-all call: release every key you pressed before
-  closing the Node.
+  range. There is no release-all call; closing the Node sends a report with
+  every key up.
 - **Mouse.** Deltas accumulate in signed 64-bit totals (overflow returns
   `AOAHID_ERR_OVERFLOW`); `aoahid_mouse_scroll` on an axis the Spec did not
   enable returns `AOAHID_ERR_UNSUPPORTED`.
@@ -425,8 +462,16 @@ action.
 
 `include/aoahid.hpp` forwards every function of `aoahid.h` unchanged under
 namespace `aoahid`, without the `aoahid_` prefix (`aoahid_keyboard_key` is
-`aoahid::keyboard_key`). Types, arguments, and results are those of the C API, and the
-header adds no checks or fallbacks of its own.
+`aoahid::keyboard_key`). Types, arguments, and results are those of the C API.
+It adds two things:
+
+- one function per initializer that returns the initialized structure:
+  `auto options = aoahid::device_options();`
+- `aoahid::SpecPtr` and `aoahid::DiscoveryPtr`, `std::unique_ptr` types that
+  release a Spec reference or destroy a discovery snapshot. Context, Device,
+  Node and Channel stay plain pointers: closing them takes timeouts and may
+  return `AOAHID_CLOSE_PENDING`, which a destructor could neither report nor
+  retry.
 
 ## Manifest
 
@@ -456,19 +501,28 @@ if the device is still present, then sends request 55 (unregister). No
 transfer, buffer, handle, or object is freed before its libusb callback has
 run.
 
-Ownership after close differs by handle:
+Every close and destroy call follows one rule:
 
-| Call | Consumes the handle when |
+| Result | The handle |
 |---|---|
-| `aoahid_node_close` | Only on `AOAHID_OK`. Any error, including `AOAHID_CLOSE_PENDING` (drain budget expired), leaves the Node valid for a retry or for Device close. The error can be one an earlier report ended with (reported once), so call close again. |
-| `aoahid_channel_close` | Only on `AOAHID_OK`. `AOAHID_CLOSE_PENDING` leaves it valid. |
-| `aoahid_device_close` | Always, on the first valid call, together with every child Node and Channel. On `AOAHID_CLOSE_PENDING` the objects move to the Context graveyard and are freed once their transfers complete. |
-| `aoahid_context_destroy` | On every result except `AOAHID_CLOSE_PENDING` and `AOAHID_ERR_PARAM`. |
-| `aoahid_context_destroy_blocking(context, control_timeout_ms, drain_timeout_ms, timeout_ms)` | On every result except `AOAHID_ERR_PARAM` (null Context or zero deadline), `AOAHID_ERR_UNSET_FIELD` (a zero control or drain timeout) and a deadline expiry, which returns `AOAHID_ERR_TIMEOUT` with `last_error()->field == "context.destroy"`. A timeout recorded earlier during teardown is also returned as `AOAHID_ERR_TIMEOUT`, but with its original field, and in that case the Context is consumed. |
+| `AOAHID_ERR_PARAM`, `AOAHID_ERR_UNSET_FIELD` | Nothing was done; it is still yours. |
+| `AOAHID_CLOSE_PENDING` | A transfer of the object is still in flight; it is still yours. Let events run (`aoahid_context_poll` in caller-poll mode) and call again. |
+| Anything else | The object is gone. An error says what failed on the way out, such as a report that failed earlier or a refused unregister (request 55). |
 
-A consumed pointer must never be passed to the API again. An error returned
-after ownership was consumed (for example a failed unregister) is reported for
-information only.
+Where `AOAHID_CLOSE_PENDING` can come from:
+
+- `aoahid_node_close`: a report of the Node is still in flight at the drain
+  deadline.
+- `aoahid_channel_close`: a cancelled Bulk transfer has not completed.
+- `aoahid_context_destroy`: a Device teardown is still waiting for a callback.
+- `aoahid_context_destroy_blocking`: as `aoahid_context_destroy`, when its own
+  `timeout_ms` passed first.
+
+`aoahid_device_close` never returns it. When a transfer of the Device is still
+in flight at the drain deadline, the Context takes the teardown over, frees
+everything once the callbacks have run, and reports any error of it from
+`aoahid_context_poll` or `aoahid_context_destroy`. A consumed pointer must never
+be passed to the API again.
 
 ## Errors
 
@@ -495,7 +549,7 @@ error is returned by the next call.
 | Code | Meaning |
 |---|---|
 | `AOAHID_ERR_PARAM` | Invalid pointer, handle, struct size, or argument. |
-| `AOAHID_ERR_UNSET_FIELD` | A required field is zero or invalid. |
+| `AOAHID_ERR_UNSET_FIELD` | A required field or timeout is zero, or a field has no valid value. |
 | `AOAHID_ERR_UNSUPPORTED` | Not supported by this profile, mode, or backend. |
 | `AOAHID_ERR_NOT_AOA` | The device does not report AOA support (`aoahid_accessory_start`). |
 | `AOAHID_ERR_ACCESS`, `_BUSY`, `_NO_DEVICE`, `_TIMEOUT`, `_IO` | Mapped libusb status. `AOAHID_ERR_BUSY` also means "report in flight" for state calls. `AOAHID_ERR_NO_DEVICE` is sticky for the Device. |
@@ -503,7 +557,7 @@ error is returned by the next call.
 | `AOAHID_ERR_SHORT_TRANSFER` | A control transfer moved fewer bytes than its payload (the 8-byte setup packet is not counted). |
 | `AOAHID_ERR_DESCRIPTOR_REJECTED` | Reserved result code; `aoahid_result_name` knows it. |
 | `AOAHID_ERR_OVERFLOW` | A size, count, or policy limit was exceeded, or libusb reported `LIBUSB_TRANSFER_OVERFLOW` (the device sent more data than requested). |
-| `AOAHID_CLOSE_PENDING` | A close could not finish within its budget. |
+| `AOAHID_CLOSE_PENDING` | A close could not finish within its budget; the handle is still the caller's. |
 | `AOAHID_ERR_INTERNAL` | Allocation failure or unexpected internal error. |
 
 No C++ exception crosses the C ABI. Allocation failures and unexpected

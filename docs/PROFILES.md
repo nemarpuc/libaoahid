@@ -78,7 +78,10 @@ configuration, key layout, or OEM.
 
 The library never infers a product value: Usages, Application Collection,
 Report ID, logical and physical ranges, widths, axis neutrals, contact counts,
-button counts, and optional-field presence are always yours to set.
+button counts, and optional-field presence are what the options say. The
+`*_init` functions fill in one working set of them
+([API.md](API.md#initial-values)); a factory reads only what the structure
+holds.
 
 ## Keyboard
 

@@ -108,7 +108,7 @@ depends on the descriptor and on that device's kernel and Android version. See
 | Find AOA-capable devices | `aoahid_discover` | 51 to every accessible USB device. Lists only those with a nonzero version, with the version in `protocol_version`. The caller decides whether version 2 is required. |
 | Switch to accessory mode (optional) | `aoahid_accessory_start` | 51, then 52 for each non-null string (manufacturer and model required), then 53. Returns when 53 completes. It does not wait for re-enumeration and never retries. A device already in accessory mode receives nothing. |
 | Open the device | `aoahid_device_open` | None. Opens the device in its current mode and allocates the transfer pool. |
-| Register a HID device | `aoahid_node_open` | 54, then 56 in fragments of `descriptor_fragment_bytes` (default 64 when set to zero). On failure after 54, sends a best-effort 55. |
+| Register a HID device | `aoahid_node_open` | 54, then 56 in fragments of `descriptor_fragment_bytes`. On failure after 54, sends a best-effort 55. |
 | Send input | `aoahid_node_submit`, `aoahid_node_submit_blocking`, `aoahid_raw_submit` | 57, asynchronous. |
 | Unregister | `aoahid_node_close`, `aoahid_device_close`, context destroy | Neutral reports as needed, then 55. |
 | Bulk data (e.g. ADB) | `aoahid_channel_open/read/write` | No AOA request. Bulk transfers on an interface chosen by class/subclass/protocol. |

@@ -109,11 +109,11 @@ differ; check the same symbols in the kernel you target.
 | `hidinput_setup_battery` (through v6.12) | One battery per HID device | `drivers/hid/hid-input.c` | A Spec has at most one battery report. |
 | `hidinput_connect` | A HID device with no input usages gets no input device, and its power supply is unregistered | `drivers/hid/hid-input.c` | The battery report rides on an input profile; there is no battery-only profile. |
 
-The five `linux_hid_*_policy` fields of `aoahid_device_options`
-(`fields_per_report`, `usages`, `global_stack_depth`, `report_size_bits`,
-`report_data_bits`) correspond to the first rows of this table. The library has
-no default for them: set them for your target kernel. For the revision above
-they would be 256, 12288, 4, 256, and 65528. Each Spec records what it needs,
+The `linux_hid` fields of `aoahid_device_options` (`descriptor_bytes`,
+`fields_per_report`, `usages`, `global_stack_depth`, `report_size_bits`,
+`report_data_bits`) correspond to the first rows of this table. For the revision
+above they are 4096, 256, 12288, 4, 256 and 65528, the values
+`aoahid_device_options_init` fills in; check them against your target kernel. Each Spec records what it needs,
 using checked arithmetic without expanding Usage ranges, and `aoahid_node_open`
 returns `AOAHID_ERR_OVERFLOW` before registering if a policy is exceeded.
 
@@ -136,7 +136,7 @@ These are choices made by this library, not HID, Linux, or Android limits.
 | Toggle semantics | Selector, OOC toggle, OOC maintained, MC, OSC, RTC only. |
 | Raw report table | At most 256 entries; exact ID and wire length (a `uint32_t`). |
 | Raw descriptors | Short items only; reserved Main, Local, and item-type values rejected; a 4-byte Usage Maximum of `0xFFFFFFFF` rejected; every Collection has a Usage; every non-Constant Input has Usage Page, Usage, Logical Minimum/Maximum, Report Size, and Report Count; Delimiter sets close before their Main item. |
-| AOA descriptor | At most 65535 bytes (16-bit AOA length field), further limited by `aoa_descriptor_wire_policy_bytes` and `linux_descriptor_policy_bytes`. |
+| AOA descriptor | At most 65535 bytes (16-bit AOA length field), further limited by `aoa_descriptor_wire_policy_bytes` and `linux_hid.descriptor_bytes`. |
 | Accessory strings | At most 256 bytes each, including the NUL. |
 | Object counts | No fixed maximum for Contexts, Devices, Nodes, or Specs; allocation can still fail. |
 
@@ -148,11 +148,11 @@ value above. The tuning values below are required (zero is
 `AOAHID_ERR_UNSET_FIELD`) and are the caller's choices, not USB, Android, or
 libusb recommendations; see [API.md](API.md#tuning-values).
 
-`descriptor_fragment_bytes`, `transfer_pool_slots`, `maximum_report_bytes`,
-`aoahid_accessory_options.control_timeout_ms`, and the Channel's
-`out_transfers`, `transfer_bytes` and (stream mode) `in_transfers`. The waits
-(`control_timeout_ms`, `send_timeout_ms`, `drain_timeout_ms`) are arguments of
-the calls that wait, with no default; see [API.md](API.md#timeouts).
+`descriptor_fragment_bytes`, `transfer_pool_slots`, `maximum_report_bytes`, and
+the Channel's `out_transfers`, `transfer_bytes` and (stream mode)
+`in_transfers`; the initializers fill them in. The waits (`control_timeout_ms`,
+`send_timeout_ms`, `drain_timeout_ms`) are arguments of the calls that wait; see
+[API.md](API.md#timeouts).
 `aoahid_node_options` `0/0` is no reserved slot.
 
 `maximum_report_bytes` and `descriptor_fragment_bytes` must fit

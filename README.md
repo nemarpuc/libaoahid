@@ -11,18 +11,11 @@ usable from C, C++, Python, C#, and Rust.
 `libaoahid` is a C++20 library with a stable C ABI. It drives the HID feature
 of [Android Open Accessory 2.0](https://source.android.com/docs/core/interaction/accessories/aoa2)
 over libusb. You describe each input device (ranges, bit widths, Report IDs,
-Usages) explicitly; the library builds a valid HID descriptor, registers it
+Usages), starting from initializers that fill in values that work with a
+current Android phone; the library builds a valid HID descriptor, registers it
 with Android, and keeps the report state machines (multi-touch contacts,
-key rollover, pointer deltas) correct. It never guesses a value you did not
-set. MIT licensed.
-
-## Demo
-
-https://github.com/user-attachments/assets/880c5a81-bc1e-406b-9286-1a0f3dbf9899
-
-The app in the video is
-[aoahid_player](https://github.com/nemarpuc/aoahid_player), a script player
-and recorder built on this library.
+key rollover, pointer deltas) correct. A required value left zero is refused,
+never guessed. MIT licensed.
 
 For an overview of how the library works and why it was built, see
 [the introduction on DEV](https://dev.to/nemarpuc/libaoahid-a-c-abi-library-for-sending-hid-input-to-android-over-usb-1h6f).
@@ -87,8 +80,9 @@ separately above.
 
 ### What the library handles for you
 
-Each profile derives the report mechanics from its immutable Spec; you still
-choose every product and target value.
+Each profile derives the report mechanics from its immutable Spec; the product
+and target values are what its options say (the `*_init` functions fill in one
+working set).
 
 | Profile | Derived by the library | You specify |
 |---|---|---|
@@ -152,14 +146,14 @@ Windows `adb`-conflict gotcha, and small programs under
 (typing text, dragging on the touchscreen, moving the mouse in circles) so you
 can confirm a real phone reacts before writing product code.
 
-The complete, fully explicit C session is
+The complete C session, with reconnection and threads, is
 [examples/c/multi_profile.c](examples/c/multi_profile.c). For a single profile
 in isolation, [examples/c/profiles/](examples/c/profiles) has one self-contained
 program per HID profile kind and one for the battery report, all ten of which
 run without a device. In
 outline:
 
-1. Create a context and explicitly select caller-poll or internal-thread mode.
+1. Create a context in caller-poll or internal-thread mode.
 2. Discover and select a physical USB device. Discovery sends AOA request 51
    to each device and reports its AOA version; the caller checks for version 2.
    To send no request 51 at all, fill `aoahid_device_info` yourself instead.
@@ -173,21 +167,65 @@ outline:
    handle; HID and Bulk never need a second open of the device.
 6. Close nodes/channels/device so neutral state is completed before request 55.
 
+Typing one key on the first phone found, with the error checks left out (every
+call returns an `aoahid_result`):
+
+```c
+#include "aoahid.h"
+
+int main(void) {
+    aoahid_context_options context_options;
+    aoahid_context_options_init(&context_options);
+    aoahid_context* context = NULL;
+    aoahid_context_create(&context_options, &context);
+
+    aoahid_discovery* discovery = NULL;
+    aoahid_discover(context, AOAHID_CONTROL_TIMEOUT_MS, &discovery);
+    aoahid_device_options device_options;
+    aoahid_device_options_init(&device_options);
+    aoahid_device* device = NULL;
+    aoahid_device_open(context, aoahid_discovery_get(discovery, 0), &device_options, &device);
+    aoahid_discovery_destroy(discovery);
+
+    aoahid_keyboard_options keyboard;
+    aoahid_keyboard_options_init(&keyboard);
+    aoahid_spec* spec = NULL;
+    aoahid_spec_create_keyboard(&keyboard, &spec);
+    aoahid_node_options node_options;
+    aoahid_node_options_init(&node_options);
+    aoahid_node* node = NULL;
+    aoahid_node_open(device, spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS, &node);
+    aoahid_spec_release(spec); /* the Node keeps its own reference */
+    /* Give Android about 100 ms to register the keyboard before the first report. */
+
+    aoahid_keyboard_key(node, 0x04, 1); /* Keyboard a */
+    aoahid_node_submit_blocking(node, AOAHID_SEND_TIMEOUT_MS);
+    aoahid_keyboard_key(node, 0x04, 0);
+    aoahid_node_submit_blocking(node, AOAHID_SEND_TIMEOUT_MS);
+
+    aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    return 0;
+}
+```
+
 The C header is [include/aoahid.h](include/aoahid.h). The optional C++ header
-forwards every C function unchanged under namespace `aoahid`. Python ctypes,
-C# P/Invoke, and Rust `-sys` plus typed wrappers live under `bindings/`; they
-preserve the C layout and do not choose values.
+forwards every C function under namespace `aoahid` and adds functions that
+return initialized options, plus owning pointers for Specs and discovery
+snapshots. Python ctypes, C# P/Invoke, and Rust `-sys` plus typed wrappers live
+under `bindings/`; they preserve the C layout. The initializers are inline C,
+so a binding sets every field itself ([docs/API.md](docs/API.md#initial-values)
+lists the values).
 
 Every tuning value (descriptor fragment size, pool slots, maximum report size,
-Channel transfer counts and size) is the caller's, and so is every wait: each
-call that can wait takes its timeout as an argument (see "Timeouts" in
-[docs/API.md](docs/API.md#timeouts)). Zero is refused with
-`AOAHID_ERR_UNSET_FIELD`. The library never
+Channel transfer counts and size) is a field of the options, which the
+initializers fill in, and every wait is an argument of the call that waits
+(see "Timeouts" in [docs/API.md](docs/API.md#timeouts)). A required value or
+timeout of zero is refused with `AOAHID_ERR_UNSET_FIELD`. The library never
 retries a transfer; a STALLed report stays pending for the caller's resend. A
 timeout is the failure deadline passed to the backend; it does not add delay
-to a successful transfer. Node reservation `0/0` means no reservation. Exact
-device, descriptor, target-parser, and product-profile policies remain
-mandatory and are never guessed.
+to a successful transfer. Node reservation `0/0` means no reservation.
 
 `aoahid_device_open` never switches modes. Devices whose
 firmware accepts AOA HID requests only after `ACCESSORY_START` are reached with

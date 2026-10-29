@@ -127,8 +127,9 @@ transfers, and waits for them to drain.
 - A drained Device is destroyed at once
   (`src/api/c_api.cpp`).
 - Otherwise the whole graph moves to `graveyard`
-  (`src/api/c_api.cpp`) and the call returns
-  `AOAHID_CLOSE_PENDING`. The event thread reaps it after a poll returns;
+  (`src/api/c_api.cpp`) and `aoahid_device_close` still consumes the handle;
+  errors of the rest of the teardown come back from `aoahid_context_poll` or
+  `aoahid_context_destroy`. The event thread reaps it after a poll returns;
   in caller-poll mode `aoahid_context_poll` and context destroy do. Nothing
   wakes the event thread for the hand-over itself: a graph whose last callback
   finished just before it is reaped at the next USB event, or when the

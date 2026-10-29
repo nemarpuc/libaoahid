@@ -1,9 +1,10 @@
 # Worked examples
 
-There are deliberately no callable profile presets. The examples show complete
-values that can be copied, reviewed for a target, and edited. Every
-host-transport tuning value, product value and target value is set by the
-caller; the library has no defaults and never infers them.
+The C examples start every options structure from its `*_init` function and
+change only what they need, so each change is visible. The Python, C# and Rust
+examples set every field themselves, since the initializers are inline C and
+not part of the binary ABI. The library itself never puts a value in place of a
+zero.
 
 ## Multi-profile lifecycle examples
 
@@ -28,22 +29,20 @@ same lifecycle. No fixed device count appears in storage or scheduling.
 
 The close helpers follow the ABI's ownership rules (see `include/aoahid.h`):
 
-- `aoahid_node_close()` returning `AOAHID_CLOSE_PENDING` retains the Node, so
-  the examples poll and retry that same Node.
-- the first `aoahid_device_close()` consumes the Device and all its Nodes even
-  when it returns `AOAHID_CLOSE_PENDING`; the examples clear those handles and
-  let the Context graveyard drain them.
-- `aoahid_context_destroy()` is retried only after `AOAHID_CLOSE_PENDING` and a
-  poll. Every other result from a valid destroy is treated as terminal and the
-  Context is never reused.
+- `AOAHID_CLOSE_PENDING` leaves the handle with the caller, so the examples
+  poll and close the same Node or Context again.
+- Every other result of a valid close consumes the handle; the examples clear
+  it, and report the result if it is an error.
+- `aoahid_device_close()` never returns `AOAHID_CLOSE_PENDING`; it consumes the
+  Device and all its Nodes, and the examples clear all of those handles.
 
 ## One example per profile kind
 
 `examples/c/profiles/` holds one small, self-contained program for each of the
 nine `aoahid_profile_kind` values, plus `keyboard_battery.c` for the battery
-report any generated profile can carry. Each file carries the complete option set
-for its own profile and nothing else, so it can be copied into a product and
-edited directly. None of them creates a Context or opens a device, so they run
+report any generated profile can carry. Each file starts from its profile's
+`*_init` function and sets only what it changes, so it can be copied into a
+product and edited directly. None of them creates a Context or opens a device, so they run
 anywhere the library links. With both `AOAHID_BUILD_EXAMPLES` and
 `AOAHID_BUILD_TESTS` on, CTest runs each one as
 `aoahid.example-profile-<name>`.
@@ -76,8 +75,7 @@ complete call sequence that would send the profile to a real device -
 printed rather than executed because these programs open no device; run
 `examples/c/verify/` against a phone to watch the same calls take effect.
 
-The option values match those in `tests/hidtools/export_descriptors.cpp`,
-reduced to one representative form per kind. The expected target-event strings
+The expected target-event strings
 in the toggle allow-list are placeholders: a product should use the event names
 it actually observes on its own target.
 
@@ -108,8 +106,9 @@ are meant to be watched rather than run unattended.
 
 ## Example values
 
-Every number below is visible in each comprehensive example and is selected by
-that caller. A tuning value left at zero is refused (`AOAHID_ERR_UNSET_FIELD`).
+Every number below is set in each comprehensive example. The C example takes
+the rest from the `*_init` functions, and the other languages set those values
+too. A required value left at zero is refused (`AOAHID_ERR_UNSET_FIELD`).
 
 | Example value | Role |
 |---|---|
@@ -126,8 +125,8 @@ that caller. A tuning value left at zero is refused (`AOAHID_ERR_UNSET_FIELD`).
 | One-contact MT; Contact ID 0 through 15 at 4 bits; coordinates 0 through 32767 at 16 bits | A complete one-contact example geometry; none of these ranges is claimed as an Android or HID universal value. |
 | Key A, mouse delta `(30,-20)`, contact `(1000,2000)`, pointer button 1 | Input performed solely to make every state/submit pass observable. |
 
-`interface_number=-1` accompanies the explicit no-claim policy. Every disabled
-optional field is explicitly zero, and every required field is assigned. The
+`interface_number=-1` accompanies the no-claim policy. Every disabled optional
+field is zero, and every required field is assigned. The
 immutable specs stay alive through reconnection and are released only after all
 Nodes have either closed or been handed to Device teardown.
 
@@ -148,27 +147,22 @@ relocatable `libusb-1.0.pc` for that dependency.
 
 ## Creating an option structure
 
-Use zero initialization as storage initialization, then assign every product
-and target field whose meaning applies, and every tuning value. An optional disabled product field must have its enable
-flag set to zero and its associated field storage left as the explicitly unused
-zero form. Example:
+Start from the initializer and change what differs:
 
 ```c
-aoahid_mouse_options mouse = {0};
-mouse.struct_size = sizeof mouse;
-mouse.reserved = 0;
-mouse.report_id = (aoahid_report_id_option){0, 0, {0, 0, 0}};
+aoahid_mouse_options mouse;
+aoahid_mouse_options_init(&mouse);
 mouse.button_count = 3;
-mouse.x = (aoahid_integer_field){-127, 127, 8};
-mouse.y = (aoahid_integer_field){-127, 127, 8};
-mouse.enable_wheel = 0;
-mouse.wheel = (aoahid_integer_field){0, 0, 0};
+mouse.x = aoahid_integer_field_make(-127, 127, 8);
+mouse.y = mouse.x;
 mouse.enable_pan = 0;
-mouse.pan = (aoahid_integer_field){0, 0, 0};
+mouse.pan = aoahid_integer_field_make(0, 0, 0); /* a disabled field is all zero */
 ```
 
-The ranges above are a caller selection. The factory proves that relative axes
-can represent negative, zero, and positive values; it does not choose them.
+Without the initializer, zero the structure, set `struct_size`, and set every
+required field: the factory refuses a required field left zero. It does not
+choose a range; it proves that relative axes can represent negative, zero, and
+positive values.
 
 ## Current USB mode and the AOA version
 
@@ -184,8 +178,8 @@ open a device below version 2 with `AOAHID_ERR_NOT_AOA`.
 ## Bindings
 
 - Python: call `aoahid.load(explicit_path)` and populate `ctypes.Structure`
-  product/target fields yourself. Zero-valued Device tuning fields are handled
-  by the native API. The binding test proves `struct_size` begins at zero.
+  fields yourself, `struct_size` included; the binding test proves it begins
+  at zero.
 - C#: populate the sequential structs, using unmanaged UTF-8 storage whose
   lifetime covers the native call. P/Invoke uses C calling convention.
 - Rust: populate `aoahid_sys` `repr(C)` structures. The safe wrapper owns specs

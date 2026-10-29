@@ -43,13 +43,14 @@ makes no timing claims that were not measured.
   turning that error path into a busy loop.
 - Sticky device removal prevents work from accumulating for a lost link.
 
-## Zero-value tuning and its cost model
+## Initial values and their cost model
 
-The native API normalizes a local copy of zero-valued Device tuning fields to
-500 ms control/send timeouts, 64-byte descriptor fragments, 8 pool slots, a
-1024-byte maximum report buffer, and a 1000 ms close-drain budget. Node
-reservation zero/zero means no reservation. These are project choices, not
-libusb recommendations or measured optima.
+`aoahid_device_options_init` selects 4096-byte descriptor fragments, 4 pool
+slots and a 1024-byte maximum report buffer; `AOAHID_CONTROL_TIMEOUT_MS` and
+`AOAHID_SEND_TIMEOUT_MS` are 500 ms and `AOAHID_DRAIN_TIMEOUT_MS` is 1000 ms.
+A required value left zero is refused, never replaced. Node reservation
+zero/zero means no reservation. These are project choices, not libusb
+recommendations or measured optima.
 
 A timeout is a backend failure deadline, not an intentional delay. A successful
 control transfer or report completes when the backend reports completion; it

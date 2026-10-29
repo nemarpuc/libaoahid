@@ -3,23 +3,40 @@
 All notable changes to libaoahid are recorded here. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2026-10-27
+## [2.0.0] - 2026-10-29
 
-Not hardware-verified on a phone: this release changes how waits are passed and a
-few names, not the transport or the profiles, which stay as hardware-verified in
-1.0.0. The changes are tested against the fake libusb backend (including a
-ThreadSanitizer build) and the bindings against the compiled C ABI.
+Not hardware-verified on a phone: this release changes the API around the
+transport and the profiles, not how they work, and those stay as
+hardware-verified in 1.0.0. The changes are tested against the fake libusb
+backend (including a ThreadSanitizer build) and the bindings against the
+compiled C ABI.
 
-The ABI changes so that libaoahid and libmimhid follow one rule for waits and use
-the same names for the same things.
+The ABI changes so that libaoahid and libmimhid follow the same rules for waits,
+closing and initial values, and use the same names for the same things.
 
 ### Changed (breaking)
 
+- **One ownership rule for every close and destroy.** `AOAHID_ERR_PARAM` or
+  `AOAHID_ERR_UNSET_FIELD`: nothing was done. `AOAHID_CLOSE_PENDING`: a transfer
+  is still in flight and the handle is still the caller's; call again. Any
+  other result: the object is gone, and an error says what failed on the way
+  out. Before, a failed `aoahid_node_close` or `aoahid_channel_close` left the
+  handle with the caller.
+  - `aoahid_node_close` runs every step (finish the touch frame, neutral report,
+    request 55) even when one fails, and returns the first failure.
+  - `aoahid_device_close` never returns `AOAHID_CLOSE_PENDING`: when a transfer
+    is still in flight, the Context finishes the teardown and reports its errors
+    from `aoahid_context_poll` or `aoahid_context_destroy`.
+  - `aoahid_context_destroy_blocking` returns `AOAHID_CLOSE_PENDING` (it returned
+    `AOAHID_ERR_TIMEOUT`) when its own deadline passes first.
 - **Every timeout is an argument of the call; none is set at open.** The three
   `aoahid_device_options` fields `control_timeout_ms`, `send_timeout_ms` and
-  `close_drain_timeout_ms` are removed, and a zero timeout is refused with
-  `AOAHID_ERR_UNSET_FIELD` before anything is done (nothing is consumed). New
+  `close_drain_timeout_ms` and `aoahid_accessory_options.control_timeout_ms` are
+  removed. A zero timeout is refused with `AOAHID_ERR_UNSET_FIELD` before
+  anything is done, in `aoahid_discover` and the deadline of
+  `aoahid_context_destroy_blocking` too (both returned `AOAHID_ERR_PARAM`). New
   signatures:
+  - `aoahid_accessory_start(context, selected, options, control_timeout_ms)`
   - `aoahid_node_open(device, spec, options, control_timeout_ms, &node)`
   - `aoahid_node_close(node, control_timeout_ms, drain_timeout_ms)`
   - `aoahid_node_submit(node, send_timeout_ms)`
@@ -32,26 +49,58 @@ the same names for the same things.
 
   `aoahid_node_submit_blocking` keeps its `timeout_ms`; it now also bounds each
   report it sends (that report's deadline is what is left of it), and a close
-  bounds the neutral reports it sends by what is left of `drain_timeout_ms`. A
-  Device close that finishes in the Context graveyard uses the
-  `control_timeout_ms` of the call that consumed it. `aoahid_discover` and
-  `aoahid_accessory_options.control_timeout_ms` are unchanged. See "Timeouts" in
-  `docs/API.md`.
+  bounds the neutral reports it sends by what is left of `drain_timeout_ms`.
+- **The Linux HID parser limits are one structure,** `aoahid_linux_hid_policy`,
+  in `aoahid_device_options.linux_hid`: `descriptor_bytes`, `fields_per_report`,
+  `global_stack_depth`, `report_size_bits`, `usages` and `report_data_bits`
+  replace `linux_descriptor_policy_bytes` and the five `linux_hid_*_policy`
+  fields.
+- **`AOAHID_CHANNEL_READ_STREAM` is 1 and `AOAHID_CHANNEL_READ_REQUEST` is 2.**
+  Every enumeration now starts at 1, so a `read_mode` left zero is refused
+  instead of selecting stream mode.
 - **`aoahid_node_hid_id` is `aoahid_node_id`**, as in libmimhid (C#: `Native.NodeId`).
 - **`aoahid_error_detail` fields `libusb_status` and `hid_id` are `transport_status`
-  and `node_id`**, as in libmimhid. The value and meaning are unchanged; the log
-  keys follow (`transport_status=`, `node_id=`).
-
+  and `node_id`**, as in libmimhid, and `code` is typed `aoahid_result` (the same
+  `int32_t`). The log keys follow (`transport_status=`, `node_id=`).
 - **The shared library's SONAME is `libaoahid.so.2`** (`libaoahid.2.dylib`) and its
   ELF version node is `AOAHID_2.0`, so a program built against 1.x fails to load
   against this library instead of calling functions with the old arguments.
 
+### Added
+
+- **Initializers.** `aoahid_<structure>_init` for every options structure fills
+  in values that work with a current Android phone, so a caller changes only
+  what it needs; `aoahid_integer_field_make` builds one field.
+  `AOAHID_CONTROL_TIMEOUT_MS`, `AOAHID_SEND_TIMEOUT_MS` and
+  `AOAHID_DRAIN_TIMEOUT_MS` are timeouts that work with the same phones. They
+  are `static inline` in the header, so the binary ABI has nothing new; the
+  library still never puts a value of its own in place of a zero. The values
+  are listed in "Initial values" in `docs/API.md`.
+- `aoahid.hpp` returns initialized structures (`aoahid::device_options()`, ...)
+  and has `aoahid::SpecPtr` and `aoahid::DiscoveryPtr`, `std::unique_ptr` types
+  that release a Spec or a discovery snapshot.
+
+### Fixed
+
+- The examples drop a Node handle after every close result but
+  `AOAHID_CLOSE_PENDING`, as the new rule requires.
+- The profile examples counted buttons from 0 in their printed call sequences;
+  buttons count from 1.
+
 ### Migration
 
-Pass the waits you gave in `aoahid_device_options` to the calls above, for
-example `aoahid_node_submit(node, 500U)` where `send_timeout_ms` was 500, and
-delete the three fields from the options. The C++ forwarders, the Python, C# and
-Rust bindings and the examples follow the same signatures.
+- Pass the waits you gave in `aoahid_device_options` and
+  `aoahid_accessory_options` to the calls above, for example
+  `aoahid_node_submit(node, 500U)` where `send_timeout_ms` was 500.
+- Move the Linux policy values into `options.linux_hid`, or start from
+  `aoahid_device_options_init`, which fills in the values of `docs/LIMITS.md`.
+- Set `read_mode` explicitly; zero is no longer stream mode.
+- Treat a Node or Channel as gone after any close result but
+  `AOAHID_CLOSE_PENDING`, and stop expecting `AOAHID_CLOSE_PENDING` from
+  `aoahid_device_close`.
+
+The C++ forwarders, the Python, C# and Rust bindings and the examples follow
+the same signatures.
 
 ## [1.0.1] - 2026-10-18
 

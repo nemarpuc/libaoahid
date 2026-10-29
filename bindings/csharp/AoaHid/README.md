@@ -8,10 +8,11 @@ name `aoahid`.
 
 The NuGet package version and native libaoahid version must match. Complete
 native archives, dependency notices, and SPDX documents are published with the
-corresponding GitHub Release. Every C option remains explicit; this binding
-does not choose tuning overrides. Callers provide every product/target field;
-the native C API applies the documented bounded fallback when a Device
-transport-tuning field is zero.
+corresponding GitHub Release. The C header's `*_init` functions are inline and
+not part of the binary ABI, so a structure starts all zero: set its
+`StructSize` and every required field yourself. `docs/API.md` lists the values
+the C initializers use; a required field left zero is refused with
+`Result.UnsetField`.
 
 ## Callback lifetime
 
