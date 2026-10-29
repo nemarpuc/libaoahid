@@ -177,6 +177,17 @@ class AoaStrings(c.Structure):
     ]
 
 
+class LinuxHidPolicy(c.Structure):
+    _fields_ = [
+        ("descriptor_bytes", c.c_uint32),
+        ("fields_per_report", c.c_uint32),
+        ("global_stack_depth", c.c_uint32),
+        ("report_size_bits", c.c_uint32),
+        ("usages", c.c_uint64),
+        ("report_data_bits", c.c_uint64),
+    ]
+
+
 class DeviceOptions(c.Structure):
     _fields_ = [
         ("struct_size", c.c_uint32),
@@ -185,12 +196,7 @@ class DeviceOptions(c.Structure):
         ("transfer_pool_slots", c.c_uint32),
         ("maximum_report_bytes", c.c_uint32),
         ("aoa_descriptor_wire_policy_bytes", c.c_uint32),
-        ("linux_descriptor_policy_bytes", c.c_uint32),
-        ("linux_hid_fields_per_report_policy", c.c_uint32),
-        ("linux_hid_global_stack_depth_policy", c.c_uint32),
-        ("linux_hid_usages_policy", c.c_uint64),
-        ("linux_hid_report_data_policy_bits", c.c_uint64),
-        ("linux_hid_report_size_policy_bits", c.c_uint32),
+        ("linux_hid", LinuxHidPolicy),
         ("target_ep0_data_policy_bytes", c.c_uint32),
         ("host_control_buffer_policy_bytes", c.c_uint32),
         ("interface_claim_policy", c.c_int32),
@@ -204,7 +210,6 @@ class AccessoryOptions(c.Structure):
         ("struct_size", c.c_uint32),
         ("reserved", c.c_uint32),
         ("strings", AoaStrings),
-        ("control_timeout_ms", c.c_uint32),
     ]
 
 
@@ -546,6 +551,7 @@ ABI_STRUCTS = {
     "aoahid_context_options": ContextOptions,
     "aoahid_device_info": DeviceInfo,
     "aoahid_aoa_strings": AoaStrings,
+    "aoahid_linux_hid_policy": LinuxHidPolicy,
     "aoahid_device_options": DeviceOptions,
     "aoahid_accessory_options": AccessoryOptions,
     "aoahid_channel_options": ChannelOptions,
@@ -595,7 +601,7 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
     declare("aoahid_discovery_count", [DiscoveryP], c.c_size_t)
     declare("aoahid_discovery_get", [DiscoveryP, c.c_size_t], c.POINTER(DeviceInfo))
     declare("aoahid_discovery_destroy", [DiscoveryP], None)
-    declare("aoahid_accessory_start", [ContextP, c.POINTER(DeviceInfo), c.POINTER(AccessoryOptions)], result)
+    declare("aoahid_accessory_start", [ContextP, c.POINTER(DeviceInfo), c.POINTER(AccessoryOptions), c.c_uint32], result)
     declare("aoahid_device_open", [ContextP, c.POINTER(DeviceInfo), c.POINTER(DeviceOptions), c.POINTER(DeviceP)], result)
     declare("aoahid_device_close", [DeviceP, c.c_uint32, c.c_uint32], result)
     declare("aoahid_device_latched_error", [DeviceP], result)
@@ -668,6 +674,7 @@ __all__ += [
     "ContextOptions",
     "DeviceInfo",
     "AoaStrings",
+    "LinuxHidPolicy",
     "DeviceOptions",
     "AccessoryOptions",
     "NodeOptions",

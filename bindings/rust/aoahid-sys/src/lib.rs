@@ -120,7 +120,7 @@ macro_rules! c_struct {
 }
 
 c_struct!(aoahid_error_detail {
-    code: i32, field: *const c_char, reason: *const c_char, transport_status: i32,
+    code: aoahid_result, field: *const c_char, reason: *const c_char, transport_status: i32,
     aoa_request: i32, node_id: u16, report_id: u16, offset: u32, length: u32,
 });
 c_struct!(aoahid_context_options {
@@ -137,6 +137,14 @@ c_struct!(aoahid_aoa_strings {
     manufacturer: *const c_char, model: *const c_char, description: *const c_char,
     version: *const c_char, uri: *const c_char, serial: *const c_char,
 });
+c_struct!(aoahid_linux_hid_policy {
+    descriptor_bytes: u32,
+    fields_per_report: u32,
+    global_stack_depth: u32,
+    report_size_bits: u32,
+    usages: u64,
+    report_data_bits: u64,
+});
 c_struct!(aoahid_device_options {
     struct_size: u32,
     reserved: u32,
@@ -144,12 +152,7 @@ c_struct!(aoahid_device_options {
     transfer_pool_slots: u32,
     maximum_report_bytes: u32,
     aoa_descriptor_wire_policy_bytes: u32,
-    linux_descriptor_policy_bytes: u32,
-    linux_hid_fields_per_report_policy: u32,
-    linux_hid_global_stack_depth_policy: u32,
-    linux_hid_usages_policy: u64,
-    linux_hid_report_data_policy_bits: u64,
-    linux_hid_report_size_policy_bits: u32,
+    linux_hid: aoahid_linux_hid_policy,
     target_ep0_data_policy_bytes: u32,
     host_control_buffer_policy_bytes: u32,
     interface_claim_policy: aoahid_interface_claim_policy,
@@ -160,7 +163,6 @@ c_struct!(aoahid_accessory_options {
     struct_size: u32,
     reserved: u32,
     strings: aoahid_aoa_strings,
-    control_timeout_ms: u32,
 });
 c_struct!(aoahid_channel_options {
     struct_size: u32,
@@ -416,6 +418,7 @@ extern "C" {
         context: *mut aoahid_context,
         selected: *const aoahid_device_info,
         options: *const aoahid_accessory_options,
+        control_timeout_ms: u32,
     ) -> aoahid_result;
     pub fn aoahid_device_open(
         context: *mut aoahid_context,

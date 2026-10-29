@@ -16,18 +16,14 @@ static const char* const k_send_sequence[] = {
     NULL};
 
 int main(void) {
-    aoahid_touchpad_options options = {0};
-    const aoahid_integer_field coordinate = {0, 32767, 16U, {0, 0, 0, 0, 0}};
+    aoahid_touchpad_options options;
     const aoahid_integer_field byte_range = {0, 255, 8U, {0, 0, 0, 0, 0}};
     aoahid_spec* spec = NULL;
     aoahid_result result;
 
-    options.struct_size = (uint32_t)sizeof options;
+    aoahid_touchpad_options_init(&options);
     options.maximum_contacts = 3U;
     options.contacts_per_report = 3U;
-    options.contact_id = (aoahid_integer_field){0, 15, 4U, {0, 0, 0, 0, 0}};
-    options.x = coordinate;
-    options.y = coordinate;
     options.contact_count = (aoahid_integer_field){0, 3, 2U, {0, 0, 0, 0, 0}};
     options.enable_pressure = 1U;
     options.pressure = byte_range;
@@ -40,7 +36,6 @@ int main(void) {
     options.enable_scan_time = 1U;
     options.scan_time = (aoahid_integer_field){0, 65535, 16U, {0, 0, 0, 0, 0}};
     options.scan_time_unit_100us = 1U;
-    options.button_count = 1U;
 
     result = aoahid_spec_create_touchpad(&options, &spec);
     return aoahid_example_run("touchpad", AOAHID_PROFILE_TOUCHPAD, result, spec, k_send_sequence);

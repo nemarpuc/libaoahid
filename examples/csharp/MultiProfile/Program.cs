@@ -85,14 +85,17 @@ internal static class Program
         MaximumReportBytes = HostReportPolicyBytes,
         ValidateReports = 1,
         AoaDescriptorWirePolicyBytes = DescriptorPolicyBytes,
-        LinuxDescriptorPolicyBytes = DescriptorPolicyBytes,
-        // These policies mirror Linux HID core limits
-        // (include/linux/hid.h); check them against the target kernel.
-        LinuxHidFieldsPerReportPolicy = 256,
-        LinuxHidGlobalStackDepthPolicy = 4,
-        LinuxHidUsagesPolicy = 12288,
-        LinuxHidReportDataPolicyBits = 65528,
-        LinuxHidReportSizePolicyBits = 256,
+        // The Linux HID parser limits of include/linux/hid.h (docs/LIMITS.md); check them against
+        // the target kernel.
+        LinuxHid = new LinuxHidPolicy
+        {
+            DescriptorBytes = DescriptorPolicyBytes,
+            FieldsPerReport = 256,
+            GlobalStackDepth = 4,
+            ReportSizeBits = 256,
+            Usages = 12288,
+            ReportDataBits = 65528,
+        },
         TargetEp0DataPolicyBytes = DescriptorPolicyBytes,
         HostControlBufferPolicyBytes = HostReportPolicyBytes,
         InterfaceClaimPolicy = ClaimPolicy.None,
@@ -234,7 +237,7 @@ internal static class Program
         var detailPointer = Native.LastError();
         status = detailPointer == nint.Zero
             ? Result.Internal
-            : (Result)Marshal.PtrToStructure<ErrorDetail>(detailPointer).Code;
+            : Marshal.PtrToStructure<ErrorDetail>(detailPointer).Code;
         if (status == Result.Ok)
             status = Result.Internal;
         return false;
@@ -255,7 +258,7 @@ internal static class Program
             status = Result.Internal;
             return false;
         }
-        status = (Result)Marshal.PtrToStructure<ErrorDetail>(detailPointer).Code;
+        status = Marshal.PtrToStructure<ErrorDetail>(detailPointer).Code;
         return status == Result.Ok;
     }
 
@@ -346,12 +349,12 @@ internal static class Program
         if (session.Device == nint.Zero)
             return Result.Ok;
         var status = Native.DeviceClose(session.Device, timeoutMs, CloseDrainTimeoutMs);
-        // The first close consumes Device and all Node handles for every result.
+        // Every result of a valid close consumes the Device and its Nodes.
         session.Device = nint.Zero;
         session.Keyboard = nint.Zero;
         session.Mouse = nint.Zero;
         session.Touchscreen = nint.Zero;
-        if (status is not (Result.Ok or Result.ClosePending or Result.NoDevice))
+        if (status is not (Result.Ok or Result.NoDevice))
             ReportError(status, "device close");
         return status;
     }
@@ -361,17 +364,15 @@ internal static class Program
         while (session.Touchscreen != nint.Zero)
         {
             var status = Native.NodeClose(session.Touchscreen, pollMs, CloseDrainTimeoutMs);
-            if (status == Result.Ok)
-            {
-                session.Touchscreen = nint.Zero;
-                return status;
-            }
             if (status != Result.ClosePending)
             {
-                ReportError(status, "touchscreen close");
+                // Any other result consumed the Node; an error says what failed on the way out.
+                session.Touchscreen = nint.Zero;
+                if (status != Result.Ok)
+                    ReportError(status, "touchscreen close");
                 return status;
             }
-            // Pending Node close retains ownership, so polling and retry are required.
+            // The Node is still ours: let its report finish, then close it again.
             var poll = Native.ContextPoll(context, pollMs);
             if (poll != Result.Ok)
                 return poll;

@@ -78,14 +78,16 @@ fn device_options() -> sys::aoahid_device_options {
         transfer_pool_slots: POOL_SLOTS,
         maximum_report_bytes: HOST_REPORT_POLICY_BYTES,
         aoa_descriptor_wire_policy_bytes: DESCRIPTOR_POLICY_BYTES,
-        linux_descriptor_policy_bytes: DESCRIPTOR_POLICY_BYTES,
-        // These policies mirror Linux HID core limits
-        // (include/linux/hid.h); check them against the target kernel.
-        linux_hid_fields_per_report_policy: 256,
-        linux_hid_global_stack_depth_policy: 4,
-        linux_hid_usages_policy: 12288,
-        linux_hid_report_data_policy_bits: 65528,
-        linux_hid_report_size_policy_bits: 256,
+        // The Linux HID parser limits of include/linux/hid.h (docs/LIMITS.md); check them
+        // against the target kernel.
+        linux_hid: sys::aoahid_linux_hid_policy {
+            descriptor_bytes: DESCRIPTOR_POLICY_BYTES,
+            fields_per_report: 256,
+            global_stack_depth: 4,
+            report_size_bits: 256,
+            usages: 12288,
+            report_data_bits: 65528,
+        },
         target_ep0_data_policy_bytes: DESCRIPTOR_POLICY_BYTES,
         host_control_buffer_policy_bytes: HOST_REPORT_POLICY_BYTES,
         interface_claim_policy: sys::AOAHID_INTERFACE_CLAIM_NONE,
@@ -399,15 +401,12 @@ fn close_device(session: &mut Session, timeout_ms: u32) -> sys::aoahid_result {
         return sys::AOAHID_OK;
     }
     let status = unsafe { sys::aoahid_device_close(session.device, timeout_ms, CLOSE_DRAIN_TIMEOUT_MS) };
-    // The first Device close consumes it and every Node handle for every result.
+    // Every result of a valid close consumes the Device and its Nodes.
     session.device = ptr::null_mut();
     session.keyboard = ptr::null_mut();
     session.mouse = ptr::null_mut();
     session.touchscreen = ptr::null_mut();
-    if !matches!(
-        status,
-        sys::AOAHID_OK | sys::AOAHID_CLOSE_PENDING | sys::AOAHID_ERR_NO_DEVICE
-    ) {
+    if !matches!(status, sys::AOAHID_OK | sys::AOAHID_ERR_NO_DEVICE) {
         report_error(status, "device close");
     }
     status
@@ -420,14 +419,12 @@ fn close_touchscreen(
 ) -> sys::aoahid_result {
     while !session.touchscreen.is_null() {
         let status = unsafe { sys::aoahid_node_close(session.touchscreen, poll_ms, CLOSE_DRAIN_TIMEOUT_MS) };
-        if status == sys::AOAHID_OK {
+        if status != sys::AOAHID_CLOSE_PENDING {
+            // Any other result consumed the Node; an error says what failed on the way out.
             session.touchscreen = ptr::null_mut();
             return status;
         }
-        if status != sys::AOAHID_CLOSE_PENDING {
-            return status;
-        }
-        // Pending Node close retains its handle; polling and retry are required.
+        // The Node is still ours: let its report finish, then close it again.
         let poll = unsafe { sys::aoahid_context_poll(context, poll_ms) };
         if poll != sys::AOAHID_OK {
             return poll;

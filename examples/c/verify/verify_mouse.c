@@ -22,31 +22,24 @@ int main(void) {
     if (verify_open_first_device(&context, &device) != 0)
         return 1;
 
-    aoahid_mouse_options options = {0};
-    options.struct_size = (uint32_t)sizeof options;
-    options.button_count = 3U;
-    options.x.logical_minimum = -127;
-    options.x.logical_maximum = 127;
-    options.x.bit_width = 8U;
-    options.y.logical_minimum = -127;
-    options.y.logical_maximum = 127;
-    options.y.bit_width = 8U;
+    aoahid_mouse_options options;
+    aoahid_mouse_options_init(&options);
 
     aoahid_spec* spec = NULL;
     aoahid_result result = aoahid_spec_create_mouse(&options, &spec);
     if (result != AOAHID_OK) {
-        aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         return verify_fail("mouse spec create", result);
     }
 
     const aoahid_node_options node_options = {(uint32_t)sizeof(aoahid_node_options), 0U, 1U, 0U};
     aoahid_node* node = NULL;
-    result = aoahid_node_open(device, spec, &node_options, VERIFY_CONTROL_TIMEOUT_MS, &node);
+    result = aoahid_node_open(device, spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS, &node);
     aoahid_spec_release(spec);
     if (result != AOAHID_OK) {
-        aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         return verify_fail("mouse node open", result);
     }
     /* Android registers the HID asynchronously; input sent at once may be
@@ -76,18 +69,18 @@ int main(void) {
             if (dx != 0 || dy != 0) {
                 result = aoahid_mouse_move(node, dx, dy);
                 if (result != AOAHID_OK) {
-                    aoahid_node_close(node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-                    aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-                    aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS,
-                                           VERIFY_DRAIN_TIMEOUT_MS);
+                    aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+                    aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+                    aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS,
+                                           AOAHID_DRAIN_TIMEOUT_MS);
                     return verify_fail("mouse move", result);
                 }
                 result = verify_submit(node);
                 if (result != AOAHID_OK) {
-                    aoahid_node_close(node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-                    aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-                    aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS,
-                                           VERIFY_DRAIN_TIMEOUT_MS);
+                    aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+                    aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+                    aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS,
+                                           AOAHID_DRAIN_TIMEOUT_MS);
                     return verify_fail("submit mouse move", result);
                 }
             }
@@ -96,8 +89,8 @@ int main(void) {
     }
 
     printf("done. Expected result: the cursor traced circles, if your phone shows one.\n");
-    aoahid_node_close(node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-    aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-    aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+    aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     return 0;
 }

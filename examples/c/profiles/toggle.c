@@ -26,17 +26,14 @@ static const char* const k_send_sequence[] = {
     "aoahid_node_submit(node, send_ms)  sends the 0 edge that completes the tap", NULL};
 
 int main(void) {
-    aoahid_toggle_options options = {0};
+    aoahid_toggle_options options;
     aoahid_spec* spec = NULL;
     aoahid_result result;
 
-    options.struct_size = (uint32_t)sizeof options;
-    /* Consumer Control. For System Control instead: 0x01/0x80/0x01.
-     * For Camera keys: application 0x0C/0x01, field_page 0x90 (Auto-focus
-     * 0x20 / Shutter 0x21 only). For Telephony keys: 0x0B/0x01/0x0B. */
-    options.application_page = 0x0CU;
-    options.application_usage = 0x01U;
-    options.field_page = 0x0CU;
+    aoahid_toggle_options_init(&options);
+    /* The initializer selects Consumer Control. For System Control set the three pages to
+     * 0x01/0x80/0x01; for Camera keys keep 0x0C/0x01 and set field_page to 0x90 (Auto-focus 0x20
+     * and Shutter 0x21 only); for Telephony keys 0x0B/0x01/0x0B. */
     options.allowed_usages = k_usages;
     options.allowed_usage_count = sizeof k_usages / sizeof k_usages[0];
     options.usage_semantics = k_semantics;

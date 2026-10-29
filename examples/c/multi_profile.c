@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 libaoahid contributors
-/* Exercises caller-owned discovery, multi-profile state, reconnection, and
- * teardown through the C ABI. This example chooses every option itself; the
- * library picks no policy. docs/EXAMPLES.md explains each value. */
+/* Exercises caller-owned discovery, multi-profile state, reconnection, and teardown through the C
+ * ABI. Options start from the *_init functions; docs/EXAMPLES.md explains each value changed. */
 #if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
 /* Must be defined before any system header is included in this translation
  * unit, or glibc's feature-test-macro selection will already be locked in
@@ -42,10 +41,9 @@ static void demo_sleep_ms(int milliseconds) {
 #endif
 }
 
-/* Every value in this block is this caller's reviewed example policy or input.
- * None is selected by libaoahid; docs/EXAMPLES.md records the value ledger. */
+/* The values this example changes from the *_init functions, and its input; docs/EXAMPLES.md
+ * lists them. */
 static const uint32_t k_control_timeout_ms = 500U;
-static const uint32_t k_descriptor_policy_bytes = 4096U;
 static const uint32_t k_host_report_policy_bytes = 4088U;
 static const uint32_t k_pool_slots = 8U;
 static const uint32_t k_reserved_slots_per_node = 1U;
@@ -57,11 +55,6 @@ static const int32_t k_relative_minimum = -127;
 static const int32_t k_relative_maximum = 127;
 static const uint32_t k_relative_bits = 8U;
 static const uint32_t k_touch_contact_id = 1U;
-static const int32_t k_touch_contact_id_maximum = 15;
-static const uint32_t k_touch_contact_id_bits = 4U;
-static const int32_t k_touch_coordinate_maximum = 32767;
-static const uint32_t k_touch_coordinate_bits = 16U;
-static const uint32_t k_touch_contact_count_bits = 1U;
 static const int32_t k_example_touch_x = 1000;
 static const int32_t k_example_touch_y = 2000;
 static const int32_t k_example_mouse_dx = 30;
@@ -141,101 +134,52 @@ static aoahid_result discovery_count_checked(const aoahid_discovery* discovery, 
 }
 
 static aoahid_context_options context_options(void) {
-    aoahid_context_options options = {0};
-    options.struct_size = sizeof(options);
-    options.reserved = 0U;
+    aoahid_context_options options;
+    aoahid_context_options_init(&options);
     options.event_mode = AOAHID_EVENT_CALLER_POLL;
-    options.log_level = AOAHID_LOG_DISABLED;
-    options.log_sink = NULL;
-    options.log_user = NULL;
     return options;
 }
 
 static aoahid_device_options device_options(void) {
-    aoahid_device_options options = {0};
-    options.struct_size = sizeof(options);
-    options.reserved = 0U;
-    options.descriptor_fragment_bytes = 64U; /* Explicit policy; AOA fixes no fragment size. */
+    aoahid_device_options options;
+    aoahid_device_options_init(&options);
+    options.descriptor_fragment_bytes = 64U; /* AOA fixes no fragment size. */
     options.transfer_pool_slots = k_pool_slots;
     options.maximum_report_bytes = k_host_report_policy_bytes;
-    options.validate_reports = 1U;
-    options.aoa_descriptor_wire_policy_bytes = k_descriptor_policy_bytes;
-    options.linux_hid.descriptor_bytes = k_descriptor_policy_bytes;
-    /* These policies mirror Linux HID core limits
-     * (include/linux/hid.h); check them against the target kernel. */
-    options.linux_hid.fields_per_report = 256U;
-    options.linux_hid.global_stack_depth = 4U;
-    options.linux_hid.usages = 12288U;
-    options.linux_hid.report_data_bits = 65528U;
-    options.linux_hid.report_size_bits = 256U;
-    options.target_ep0_data_policy_bytes = k_descriptor_policy_bytes;
     options.host_control_buffer_policy_bytes = k_host_report_policy_bytes;
-    options.interface_claim_policy = AOAHID_INTERFACE_CLAIM_NONE;
-    options.interface_number = -1; /* No interface number accompanies the no-claim policy. */
+    options.validate_reports = 1U;
     return options;
 }
 
 static aoahid_node_options node_options(void) {
-    aoahid_node_options options = {0};
-    options.struct_size = sizeof(options);
-    options.reserved = 0U;
+    aoahid_node_options options;
+    aoahid_node_options_init(&options);
     options.has_reserved_slots = 1U;
     options.reserved_slots = k_reserved_slots_per_node;
     return options;
 }
 
-static aoahid_integer_field integer_field(int32_t minimum, int32_t maximum, uint32_t bits) {
-    aoahid_integer_field field = {0};
-    field.logical_minimum = minimum;
-    field.logical_maximum = maximum;
-    field.bit_width = bits;
-    field.physical = (aoahid_physical_properties){0U, 0, 0, 0, 0U};
-    return field;
-}
-
 static aoahid_result create_specs(specs* result) {
-    aoahid_keyboard_options keyboard = {0};
-    keyboard.struct_size = sizeof(keyboard);
-    keyboard.reserved = 0U;
-    keyboard.report_id = (aoahid_report_id_option){0U, 0U, {0U, 0U, 0U}};
-    keyboard.usage_minimum = k_keyboard_a_usage;
+    aoahid_keyboard_options keyboard;
+    aoahid_keyboard_options_init(&keyboard);
     keyboard.usage_maximum = k_keyboard_application_usage;
 
-    aoahid_mouse_options mouse = {0};
-    mouse.struct_size = sizeof(mouse);
-    mouse.reserved = 0U;
-    mouse.report_id = (aoahid_report_id_option){0U, 0U, {0U, 0U, 0U}};
+    const aoahid_integer_field relative =
+        aoahid_integer_field_make(k_relative_minimum, k_relative_maximum, k_relative_bits);
+    aoahid_mouse_options mouse;
+    aoahid_mouse_options_init(&mouse);
     mouse.button_count = k_pointer_button_count;
-    mouse.x = integer_field(k_relative_minimum, k_relative_maximum, k_relative_bits);
-    mouse.y = integer_field(k_relative_minimum, k_relative_maximum, k_relative_bits);
-    mouse.enable_wheel = 1U;
-    mouse.wheel = integer_field(k_relative_minimum, k_relative_maximum, k_relative_bits);
+    mouse.x = relative;
+    mouse.y = relative;
+    mouse.wheel = relative;
     mouse.enable_pan = 0U;
-    mouse.pan = integer_field(0, 0, 0U);
+    mouse.pan = aoahid_integer_field_make(0, 0, 0U);
 
-    aoahid_touchscreen_options touch = {0};
-    touch.struct_size = sizeof(touch);
-    touch.reserved = 0U;
-    touch.report_id = (aoahid_report_id_option){0U, 0U, {0U, 0U, 0U}};
+    aoahid_touchscreen_options touch;
+    aoahid_touchscreen_options_init(&touch);
     touch.maximum_contacts = 1U;
     touch.contacts_per_report = 1U;
-    touch.contact_id = integer_field(0, k_touch_contact_id_maximum, k_touch_contact_id_bits);
-    touch.x = integer_field(0, k_touch_coordinate_maximum, k_touch_coordinate_bits);
-    touch.y = integer_field(0, k_touch_coordinate_maximum, k_touch_coordinate_bits);
-    touch.contact_count = integer_field(0, 1, k_touch_contact_count_bits);
-    touch.enable_pressure = 0U;
-    touch.pressure = integer_field(0, 0, 0U);
-    touch.enable_width = 0U;
-    touch.width = integer_field(0, 0, 0U);
-    touch.enable_height = 0U;
-    touch.height = integer_field(0, 0, 0U);
-    touch.enable_azimuth = 0U;
-    touch.azimuth = integer_field(0, 0, 0U);
-    touch.enable_scan_time = 0U;
-    touch.scan_time = integer_field(0, 0, 0U);
-    touch.scan_time_unit_100us = 0U;
-    touch.enable_contact_count_maximum_feature_declaration = 0U;
-    touch.enable_multi_packet_frames = 0U;
+    touch.contact_count = aoahid_integer_field_make(0, 1, 1U);
 
     *result = (specs){NULL, NULL, NULL};
     aoahid_result status = aoahid_spec_create_keyboard(&keyboard, &result->keyboard);
@@ -341,7 +285,7 @@ static aoahid_result open_session(aoahid_context* context, const aoahid_device_i
         (void)failed(status, value->device == NULL ? "device open" : "profile registration");
     }
     if (status != AOAHID_OK && value->device != NULL) {
-        /* The first Device close consumes it and every opened Node for every result. */
+        /* Every result of a valid close consumes the Device and its Nodes. */
         (void)aoahid_device_close(value->device, k_control_timeout_ms, k_close_drain_timeout_ms);
         value->device = NULL;
         value->keyboard = NULL;
@@ -356,12 +300,12 @@ static aoahid_result close_device(session* value) {
         return AOAHID_OK;
     const aoahid_result status =
         aoahid_device_close(value->device, k_control_timeout_ms, k_close_drain_timeout_ms);
-    /* CLOSE_PENDING transfers the complete graph to Context; never close again. */
+    /* Every result of a valid close consumes the Device and its Nodes. */
     value->device = NULL;
     value->keyboard = NULL;
     value->mouse = NULL;
     value->touchscreen = NULL;
-    if (status != AOAHID_OK && status != AOAHID_CLOSE_PENDING && status != AOAHID_ERR_NO_DEVICE)
+    if (status != AOAHID_OK && status != AOAHID_ERR_NO_DEVICE)
         (void)failed(status, "device close");
     return status;
 }
@@ -370,13 +314,12 @@ static aoahid_result close_touchscreen(aoahid_context* context, session* value) 
     while (value->touchscreen != NULL) {
         const aoahid_result status =
             aoahid_node_close(value->touchscreen, k_control_timeout_ms, k_close_drain_timeout_ms);
-        if (status == AOAHID_OK) {
+        if (status != AOAHID_CLOSE_PENDING) {
+            /* Any other result consumed the Node; an error says what failed on the way out. */
             value->touchscreen = NULL;
             return status;
         }
-        if (status != AOAHID_CLOSE_PENDING)
-            return status;
-        /* Pending Node close retains ownership, so poll and retry the same handle. */
+        /* The Node is still ours: let its report finish, then close it again. */
         const aoahid_result poll = aoahid_context_poll(context, k_control_timeout_ms);
         if (poll != AOAHID_OK)
             return poll;

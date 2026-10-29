@@ -12,18 +12,14 @@ static const char* const k_send_sequence[] = {
     "aoahid_node_submit(node, send_ms)          closes the frame", NULL};
 
 int main(void) {
-    aoahid_touchscreen_options options = {0};
-    const aoahid_integer_field coordinate = {0, 32767, 16U, {0, 0, 0, 0, 0}};
+    aoahid_touchscreen_options options;
     const aoahid_integer_field byte_range = {0, 255, 8U, {0, 0, 0, 0, 0}};
     aoahid_spec* spec = NULL;
     aoahid_result result;
 
-    options.struct_size = (uint32_t)sizeof options;
+    aoahid_touchscreen_options_init(&options);
     options.maximum_contacts = 3U;
     options.contacts_per_report = 3U;
-    options.contact_id = (aoahid_integer_field){0, 15, 4U, {0, 0, 0, 0, 0}};
-    options.x = coordinate;
-    options.y = coordinate;
     options.contact_count = (aoahid_integer_field){0, 3, 2U, {0, 0, 0, 0, 0}};
     options.enable_pressure = 1U;
     options.pressure = byte_range;

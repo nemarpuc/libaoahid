@@ -8,6 +8,7 @@
 #include "api/internal.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -1001,6 +1002,88 @@ aoahid_result allocate_hid_id(aoahid_device* device, std::uint16_t* hid_id) noex
     *hid_id = static_cast<std::uint16_t>(domain.next_hid_id++);
     return AOAHID_OK;
 }
+
+aoahid_result check_reservation(const aoahid_device* device,
+                                const aoahid_node_options& options) noexcept {
+    const bool no_reservation = options.has_reserved_slots == 0U && options.reserved_slots == 0U;
+    if (options.reserved != 0U || (!no_reservation && options.has_reserved_slots != 1U) ||
+        options.reserved_slots > 1U) {
+        set_error(AOAHID_ERR_UNSET_FIELD, "node.reserved_slots",
+                  "Reserve nothing with 0/0, or one slot with has_reserved_slots 1 and "
+                  "reserved_slots 0 or 1.");
+        return AOAHID_ERR_UNSET_FIELD;
+    }
+    std::uint64_t reserved = options.reserved_slots;
+    for (const auto* sibling : device->nodes)
+        reserved += sibling->reserved_slots;
+    if (reserved >= device->config.pool_slots) {
+        set_error(AOAHID_ERR_PARAM, "node.reserved_slots",
+                  "The reservations of all Nodes must leave at least one shared pool slot.");
+        return AOAHID_ERR_PARAM;
+    }
+    return AOAHID_OK;
+}
+
+std::uint32_t saturate_u32(const std::uint64_t value) noexcept {
+    return static_cast<std::uint32_t>(
+        std::min<std::uint64_t>(value, std::numeric_limits<std::uint32_t>::max()));
+}
+
+// Every limit is checked before request 54, so a Spec the target would refuse never registers.
+// A refused limit reports the Device's value in offset and the Spec's in length.
+aoahid_result check_spec_fits_device(const aoahid_device* device,
+                                     const aoahid_spec* spec) noexcept {
+    if (spec->descriptor.empty() || spec->descriptor.size() > device->aoa_descriptor_policy_bytes) {
+        set_error(AOAHID_ERR_OVERFLOW, "spec.descriptor.aoa_wire_policy",
+                  "The descriptor exceeds aoa_descriptor_wire_policy_bytes.");
+        return AOAHID_ERR_OVERFLOW;
+    }
+    struct Limit {
+        const char* field;
+        const char* reason;
+        std::uint64_t allowed;
+        std::uint64_t needed;
+    };
+    const aoahid_linux_hid_policy& linux_hid = device->linux_hid;
+    const aoa::hid::DescriptorRequirements& needs = spec->requirements;
+    const std::array<Limit, 6> limits{{
+        {"spec.descriptor.linux_policy", "The descriptor exceeds linux_hid.descriptor_bytes.",
+         linux_hid.descriptor_bytes, spec->descriptor.size()},
+        {"spec.requirements.maximum_fields_per_report",
+         "A report has more fields than linux_hid.fields_per_report.", linux_hid.fields_per_report,
+         needs.maximum_fields_per_report},
+        {"spec.requirements.maximum_global_stack_depth",
+         "The descriptor pushes deeper than linux_hid.global_stack_depth.",
+         linux_hid.global_stack_depth, needs.maximum_global_stack_depth},
+        {"spec.requirements.maximum_report_size_bits",
+         "A Report Size is larger than linux_hid.report_size_bits.", linux_hid.report_size_bits,
+         needs.maximum_report_size_bits},
+        {"spec.requirements.maximum_usages",
+         "The descriptor has more Usages than linux_hid.usages.", linux_hid.usages,
+         needs.maximum_usages},
+        {"spec.requirements.maximum_report_data_bits",
+         "A report is larger than linux_hid.report_data_bits.", linux_hid.report_data_bits,
+         needs.maximum_report_data_bits},
+    }};
+    for (const Limit& limit : limits) {
+        if (limit.needed > limit.allowed) {
+            set_error(AOAHID_ERR_OVERFLOW, limit.field, limit.reason, 0, 0, 0, 0,
+                      saturate_u32(limit.allowed), saturate_u32(limit.needed));
+            return AOAHID_ERR_OVERFLOW;
+        }
+    }
+    for (const auto& report : spec->report_capabilities) {
+        if (report.wire_length > device->config.maximum_report_bytes ||
+            report.wire_length > device->target_ep0_policy_bytes ||
+            report.wire_length > device->host_control_policy_bytes) {
+            set_error(AOAHID_ERR_OVERFLOW, "spec.report",
+                      "A report is larger than maximum_report_bytes, "
+                      "target_ep0_data_policy_bytes or host_control_buffer_policy_bytes.");
+            return AOAHID_ERR_OVERFLOW;
+        }
+    }
+    return AOAHID_OK;
+}
 } // namespace
 
 #if defined(AOAHID_CHECK_SERIALIZATION)
@@ -1432,92 +1515,12 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
                                    static_cast<std::uint32_t>(sizeof(*options)), "node_options")) {
         return AOAHID_ERR_PARAM;
     }
-    const bool use_zero_reservation_fallback =
-        options->has_reserved_slots == 0U && options->reserved_slots == 0U;
-    if (options->reserved != 0U ||
-        (!use_zero_reservation_fallback && options->has_reserved_slots != 1U) ||
-        options->reserved_slots > 1U) {
-        set_error(AOAHID_ERR_UNSET_FIELD, "node.reserved_slots",
-                  "Zero/zero selects the no-reservation fallback; otherwise reservation intent "
-                  "must be explicit, and a one-inflight Node can reserve only zero or one slot.");
-        return AOAHID_ERR_UNSET_FIELD;
-    }
-    std::uint64_t reserved = options->reserved_slots;
-    for (const auto* sibling : device->nodes)
-        reserved += sibling->reserved_slots;
-    if (reserved >= device->config.pool_slots) {
-        set_error(AOAHID_ERR_PARAM, "node.reserved_slots",
-                  "Positive Node reservations must leave at least one shared pool slot.");
-        return AOAHID_ERR_PARAM;
-    }
-    if (spec->descriptor.empty() || spec->descriptor.size() > device->aoa_descriptor_policy_bytes) {
-        set_error(AOAHID_ERR_OVERFLOW, "spec.descriptor.aoa_wire_policy",
-                  "The descriptor exceeds the caller's AOA wire-size policy.");
-        return AOAHID_ERR_OVERFLOW;
-    }
-    if (spec->descriptor.size() > device->linux_hid.descriptor_bytes) {
-        set_error(AOAHID_ERR_OVERFLOW, "spec.descriptor.linux_policy",
-                  "The descriptor exceeds the caller's Linux descriptor byte policy.");
-        return AOAHID_ERR_OVERFLOW;
-    }
-    if (spec->requirements.maximum_fields_per_report > device->linux_hid.fields_per_report) {
-        set_error(AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_fields_per_report",
-                  "The descriptor exceeds the caller-selected per-report field policy for the "
-                  "exact target HID parser revision.",
-                  0, 0, 0, 0, device->linux_hid.fields_per_report,
-                  spec->requirements.maximum_fields_per_report);
-        return AOAHID_ERR_OVERFLOW;
-    }
-    if (spec->requirements.maximum_global_stack_depth > device->linux_hid.global_stack_depth) {
-        set_error(AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_global_stack_depth",
-                  "The descriptor exceeds the caller-selected Global stack-depth policy for the "
-                  "exact target HID parser revision.",
-                  0, 0, 0, 0, device->linux_hid.global_stack_depth,
-                  spec->requirements.maximum_global_stack_depth);
-        return AOAHID_ERR_OVERFLOW;
-    }
-    if (spec->requirements.maximum_report_size_bits > device->linux_hid.report_size_bits) {
-        set_error(AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_report_size_bits",
-                  "The descriptor exceeds the caller-selected Report Size declaration policy for "
-                  "the exact target HID parser revision.",
-                  0, 0, 0, 0, device->linux_hid.report_size_bits,
-                  spec->requirements.maximum_report_size_bits);
-        return AOAHID_ERR_OVERFLOW;
-    }
-    if (spec->requirements.maximum_usages > device->linux_hid.usages) {
-        set_error(
-            AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_usages",
-            "The descriptor exceeds the caller-selected Usage policy for the exact target HID "
-            "parser revision.",
-            0, 0, 0, 0,
-            static_cast<std::uint32_t>(std::min<std::uint64_t>(
-                device->linux_hid.usages, std::numeric_limits<std::uint32_t>::max())),
-            static_cast<std::uint32_t>(std::min<std::uint64_t>(
-                spec->requirements.maximum_usages, std::numeric_limits<std::uint32_t>::max())));
-        return AOAHID_ERR_OVERFLOW;
-    }
-    if (spec->requirements.maximum_report_data_bits > device->linux_hid.report_data_bits) {
-        set_error(
-            AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_report_data_bits",
-            "The descriptor exceeds the caller-selected report data-bit policy for the exact "
-            "target HID parser revision.",
-            0, 0, 0, 0,
-            static_cast<std::uint32_t>(std::min<std::uint64_t>(
-                device->linux_hid.report_data_bits, std::numeric_limits<std::uint32_t>::max())),
-            static_cast<std::uint32_t>(
-                std::min<std::uint64_t>(spec->requirements.maximum_report_data_bits,
-                                        std::numeric_limits<std::uint32_t>::max())));
-        return AOAHID_ERR_OVERFLOW;
-    }
-    for (const auto& report : spec->report_capabilities) {
-        if (report.wire_length > device->config.maximum_report_bytes ||
-            report.wire_length > device->target_ep0_policy_bytes ||
-            report.wire_length > device->host_control_policy_bytes) {
-            set_error(AOAHID_ERR_OVERFLOW, "spec.report",
-                      "A report exceeds one of the caller's distinct report/control policies.");
-            return AOAHID_ERR_OVERFLOW;
-        }
-    }
+    const aoahid_result reservation = check_reservation(device, *options);
+    if (reservation != AOAHID_OK)
+        return reservation;
+    const aoahid_result fits = check_spec_fits_device(device, spec);
+    if (fits != AOAHID_OK)
+        return fits;
     auto node = std::unique_ptr<aoahid_node>(new (std::nothrow) aoahid_node());
     if (node == nullptr) {
         set_error(AOAHID_ERR_INTERNAL, "node", "Memory allocation for the Node failed.");

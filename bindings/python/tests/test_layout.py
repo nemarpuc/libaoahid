@@ -25,13 +25,16 @@ def test_context_options_exposes_explicit_choice_fields():
 
 def test_device_options_exposes_target_parser_policies():
     names = {name for name, *_ in DeviceOptions._fields_}
-    assert {
-        "linux_hid_fields_per_report_policy",
-        "linux_hid_global_stack_depth_policy",
-        "linux_hid_usages_policy",
-        "linux_hid_report_data_policy_bits",
-        "linux_hid_report_size_policy_bits",
-    } <= names
+    assert "linux_hid" in names
+    policy = {name for name, *_ in native.LinuxHidPolicy._fields_}
+    assert policy == {
+        "descriptor_bytes",
+        "fields_per_report",
+        "global_stack_depth",
+        "report_size_bits",
+        "usages",
+        "report_data_bits",
+    }
 
 
 def test_package_exports_only_the_binding_surface():

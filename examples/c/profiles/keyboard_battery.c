@@ -16,16 +16,14 @@ static const char* const k_send_sequence[] = {
     NULL};
 
 int main(void) {
-    aoahid_keyboard_options options = {0};
+    aoahid_keyboard_options options;
     aoahid_spec* spec = NULL;
     aoahid_result result;
 
-    options.struct_size = (uint32_t)sizeof options;
+    aoahid_keyboard_options_init(&options);
     /* Both reports need a Report ID, and the two must differ. */
     options.report_id.enabled = 1U;
     options.report_id.value = 1U;
-    options.usage_minimum = 0x04U;
-    options.usage_maximum = 0x65U;
     options.enable_battery = 1U;
     options.battery.report_id.enabled = 1U;
     options.battery.report_id.value = 2U;

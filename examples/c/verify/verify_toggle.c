@@ -79,11 +79,8 @@ int main(void) {
     if (verify_open_first_device(&context, &device) != 0)
         return 1;
 
-    aoahid_toggle_options options = {0};
-    options.struct_size = (uint32_t)sizeof options;
-    options.application_page = 0x0CU;
-    options.application_usage = 0x01U;
-    options.field_page = 0x0CU;
+    aoahid_toggle_options options;
+    aoahid_toggle_options_init(&options);
 
     uint16_t usages[TOGGLE_CASE_COUNT];
     aoahid_usage_semantic semantics[TOGGLE_CASE_COUNT];
@@ -104,18 +101,18 @@ int main(void) {
     aoahid_spec* spec = NULL;
     aoahid_result result = aoahid_spec_create_toggle(&options, &spec);
     if (result != AOAHID_OK) {
-        aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         return verify_fail("toggle spec create", result);
     }
 
     const aoahid_node_options node_options = {(uint32_t)sizeof(aoahid_node_options), 0U, 1U, 0U};
     aoahid_node* node = NULL;
-    result = aoahid_node_open(device, spec, &node_options, VERIFY_CONTROL_TIMEOUT_MS, &node);
+    result = aoahid_node_open(device, spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS, &node);
     aoahid_spec_release(spec);
     if (result != AOAHID_OK) {
-        aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         return verify_fail("toggle node open", result);
     }
 
@@ -140,8 +137,8 @@ int main(void) {
                "    target/build, with the kernel log and getevent output attached\n");
     }
 
-    aoahid_node_close(node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-    aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-    aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+    aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     return exit_code;
 }

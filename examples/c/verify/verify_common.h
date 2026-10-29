@@ -4,11 +4,7 @@
  * is meant to be run against a real phone and watched, not just compiled: it
  * prints what to do, waits, then does one clearly described thing. See
  * docs/QUICKSTART.md for the full walkthrough this directory implements.
- *
- * This header chooses no product policy either: every tuning field below is
- * a plain, generous value picked for a first working connection, not a
- * recommendation for a shipped product. See docs/API.md for what each field
- * means and what a zero value would have selected instead. */
+ */
 #ifndef AOAHID_VERIFY_COMMON_H
 #define AOAHID_VERIFY_COMMON_H
 
@@ -56,34 +52,6 @@ static int verify_fail(const char* what, aoahid_result result) {
     return 1;
 }
 
-/* Every wait is an argument of the call and has no default; plain, generous values for a
- * first working connection, not a recommendation for a shipped product. */
-#define VERIFY_CONTROL_TIMEOUT_MS 500U
-#define VERIFY_SEND_TIMEOUT_MS 500U
-#define VERIFY_DRAIN_TIMEOUT_MS 1000U
-
-/* The Device options every verify program uses: plain, generous values for a
- * first working connection, not a recommendation for a shipped product. */
-static aoahid_device_options verify_device_options(void) {
-    aoahid_device_options device_options = {0};
-    device_options.struct_size = (uint32_t)sizeof device_options;
-    device_options.descriptor_fragment_bytes = 4096U;
-    device_options.transfer_pool_slots = 4U;
-    device_options.maximum_report_bytes = 1024U;
-    device_options.aoa_descriptor_wire_policy_bytes = 4096U;
-    device_options.linux_hid.descriptor_bytes = 4096U;
-    device_options.linux_hid.fields_per_report = 256U;
-    device_options.linux_hid.global_stack_depth = 4U;
-    device_options.linux_hid.usages = 12288U;
-    device_options.linux_hid.report_data_bits = 65528U;
-    device_options.linux_hid.report_size_bits = 256U;
-    device_options.target_ep0_data_policy_bytes = 4096U;
-    device_options.host_control_buffer_policy_bytes = 4096U;
-    device_options.interface_claim_policy = AOAHID_INTERFACE_CLAIM_NONE;
-    device_options.interface_number = -1;
-    return device_options;
-}
-
 /* The library never retries. Right after aoahid_node_open, Android may still
  * be registering the HID and refuse the first report with AOAHID_ERR_STALL; a
  * refused report stays pending, so this program resends it itself, a bounded
@@ -93,7 +61,7 @@ static aoahid_result verify_submit(aoahid_node* node) {
     for (int attempt = 0; attempt < 20 && result == AOAHID_ERR_STALL; ++attempt) {
         if (attempt != 0)
             verify_sleep_ms(1);
-        result = aoahid_node_submit_blocking(node, 500U);
+        result = aoahid_node_submit_blocking(node, AOAHID_SEND_TIMEOUT_MS);
     }
     return result;
 }
@@ -106,18 +74,16 @@ static int verify_open_first_device(aoahid_context** out_context, aoahid_device*
     *out_context = NULL;
     *out_device = NULL;
 
-    aoahid_context_options context_options = {0};
-    context_options.struct_size = (uint32_t)sizeof context_options;
-    context_options.event_mode = AOAHID_EVENT_CALLER_POLL;
-    context_options.log_level = AOAHID_LOG_DISABLED;
+    aoahid_context_options context_options;
+    aoahid_context_options_init(&context_options);
     aoahid_result result = aoahid_context_create(&context_options, out_context);
     if (result != AOAHID_OK)
         return verify_fail("context create", result);
 
     aoahid_discovery* discovery = NULL;
-    result = aoahid_discover(*out_context, 500U, &discovery);
+    result = aoahid_discover(*out_context, AOAHID_CONTROL_TIMEOUT_MS, &discovery);
     if (result != AOAHID_OK) {
-        aoahid_context_destroy(*out_context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(*out_context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         *out_context = NULL;
         return verify_fail("discover", result);
     }
@@ -132,7 +98,7 @@ static int verify_open_first_device(aoahid_context** out_context, aoahid_device*
 #endif
                         "See docs/QUICKSTART.md.\n");
         aoahid_discovery_destroy(discovery);
-        aoahid_context_destroy(*out_context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(*out_context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         *out_context = NULL;
         return 1;
     }
@@ -145,17 +111,18 @@ static int verify_open_first_device(aoahid_context** out_context, aoahid_device*
         fprintf(stderr, "device has AOA %u; HID needs version 2\n",
                 info != NULL ? (unsigned)info->protocol_version : 0U);
         aoahid_discovery_destroy(discovery);
-        aoahid_context_destroy(*out_context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(*out_context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         *out_context = NULL;
         return 1;
     }
 
-    const aoahid_device_options device_options = verify_device_options();
+    aoahid_device_options device_options;
+    aoahid_device_options_init(&device_options);
 
     result = aoahid_device_open(*out_context, info, &device_options, out_device);
     aoahid_discovery_destroy(discovery);
     if (result != AOAHID_OK) {
-        aoahid_context_destroy(*out_context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(*out_context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         *out_context = NULL;
         return verify_fail("device open", result);
     }

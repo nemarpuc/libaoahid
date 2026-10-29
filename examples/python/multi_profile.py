@@ -115,14 +115,14 @@ def device_options() -> DeviceOptions:  # noqa: F405
     options.maximum_report_bytes = HOST_REPORT_POLICY_BYTES
     options.validate_reports = 1
     options.aoa_descriptor_wire_policy_bytes = DESCRIPTOR_POLICY_BYTES
-    options.linux_descriptor_policy_bytes = DESCRIPTOR_POLICY_BYTES
-    # These policies mirror Linux HID core limits
-    # (include/linux/hid.h); check them against the target kernel.
-    options.linux_hid_fields_per_report_policy = 256
-    options.linux_hid_global_stack_depth_policy = 4
-    options.linux_hid_usages_policy = 12288
-    options.linux_hid_report_data_policy_bits = 65528
-    options.linux_hid_report_size_policy_bits = 256
+    # The Linux HID parser limits of include/linux/hid.h (docs/LIMITS.md); check them against the
+    # target kernel.
+    options.linux_hid.descriptor_bytes = DESCRIPTOR_POLICY_BYTES
+    options.linux_hid.fields_per_report = 256
+    options.linux_hid.global_stack_depth = 4
+    options.linux_hid.report_size_bits = 256
+    options.linux_hid.usages = 12288
+    options.linux_hid.report_data_bits = 65528
     options.target_ep0_data_policy_bytes = DESCRIPTOR_POLICY_BYTES
     options.host_control_buffer_policy_bytes = HOST_REPORT_POLICY_BYTES
     options.interface_claim_policy = AOAHID_INTERFACE_CLAIM_NONE  # noqa: F405
@@ -281,7 +281,7 @@ def open_session(
             report_error(library, status, "profile registration")
             library.aoahid_device_close(
                 device, control_timeout_ms, CLOSE_DRAIN_TIMEOUT_MS
-            )  # The first close consumes every opened node.
+            )  # Every result of a valid close consumes the Device and its Nodes.
             return None, int(status)
     return Session(locator, device, nodes[0], nodes[1], nodes[2]), AOAHID_OK  # noqa: F405
 
@@ -290,12 +290,12 @@ def close_device(library: c.CDLL, session: Session, control_timeout_ms: int) -> 
     if not session.device:
         return AOAHID_OK  # noqa: F405
     status = library.aoahid_device_close(session.device, control_timeout_ms, CLOSE_DRAIN_TIMEOUT_MS)
-    # Device ownership is consumed even when callbacks move it to the Context graveyard.
+    # Every result of a valid close consumes the Device and its Nodes.
     session.device = DeviceP()  # noqa: F405
     session.keyboard = NodeP()  # noqa: F405
     session.mouse = NodeP()  # noqa: F405
     session.touchscreen = NodeP()  # noqa: F405
-    if status not in (AOAHID_OK, AOAHID_CLOSE_PENDING, AOAHID_ERR_NO_DEVICE):  # noqa: F405
+    if status not in (AOAHID_OK, AOAHID_ERR_NO_DEVICE):  # noqa: F405
         report_error(library, status, "device close")
     return status
 
@@ -303,13 +303,13 @@ def close_device(library: c.CDLL, session: Session, control_timeout_ms: int) -> 
 def close_touchscreen(library: c.CDLL, context: ContextP, session: Session, poll_ms: int) -> int:  # noqa: F405
     while session.touchscreen:
         status = library.aoahid_node_close(session.touchscreen, poll_ms, CLOSE_DRAIN_TIMEOUT_MS)
-        if status == AOAHID_OK:  # noqa: F405
-            session.touchscreen = NodeP()  # noqa: F405
-            return status
         if status != AOAHID_CLOSE_PENDING:  # noqa: F405
-            report_error(library, status, "touchscreen close")
+            # Any other result consumed the Node; an error says what failed on the way out.
+            session.touchscreen = NodeP()  # noqa: F405
+            if status != AOAHID_OK:  # noqa: F405
+                report_error(library, status, "touchscreen close")
             return status
-        # A pending Node close retains its handle, unlike a pending Device close.
+        # The Node is still ours: let its report finish, then close it again.
         poll = library.aoahid_context_poll(context, poll_ms)
         if poll != AOAHID_OK:  # noqa: F405
             report_error(library, poll, "context poll during touchscreen close")

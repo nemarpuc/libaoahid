@@ -34,10 +34,8 @@ int main(int argc, char** argv) {
         fprintf(stderr, "usage: %s <manufacturer> <model>\n", argv[0]);
         return 2;
     }
-    aoahid_context_options context_options = {0};
-    context_options.struct_size = (uint32_t)sizeof context_options;
-    context_options.event_mode = AOAHID_EVENT_CALLER_POLL;
-    context_options.log_level = AOAHID_LOG_DISABLED;
+    aoahid_context_options context_options;
+    aoahid_context_options_init(&context_options);
     aoahid_context* context = NULL;
     aoahid_result result = aoahid_context_create(&context_options, &context);
     if (result != AOAHID_OK)
@@ -45,11 +43,11 @@ int main(int argc, char** argv) {
 
     /* 1. Find the phone in its current mode and remember its physical port. */
     aoahid_discovery* discovery = NULL;
-    result = aoahid_discover(context, 500U, &discovery);
+    result = aoahid_discover(context, AOAHID_CONTROL_TIMEOUT_MS, &discovery);
     if (result != AOAHID_OK || aoahid_discovery_count(discovery) == 0U) {
         fprintf(stderr, "no AOA-capable device found; see docs/QUICKSTART.md\n");
         aoahid_discovery_destroy(discovery);
-        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         return 1;
     }
     const aoahid_device_info* phone = aoahid_discovery_get(discovery, 0U);
@@ -61,16 +59,16 @@ int main(int argc, char** argv) {
 
     /* 2. Request accessory mode: requests 51, 52, 53, then return at once. */
     if (!is_accessory(phone)) {
-        aoahid_accessory_options accessory = {0};
-        accessory.struct_size = (uint32_t)sizeof accessory;
+        aoahid_accessory_options accessory;
+        aoahid_accessory_options_init(&accessory);
         accessory.strings.manufacturer = argv[1];
         accessory.strings.model = argv[2];
         accessory.strings.description = "libaoahid verify_accessory";
-        result = aoahid_accessory_start(context, phone, &accessory, 500U);
+        result = aoahid_accessory_start(context, phone, &accessory, AOAHID_CONTROL_TIMEOUT_MS);
         aoahid_discovery_destroy(discovery);
         discovery = NULL;
         if (result != AOAHID_OK) {
-            aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+            aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
             return verify_fail("accessory start", result);
         }
         printf("accessory mode requested; waiting for the phone to reconnect...\n");
@@ -83,7 +81,7 @@ int main(int argc, char** argv) {
     for (int attempt = 0; attempt < 50 && found == NULL; ++attempt) {
         if (discovery == NULL) {
             verify_sleep_ms(200);
-            if (aoahid_discover(context, 500U, &discovery) != AOAHID_OK)
+            if (aoahid_discover(context, AOAHID_CONTROL_TIMEOUT_MS, &discovery) != AOAHID_OK)
                 continue;
         }
         for (size_t index = 0U; index < aoahid_discovery_count(discovery); ++index) {
@@ -97,33 +95,32 @@ int main(int argc, char** argv) {
         }
     }
     if (found == NULL) {
-        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         fprintf(stderr, "the phone did not reappear in accessory mode\n");
         return 1;
     }
     printf("accessory mode: %04x:%04x\n", (unsigned)found->vendor_id, (unsigned)found->product_id);
 
     /* 4. From here on it is the ordinary AOA HID sequence. */
-    const aoahid_device_options device_options = verify_device_options();
+    aoahid_device_options device_options;
+    aoahid_device_options_init(&device_options);
     aoahid_device* device = NULL;
     result = aoahid_device_open(context, found, &device_options, &device);
     const int with_adb = found->product_id == 0x2D01U;
     aoahid_discovery_destroy(discovery);
     if (result != AOAHID_OK) {
-        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         return verify_fail("device open", result);
     }
-    aoahid_keyboard_options keyboard = {0};
-    keyboard.struct_size = (uint32_t)sizeof keyboard;
-    keyboard.usage_minimum = 0x04U; /* HUT 1.7 section 10: Keyboard a/A */
-    keyboard.usage_maximum = 0x65U;
+    aoahid_keyboard_options keyboard;
+    aoahid_keyboard_options_init(&keyboard);
     aoahid_spec* spec = NULL;
     result = aoahid_spec_create_keyboard(&keyboard, &spec);
     aoahid_node* node = NULL;
     if (result == AOAHID_OK) {
-        aoahid_node_options node_options = {0};
-        node_options.struct_size = (uint32_t)sizeof node_options;
-        result = aoahid_node_open(device, spec, &node_options, VERIFY_CONTROL_TIMEOUT_MS, &node);
+        aoahid_node_options node_options;
+        aoahid_node_options_init(&node_options);
+        result = aoahid_node_open(device, spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS, &node);
         aoahid_spec_release(spec);
     }
     int exit_code = 0;
@@ -142,30 +139,23 @@ int main(int argc, char** argv) {
     /* 5. Accessory + ADB shares the one handle: a Channel on the ADB
      * interface (AOSP adb.h: 0xFF/0x42/0x01) sits next to the HID Node. */
     if (exit_code == 0 && with_adb) {
-        aoahid_channel_options channel_options = {0};
-        channel_options.struct_size = (uint32_t)sizeof channel_options;
-        channel_options.interface_class = 0xFFU;
-        channel_options.interface_subclass = 0x42U;
-        channel_options.interface_protocol = 0x01U;
-        // Only opened and closed here; the transfer values are this program's choice.
-        channel_options.in_transfers = 4U;
-        channel_options.out_transfers = 4U;
-        channel_options.transfer_bytes = 65536U;
+        aoahid_channel_options channel_options;
+        aoahid_channel_options_init(&channel_options);
         aoahid_channel* channel = NULL;
-        result = aoahid_channel_open(device, &channel_options, VERIFY_DRAIN_TIMEOUT_MS, &channel);
+        result = aoahid_channel_open(device, &channel_options, AOAHID_DRAIN_TIMEOUT_MS, &channel);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("ADB channel open", result);
         } else {
             printf("ADB channel open on the same USB handle\n");
-            result = aoahid_channel_close(channel, VERIFY_DRAIN_TIMEOUT_MS);
+            result = aoahid_channel_close(channel, AOAHID_DRAIN_TIMEOUT_MS);
             if (result != AOAHID_OK)
                 exit_code = verify_fail("ADB channel close", result);
         }
     }
 
     if (node != NULL)
-        (void)aoahid_node_close(node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-    (void)aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
-    (void)aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        (void)aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    (void)aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    (void)aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     return exit_code;
 }

@@ -2,9 +2,8 @@
 // Copyright (c) 2026 libaoahid contributors
 //! Typed ownership/reference wrappers over `aoahid-sys`.
 //!
-//! This wrapper chooses no option overrides. The native C API applies its
-//! documented bounded fallbacks to zero-valued Device transport tuning fields;
-//! product and exact-target policy fields remain caller supplied.
+//! The option structures are those of `aoahid-sys`, filled in by the caller. The
+//! initial values the C header's `*_init` functions use are listed in docs/API.md.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 

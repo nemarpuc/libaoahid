@@ -34,7 +34,7 @@ if (status == Result.Ok)
             status = Result.Internal;
         else
         {
-            var countStatus = (Result)Marshal.PtrToStructure<ErrorDetail>(detailPointer).Code;
+            var countStatus = Marshal.PtrToStructure<ErrorDetail>(detailPointer).Code;
             if (countStatus != Result.Ok)
                 status = countStatus;
         }
@@ -47,7 +47,7 @@ if (status == Result.Ok)
             var detailPointer = Native.LastError();
             status = detailPointer == nint.Zero
                 ? Result.Internal
-                : (Result)Marshal.PtrToStructure<ErrorDetail>(detailPointer).Code;
+                : Marshal.PtrToStructure<ErrorDetail>(detailPointer).Code;
             if (status == Result.Ok)
                 status = Result.Internal;
             break;

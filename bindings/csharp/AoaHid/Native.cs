@@ -66,7 +66,7 @@ public delegate void LogSink(nint user, LogLevel level, nint message);
 [StructLayout(LayoutKind.Sequential)]
 public struct ErrorDetail
 {
-    public int Code;
+    public Result Code;
     public nint Field;
     public nint Reason;
     public int TransportStatus;
@@ -115,6 +115,17 @@ public struct AoaStrings
 }
 
 [StructLayout(LayoutKind.Sequential)]
+public struct LinuxHidPolicy
+{
+    public uint DescriptorBytes;
+    public uint FieldsPerReport;
+    public uint GlobalStackDepth;
+    public uint ReportSizeBits;
+    public ulong Usages;
+    public ulong ReportDataBits;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 public struct DeviceOptions
 {
     public uint StructSize;
@@ -123,12 +134,7 @@ public struct DeviceOptions
     public uint TransferPoolSlots;
     public uint MaximumReportBytes;
     public uint AoaDescriptorWirePolicyBytes;
-    public uint LinuxDescriptorPolicyBytes;
-    public uint LinuxHidFieldsPerReportPolicy;
-    public uint LinuxHidGlobalStackDepthPolicy;
-    public ulong LinuxHidUsagesPolicy;
-    public ulong LinuxHidReportDataPolicyBits;
-    public uint LinuxHidReportSizePolicyBits;
+    public LinuxHidPolicy LinuxHid;
     public uint TargetEp0DataPolicyBytes;
     public uint HostControlBufferPolicyBytes;
     public ClaimPolicy InterfaceClaimPolicy;
@@ -142,7 +148,6 @@ public struct AccessoryOptions
     public uint StructSize;
     public uint Reserved;
     public AoaStrings Strings;
-    public uint ControlTimeoutMs;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -566,6 +571,7 @@ public static class Native
             ["aoahid_device_info"] = typeof(DeviceInfo),
             ["aoahid_aoa_strings"] = typeof(AoaStrings),
             ["aoahid_device_options"] = typeof(DeviceOptions),
+            ["aoahid_linux_hid_policy"] = typeof(LinuxHidPolicy),
             ["aoahid_accessory_options"] = typeof(AccessoryOptions),
             ["aoahid_channel_options"] = typeof(ChannelOptions),
             ["aoahid_node_options"] = typeof(NodeOptions),
@@ -615,7 +621,7 @@ public static class Native
     [DllImport(Library, EntryPoint = "aoahid_discovery_destroy", ExactSpelling = true, CallingConvention = Call)]
     public static extern void DiscoveryDestroy(nint discovery);
     [DllImport(Library, EntryPoint = "aoahid_accessory_start", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result AccessoryStart(nint context, in DeviceInfo selected, in AccessoryOptions options);
+    public static extern Result AccessoryStart(nint context, in DeviceInfo selected, in AccessoryOptions options, uint controlTimeoutMs);
     [DllImport(Library, EntryPoint = "aoahid_device_open", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DeviceOpen(nint context, in DeviceInfo selected, in DeviceOptions options, out nint device);
     [DllImport(Library, EntryPoint = "aoahid_device_close", ExactSpelling = true, CallingConvention = Call)]

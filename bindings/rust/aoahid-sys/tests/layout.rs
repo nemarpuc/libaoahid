@@ -162,6 +162,19 @@ fn rust_layout() -> BTreeMap<String, usize> {
     );
     layout!(
         values,
+        aoahid_linux_hid_policy,
+        "aoahid_linux_hid_policy",
+        [
+            descriptor_bytes,
+            fields_per_report,
+            global_stack_depth,
+            report_size_bits,
+            usages,
+            report_data_bits
+        ]
+    );
+    layout!(
+        values,
         aoahid_device_options,
         "aoahid_device_options",
         [
@@ -171,12 +184,7 @@ fn rust_layout() -> BTreeMap<String, usize> {
             transfer_pool_slots,
             maximum_report_bytes,
             aoa_descriptor_wire_policy_bytes,
-            linux_descriptor_policy_bytes,
-            linux_hid_fields_per_report_policy,
-            linux_hid_global_stack_depth_policy,
-            linux_hid_usages_policy,
-            linux_hid_report_data_policy_bits,
-            linux_hid_report_size_policy_bits,
+            linux_hid,
             target_ep0_data_policy_bytes,
             host_control_buffer_policy_bytes,
             interface_claim_policy,
@@ -188,7 +196,7 @@ fn rust_layout() -> BTreeMap<String, usize> {
         values,
         aoahid_accessory_options,
         "aoahid_accessory_options",
-        [struct_size, reserved, strings, control_timeout_ms]
+        [struct_size, reserved, strings]
     );
     layout!(
         values,

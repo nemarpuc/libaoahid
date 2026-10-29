@@ -12,14 +12,11 @@ static const char* const k_send_sequence[] = {
     "aoahid_node_submit(node, send_ms)  submitting an opposite edge too early is BUSY", NULL};
 
 int main(void) {
-    aoahid_keyboard_options options = {0};
+    aoahid_keyboard_options options;
     aoahid_spec* spec = NULL;
     aoahid_result result;
 
-    options.struct_size = (uint32_t)sizeof options;
-    /* Keyboard a/A through Keyboard Application, HUT 1.7 section 10. */
-    options.usage_minimum = 0x04U;
-    options.usage_maximum = 0x65U;
+    aoahid_keyboard_options_init(&options);
 
     result = aoahid_spec_create_keyboard(&options, &spec);
     return aoahid_example_run("keyboard", AOAHID_PROFILE_KEYBOARD, result, spec, k_send_sequence);

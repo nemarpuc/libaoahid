@@ -241,37 +241,17 @@ int main(void) {
     if (verify_open_first_device(&context, &device) != 0)
         return 1;
 
-    aoahid_touchscreen_options touchscreen_options = {0};
-    touchscreen_options.struct_size = (uint32_t)sizeof touchscreen_options;
+    aoahid_touchscreen_options touchscreen_options;
+    aoahid_touchscreen_options_init(&touchscreen_options);
     touchscreen_options.maximum_contacts = 1U;
     touchscreen_options.contacts_per_report = 1U;
-    touchscreen_options.contact_id.logical_minimum = 0;
-    touchscreen_options.contact_id.logical_maximum = 1;
-    touchscreen_options.contact_id.bit_width = 1U;
-    touchscreen_options.x.logical_minimum = 0;
-    touchscreen_options.x.logical_maximum = 32767;
-    touchscreen_options.x.bit_width = 16U;
-    touchscreen_options.y.logical_minimum = 0;
-    touchscreen_options.y.logical_maximum = 32767;
-    touchscreen_options.y.bit_width = 16U;
-    touchscreen_options.contact_count.logical_minimum = 0;
-    touchscreen_options.contact_count.logical_maximum = 1;
-    touchscreen_options.contact_count.bit_width = 1U;
+    touchscreen_options.contact_count = aoahid_integer_field_make(0, 1, 1U);
 
-    aoahid_keyboard_options keyboard_options = {0};
-    keyboard_options.struct_size = (uint32_t)sizeof keyboard_options;
-    keyboard_options.usage_minimum = 0x04U;
-    keyboard_options.usage_maximum = 0x65U;
+    aoahid_keyboard_options keyboard_options;
+    aoahid_keyboard_options_init(&keyboard_options);
 
-    aoahid_mouse_options mouse_options = {0};
-    mouse_options.struct_size = (uint32_t)sizeof mouse_options;
-    mouse_options.button_count = 3U;
-    mouse_options.x.logical_minimum = -127;
-    mouse_options.x.logical_maximum = 127;
-    mouse_options.x.bit_width = 8U;
-    mouse_options.y.logical_minimum = -127;
-    mouse_options.y.logical_maximum = 127;
-    mouse_options.y.bit_width = 8U;
+    aoahid_mouse_options mouse_options;
+    aoahid_mouse_options_init(&mouse_options);
 
     aoahid_spec* touch_spec = NULL;
     aoahid_spec* keyboard_spec = NULL;
@@ -301,19 +281,19 @@ int main(void) {
     {
         const aoahid_node_options node_options = {(uint32_t)sizeof(aoahid_node_options), 0U, 1U,
                                                   0U};
-        result = aoahid_node_open(device, touch_spec, &node_options, VERIFY_CONTROL_TIMEOUT_MS,
+        result = aoahid_node_open(device, touch_spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS,
                                   &touch_node);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("touchscreen node open", result);
             goto cleanup;
         }
-        result = aoahid_node_open(device, keyboard_spec, &node_options, VERIFY_CONTROL_TIMEOUT_MS,
+        result = aoahid_node_open(device, keyboard_spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS,
                                   &keyboard_node);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("keyboard node open", result);
             goto cleanup;
         }
-        result = aoahid_node_open(device, mouse_spec, &node_options, VERIFY_CONTROL_TIMEOUT_MS,
+        result = aoahid_node_open(device, mouse_spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS,
                                   &mouse_node);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("mouse node open", result);
@@ -345,11 +325,11 @@ int main(void) {
 
 cleanup:
     if (touch_node != NULL)
-        aoahid_node_close(touch_node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_node_close(touch_node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     if (keyboard_node != NULL)
-        aoahid_node_close(keyboard_node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_node_close(keyboard_node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     if (mouse_node != NULL)
-        aoahid_node_close(mouse_node, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_node_close(mouse_node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     if (touch_spec != NULL)
         aoahid_spec_release(touch_spec);
     if (keyboard_spec != NULL)
@@ -357,8 +337,8 @@ cleanup:
     if (mouse_spec != NULL)
         aoahid_spec_release(mouse_spec);
     if (device != NULL)
-        aoahid_device_close(device, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     if (context != NULL)
-        aoahid_context_destroy(context, VERIFY_CONTROL_TIMEOUT_MS, VERIFY_DRAIN_TIMEOUT_MS);
+        aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     return exit_code;
 }
