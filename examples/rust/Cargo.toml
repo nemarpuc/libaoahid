@@ -1,12 +1,12 @@
 # Builds only the literal FFI lifecycle example; it supplies no native policy.
 [package]
 name = "aoahid-multi-profile-example"
-version = "2.0.0"
+version = "2.0.1"
 edition = "2021"
 license = "MIT"
 publish = false
 
 [dependencies]
-aoahid-sys = { path = "../../bindings/rust/aoahid-sys", version = "2.0.0" }
+aoahid-sys = { path = "../../bindings/rust/aoahid-sys", version = "2.0.1" }
 
 [workspace]

@@ -17,7 +17,7 @@ from typing import Union
 # All public enum domains in aoahid.h are exactly int32_t.
 AOAHID_VERSION_MAJOR = 2
 AOAHID_VERSION_MINOR = 0
-AOAHID_VERSION_PATCH = 0
+AOAHID_VERSION_PATCH = 1
 AOAHID_OK = 0
 AOAHID_ERR_PARAM = 1
 AOAHID_ERR_UNSET_FIELD = 2

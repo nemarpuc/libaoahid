@@ -79,7 +79,7 @@ extern "C" {
 
 #define AOAHID_VERSION_MAJOR 2
 #define AOAHID_VERSION_MINOR 0
-#define AOAHID_VERSION_PATCH 0
+#define AOAHID_VERSION_PATCH 1
 
 typedef struct aoahid_context aoahid_context;
 typedef struct aoahid_discovery aoahid_discovery;
@@ -105,8 +105,8 @@ enum {
     AOAHID_ERR_NO_DEVICE = 8,   /* the device is gone; this stays until it is closed */
     AOAHID_ERR_STALL = 9,       /* the device refused the request */
     AOAHID_ERR_TIMEOUT = 10,
-    AOAHID_ERR_SHORT_TRANSFER = 11, /* a transfer moved fewer bytes than asked */
-    AOAHID_ERR_DESCRIPTOR_REJECTED = 12,
+    AOAHID_ERR_SHORT_TRANSFER = 11,      /* a transfer moved fewer bytes than asked */
+    AOAHID_ERR_DESCRIPTOR_REJECTED = 12, /* reserved: no call returns it (libmimhid does) */
     AOAHID_ERR_IO = 13,
     AOAHID_ERR_OVERFLOW = 14,  /* a size, count or limit was exceeded */
     AOAHID_CLOSE_PENDING = 15, /* see "Closing" above */
@@ -929,9 +929,8 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_context_destroy(aoahid_context* cont
  * Blocking: Up to timeout_ms, handling libusb events itself when no thread does.
  * Synchronization: Context domain; not from the event thread or the log sink.
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for a null Context; AOAHID_ERR_UNSET_FIELD for a zero
- * timeout; AOAHID_CLOSE_PENDING when
- * timeout_ms passed first (the Context is still the caller's); otherwise as
- * aoahid_context_destroy. */
+ * timeout; AOAHID_CLOSE_PENDING when timeout_ms passed first (the Context is still the caller's);
+ * otherwise as aoahid_context_destroy. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_context_destroy_blocking(aoahid_context* context,
                                                                      uint32_t control_timeout_ms,
                                                                      uint32_t drain_timeout_ms,

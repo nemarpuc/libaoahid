@@ -3,6 +3,18 @@
 All notable changes to libaoahid are recorded here. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-10-30
+
+Not hardware-verified: only comments in `aoahid.h` change. The library, its ABI
+and its behavior are those of 2.0.0.
+
+### Fixed
+
+- `aoahid.h` says that `AOAHID_ERR_DESCRIPTOR_REJECTED` is reserved: no call
+  returns it. It keeps number 12 because libmimhid returns its own code of that
+  number when a board refuses a configuration.
+- A line break in the `Returns` of `aoahid_context_destroy_blocking`.
+
 ## [2.0.0] - 2026-10-29
 
 Not hardware-verified on a phone: this release changes the API around the
