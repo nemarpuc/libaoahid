@@ -1083,8 +1083,7 @@ static aoahid_result touch_contact_impl(aoahid_node* node, const aoahid_profile_
     if (!validate_contact(*spec, contact, "touch"))
         return AOAHID_ERR_PARAM;
     if (active != touch->contacts.end()) {
-        // The Contact ID is already down: this call moves it, matching the
-        // prior touch_move behavior exactly.
+        // The Contact ID is already down, so this call moves it.
         const bool changed =
             active->sample.x != contact.x || active->sample.y != contact.y ||
             active->sample.pressure != contact.pressure || active->sample.width != contact.width ||

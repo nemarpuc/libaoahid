@@ -737,10 +737,11 @@ aoahid_device_info public_info(const Candidate& candidate) {
                               candidate.product.c_str()};
 }
 
+constexpr std::uint32_t kAccessoryControlTimeoutMs = 500U;
+
 aoahid_accessory_options accessory_options(const char* manufacturer, const char* model) {
     aoahid_accessory_options options{};
     options.struct_size = static_cast<std::uint32_t>(sizeof(options));
-    options.control_timeout_ms = 500U;
     options.strings.manufacturer = manufacturer;
     options.strings.model = model;
     return options;
@@ -762,7 +763,8 @@ void test_accessory_start_sends_51_52_53_and_closes() {
 
     aoahid_accessory_options options = accessory_options("Maker", "Model");
     options.strings.version = "1.0";
-    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options, kAccessoryControlTimeoutMs) ==
+                 AOAHID_OK);
     AOAHID_CHECK(controls_for(51U).size() == 1U);
     const auto strings = controls_for(52U);
     const auto payloads = control_payloads_for(52U);
@@ -792,6 +794,8 @@ void test_accessory_start_sends_51_52_53_and_closes() {
     aoahid_fake_libusb_unplug(0U);
     const Candidate accessory = add_candidate(9U, {2U, 3U}, 0x18D1U, 0x2D00U);
     aoahid_discovery* discovery = nullptr;
+    AOAHID_CHECK(aoahid_discover(context, 0U, &discovery) == AOAHID_ERR_UNSET_FIELD);
+    AOAHID_CHECK(discovery == nullptr);
     AOAHID_CHECK(aoahid_discover(context, 100U, &discovery) == AOAHID_OK);
     AOAHID_CHECK(aoahid_discovery_count(discovery) == 1U);
     const aoahid_device_info* found = aoahid_discovery_get(discovery, 0U);
@@ -806,7 +810,8 @@ void test_accessory_start_sends_51_52_53_and_closes() {
     // A second start on an accessory-mode device sends nothing.
     const std::size_t before = aoahid_fake_libusb_control_count();
     const aoahid_device_info accessory_info = public_info(accessory);
-    AOAHID_CHECK(aoahid_accessory_start(context, &accessory_info, &options) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_accessory_start(context, &accessory_info, &options,
+                                        kAccessoryControlTimeoutMs) == AOAHID_OK);
     AOAHID_CHECK(aoahid_fake_libusb_control_count() == before);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
@@ -822,31 +827,42 @@ void test_accessory_start_rejects_and_reports_failures() {
     const aoahid_device_info selected = public_info(phone);
 
     aoahid_accessory_options options = accessory_options("Maker", nullptr);
-    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options) == AOAHID_ERR_UNSET_FIELD);
+    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options, kAccessoryControlTimeoutMs) ==
+                 AOAHID_ERR_UNSET_FIELD);
     options = accessory_options("", "Model");
-    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options) == AOAHID_ERR_UNSET_FIELD);
+    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options, kAccessoryControlTimeoutMs) ==
+                 AOAHID_ERR_UNSET_FIELD);
     options = accessory_options("Maker", "Model");
     options.reserved = 1U;
-    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options) == AOAHID_ERR_UNSET_FIELD);
+    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options, kAccessoryControlTimeoutMs) ==
+                 AOAHID_ERR_UNSET_FIELD);
     options = accessory_options("Maker", "Model");
     options.struct_size -= 1U;
-    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options, kAccessoryControlTimeoutMs) ==
+                 AOAHID_ERR_PARAM);
     options = accessory_options("Maker", "Model");
-    AOAHID_CHECK(aoahid_accessory_start(nullptr, &selected, &options) == AOAHID_ERR_PARAM);
-    AOAHID_CHECK(aoahid_accessory_start(context, nullptr, &options) == AOAHID_ERR_PARAM);
-    AOAHID_CHECK(aoahid_accessory_start(context, &selected, nullptr) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options, 0U) ==
+                 AOAHID_ERR_UNSET_FIELD);
+    AOAHID_CHECK(aoahid_accessory_start(nullptr, &selected, &options, kAccessoryControlTimeoutMs) ==
+                 AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_accessory_start(context, nullptr, &options, kAccessoryControlTimeoutMs) ==
+                 AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_accessory_start(context, &selected, nullptr, kAccessoryControlTimeoutMs) ==
+                 AOAHID_ERR_PARAM);
     // AOA 1.0 caps each string at 256 bytes with its NUL; an oversized one is
     // rejected before any request, and exactly 256 bytes is accepted later.
     const std::string longest(255U, 'x');
     const std::string too_long(256U, 'x');
     options = accessory_options("Maker", "Model");
     options.strings.description = too_long.c_str();
-    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options) == AOAHID_ERR_OVERFLOW);
+    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options, kAccessoryControlTimeoutMs) ==
+                 AOAHID_ERR_OVERFLOW);
     const aoahid_error_detail* overflow = aoahid_last_error();
     AOAHID_CHECK(overflow != nullptr && overflow->aoa_request == 52 && overflow->offset == 2U);
     AOAHID_CHECK(aoahid_fake_libusb_control_count() == 0U);
     options = accessory_options(longest.c_str(), "Model");
-    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options, kAccessoryControlTimeoutMs) ==
+                 AOAHID_OK);
     const auto longest_payloads = control_payloads_for(52U);
     AOAHID_CHECK(!longest_payloads.empty() && longest_payloads[0].size() == 256U);
     aoahid_fake_libusb_reset();
@@ -855,14 +871,16 @@ void test_accessory_start_rejects_and_reports_failures() {
 
     // A device without AOA support gets neither strings nor START.
     aoahid_fake_libusb_set_protocol(0U, 0U);
-    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options) == AOAHID_ERR_NOT_AOA);
+    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options, kAccessoryControlTimeoutMs) ==
+                 AOAHID_ERR_NOT_AOA);
     AOAHID_CHECK(controls_for(52U).empty() && controls_for(53U).empty());
     aoahid_fake_libusb_set_protocol(0U, 2U);
 
     // A failed string request stops the sequence; nothing is retried.
     aoahid_fake_libusb_queue_control_result(2);
     aoahid_fake_libusb_queue_control_result(LIBUSB_ERROR_PIPE);
-    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options) == AOAHID_ERR_STALL);
+    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options, kAccessoryControlTimeoutMs) ==
+                 AOAHID_ERR_STALL);
     const aoahid_error_detail* detail = aoahid_last_error();
     AOAHID_CHECK(detail != nullptr && detail->aoa_request == 52 && detail->offset == 0U);
     AOAHID_CHECK(controls_for(52U).size() == 1U && controls_for(53U).empty());
@@ -873,7 +891,8 @@ void test_accessory_start_rejects_and_reports_failures() {
     aoahid_device* device = nullptr;
     AOAHID_CHECK(aoahid_device_open(context, &selected, &device_options, &device) == AOAHID_OK);
     const std::size_t opens = aoahid_fake_libusb_open_call_count();
-    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_accessory_start(context, &selected, &options, kAccessoryControlTimeoutMs) ==
+                 AOAHID_OK);
     AOAHID_CHECK(aoahid_fake_libusb_open_call_count() == opens);
     AOAHID_CHECK(aoahid_fake_libusb_open_handle_count() == 1U);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
@@ -894,16 +913,13 @@ Candidate add_adb_phone() {
     return phone;
 }
 
+// The ADB interface read as a stream of one-packet transfers, so a test sees each packet.
 aoahid_channel_options adb_channel_options() {
-    aoahid_channel_options options{};
-    options.struct_size = static_cast<std::uint32_t>(sizeof(options));
-    options.interface_class = 0xFFU;
-    options.interface_subclass = 0x42U;
-    options.interface_protocol = 0x01U;
+    aoahid_channel_options options;
+    aoahid_channel_options_init(&options);
+    options.read_mode = AOAHID_CHANNEL_READ_STREAM;
     options.in_transfers = 2U;
-    options.out_transfers = 2U;
     options.transfer_bytes = 512U;
-    options.zero_length_termination = 1U;
     return options;
 }
 
@@ -1054,9 +1070,11 @@ void test_channel_request_reads() {
 
     aoahid_channel* channel = nullptr;
     aoahid_channel_options options = adb_channel_options();
-    options.read_mode = 2;
-    AOAHID_CHECK(aoahid_channel_open(device, &options, kDrainTimeoutMs, &channel) ==
-                 AOAHID_ERR_UNSET_FIELD);
+    for (const aoahid_channel_read_mode mode : {0, 3}) {
+        options.read_mode = mode;
+        AOAHID_CHECK(aoahid_channel_open(device, &options, kDrainTimeoutMs, &channel) ==
+                     AOAHID_ERR_UNSET_FIELD);
+    }
     options = adb_channel_options();
     options.read_mode = AOAHID_CHANNEL_READ_REQUEST;
     options.in_transfers = 7U;      // ignored in request mode
@@ -1349,15 +1367,15 @@ void test_required_device_policies_precede_usb_io() {
                                       candidate.serial.c_str(),
                                       candidate.product.c_str()};
 
-    using RequiredBytePolicy = std::uint32_t aoahid_device_options::*;
-    const std::array<RequiredBytePolicy, 4U> required_byte_policies{
-        &aoahid_device_options::aoa_descriptor_wire_policy_bytes,
-        &aoahid_device_options::linux_descriptor_policy_bytes,
-        &aoahid_device_options::target_ep0_data_policy_bytes,
-        &aoahid_device_options::host_control_buffer_policy_bytes};
-    for (const RequiredBytePolicy policy : required_byte_policies) {
+    using ClearPolicy = void (*)(aoahid_device_options&);
+    const std::array<ClearPolicy, 4U> required_byte_policies{
+        [](aoahid_device_options& options) { options.aoa_descriptor_wire_policy_bytes = 0U; },
+        [](aoahid_device_options& options) { options.linux_hid.descriptor_bytes = 0U; },
+        [](aoahid_device_options& options) { options.target_ep0_data_policy_bytes = 0U; },
+        [](aoahid_device_options& options) { options.host_control_buffer_policy_bytes = 0U; }};
+    for (const ClearPolicy clear : required_byte_policies) {
         aoahid_device_options rejected = public_device_options();
-        rejected.*policy = 0U;
+        clear(rejected);
         aoahid_device* rejected_device = nullptr;
         AOAHID_CHECK(aoahid_device_open(context, &selected, &rejected, &rejected_device) ==
                      AOAHID_ERR_UNSET_FIELD);
@@ -1372,31 +1390,31 @@ void test_required_device_policies_precede_usb_io() {
 
     aoahid_device* device = nullptr;
     aoahid_device_options options = public_device_options();
-    options.linux_hid_fields_per_report_policy = 0U;
+    options.linux_hid.fields_per_report = 0U;
     AOAHID_CHECK(aoahid_device_open(context, &selected, &options, &device) ==
                  AOAHID_ERR_UNSET_FIELD);
     AOAHID_CHECK(device == nullptr && aoahid_fake_libusb_control_count() == 0U);
 
     options = public_device_options();
-    options.linux_hid_usages_policy = 0U;
+    options.linux_hid.usages = 0U;
     AOAHID_CHECK(aoahid_device_open(context, &selected, &options, &device) ==
                  AOAHID_ERR_UNSET_FIELD);
     AOAHID_CHECK(device == nullptr && aoahid_fake_libusb_control_count() == 0U);
 
     options = public_device_options();
-    options.linux_hid_global_stack_depth_policy = 0U;
+    options.linux_hid.global_stack_depth = 0U;
     AOAHID_CHECK(aoahid_device_open(context, &selected, &options, &device) ==
                  AOAHID_ERR_UNSET_FIELD);
     AOAHID_CHECK(device == nullptr && aoahid_fake_libusb_control_count() == 0U);
 
     options = public_device_options();
-    options.linux_hid_report_data_policy_bits = 0U;
+    options.linux_hid.report_data_bits = 0U;
     AOAHID_CHECK(aoahid_device_open(context, &selected, &options, &device) ==
                  AOAHID_ERR_UNSET_FIELD);
     AOAHID_CHECK(device == nullptr && aoahid_fake_libusb_control_count() == 0U);
 
     options = public_device_options();
-    options.linux_hid_report_size_policy_bits = 0U;
+    options.linux_hid.report_size_bits = 0U;
     AOAHID_CHECK(aoahid_device_open(context, &selected, &options, &device) ==
                  AOAHID_ERR_UNSET_FIELD);
     AOAHID_CHECK(device == nullptr && aoahid_fake_libusb_control_count() == 0U);
@@ -1507,17 +1525,73 @@ aoahid_device_options public_device_options() {
     options.maximum_report_bytes = 64U;
     options.validate_reports = 0U;
     options.aoa_descriptor_wire_policy_bytes = 1024U;
-    options.linux_descriptor_policy_bytes = 1024U;
-    options.linux_hid_fields_per_report_policy = 256U;
-    options.linux_hid_global_stack_depth_policy = 4U;
-    options.linux_hid_usages_policy = 12288U;
-    options.linux_hid_report_data_policy_bits = 65528U;
-    options.linux_hid_report_size_policy_bits = 256U;
+    options.linux_hid.descriptor_bytes = 1024U;
+    options.linux_hid.fields_per_report = 256U;
+    options.linux_hid.global_stack_depth = 4U;
+    options.linux_hid.usages = 12288U;
+    options.linux_hid.report_data_bits = 65528U;
+    options.linux_hid.report_size_bits = 256U;
     options.target_ep0_data_policy_bytes = 4096U;
     options.host_control_buffer_policy_bytes = 4096U;
     options.interface_claim_policy = AOAHID_INTERFACE_CLAIM_NONE;
     options.interface_number = -1;
     return options;
+}
+
+// Only the initializers' values: a Context, a Device and a Node of every profile that has a
+// complete initializer, and one report through it.
+void test_initializers_open_a_working_session() {
+    aoahid_fake_libusb_reset();
+    const Candidate candidate = add_candidate(13U, {5U, 3U});
+    aoahid_context_options context_options;
+    aoahid_context_options_init(&context_options);
+    aoahid_context* context = nullptr;
+    AOAHID_CHECK(aoahid_context_create(&context_options, &context) == AOAHID_OK);
+    const aoahid_device_info selected = public_info(candidate);
+    aoahid_device_options device_options;
+    aoahid_device_options_init(&device_options);
+    aoahid_device* device = nullptr;
+    AOAHID_CHECK(aoahid_device_open(context, &selected, &device_options, &device) == AOAHID_OK);
+
+    aoahid_keyboard_options keyboard;
+    aoahid_keyboard_options_init(&keyboard);
+    aoahid_mouse_options mouse;
+    aoahid_mouse_options_init(&mouse);
+    aoahid_gamepad_options gamepad;
+    aoahid_gamepad_options_init(&gamepad);
+    aoahid_touchscreen_options touchscreen;
+    aoahid_touchscreen_options_init(&touchscreen);
+    aoahid_touchpad_options touchpad;
+    aoahid_touchpad_options_init(&touchpad);
+    aoahid_pen_options pen;
+    aoahid_pen_options_init(&pen);
+    aoahid_digitizer_options digitizer;
+    aoahid_digitizer_options_init(&digitizer);
+    std::array<aoahid_spec*, 7U> specs{};
+    AOAHID_CHECK(aoahid_spec_create_keyboard(&keyboard, &specs[0]) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_spec_create_mouse(&mouse, &specs[1]) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_spec_create_gamepad(&gamepad, &specs[2]) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_spec_create_touchscreen(&touchscreen, &specs[3]) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_spec_create_touchpad(&touchpad, &specs[4]) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_spec_create_pen(&pen, &specs[5]) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_spec_create_digitizer(&digitizer, &specs[6]) == AOAHID_OK);
+
+    aoahid_node_options node_options;
+    aoahid_node_options_init(&node_options);
+    std::array<aoahid_node*, 7U> nodes{};
+    for (std::size_t index = 0U; index < specs.size(); ++index) {
+        AOAHID_CHECK(aoahid_node_open(device, specs[index], &node_options,
+                                      AOAHID_CONTROL_TIMEOUT_MS, &nodes[index]) == AOAHID_OK);
+        aoahid_spec_release(specs[index]);
+    }
+    AOAHID_CHECK(aoahid_keyboard_key(nodes[0], 0x04U, 1U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_submit_blocking(nodes[0], AOAHID_SEND_TIMEOUT_MS) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_keyboard_key(nodes[0], 0x04U, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_submit_blocking(nodes[0], AOAHID_SEND_TIMEOUT_MS) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_context_destroy_blocking(context, AOAHID_CONTROL_TIMEOUT_MS,
+                                                 AOAHID_DRAIN_TIMEOUT_MS,
+                                                 AOAHID_DRAIN_TIMEOUT_MS) == AOAHID_OK);
+    aoahid_fake_libusb_reset();
 }
 
 void test_tuning_values_required_and_zero_reservation() {
@@ -1743,12 +1817,12 @@ void test_descriptor_requirements_are_caller_policies() {
             const std::uint32_t report_size_policy, const char* expected_field) {
             aoahid_device_options options = public_device_options();
             options.aoa_descriptor_wire_policy_bytes = 4096U;
-            options.linux_descriptor_policy_bytes = 4096U;
-            options.linux_hid_fields_per_report_policy = fields_policy;
-            options.linux_hid_global_stack_depth_policy = stack_policy;
-            options.linux_hid_usages_policy = usages_policy;
-            options.linux_hid_report_data_policy_bits = report_bits_policy;
-            options.linux_hid_report_size_policy_bits = report_size_policy;
+            options.linux_hid.descriptor_bytes = 4096U;
+            options.linux_hid.fields_per_report = fields_policy;
+            options.linux_hid.global_stack_depth = stack_policy;
+            options.linux_hid.usages = usages_policy;
+            options.linux_hid.report_data_bits = report_bits_policy;
+            options.linux_hid.report_size_bits = report_size_policy;
             options.maximum_report_bytes = 8192U;
             options.target_ep0_data_policy_bytes = 8192U;
             options.host_control_buffer_policy_bytes = 8192U;
@@ -1757,11 +1831,11 @@ void test_descriptor_requirements_are_caller_policies() {
             AOAHID_CHECK(device != nullptr);
             if (device == nullptr)
                 return;
-            AOAHID_CHECK(device->linux_hid_fields_per_report_policy == fields_policy);
-            AOAHID_CHECK(device->linux_hid_global_stack_depth_policy == stack_policy);
-            AOAHID_CHECK(device->linux_hid_usages_policy == usages_policy);
-            AOAHID_CHECK(device->linux_hid_report_data_policy_bits == report_bits_policy);
-            AOAHID_CHECK(device->linux_hid_report_size_policy_bits == report_size_policy);
+            AOAHID_CHECK(device->linux_hid.fields_per_report == fields_policy);
+            AOAHID_CHECK(device->linux_hid.global_stack_depth == stack_policy);
+            AOAHID_CHECK(device->linux_hid.usages == usages_policy);
+            AOAHID_CHECK(device->linux_hid.report_data_bits == report_bits_policy);
+            AOAHID_CHECK(device->linux_hid.report_size_bits == report_size_policy);
             aoahid_node* node = nullptr;
             AOAHID_CHECK(aoahid_node_open(device, spec, &node_options, kControlTimeoutMs, &node) ==
                          AOAHID_ERR_OVERFLOW);
@@ -2238,7 +2312,7 @@ void test_node_close_timeout_distinction_and_loss_freeze() {
                  AOAHID_ERR_TIMEOUT);
     AOAHID_CHECK(aoahid_last_error()->code == AOAHID_ERR_TIMEOUT);
     AOAHID_CHECK(aoahid_last_error()->transport_status == LIBUSB_TRANSFER_TIMED_OUT);
-    AOAHID_CHECK(aoahid_node_close(node, kControlTimeoutMs, session_drain_timeout_ms) == AOAHID_OK);
+    // The failed close still consumed the Node.
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
                  AOAHID_OK);
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, session_drain_timeout_ms) ==
@@ -2291,7 +2365,7 @@ void test_node_close_retains_terminal_link_loss() {
     AOAHID_CHECK(aoahid_last_error()->node_id == hid_id);
     AOAHID_CHECK(aoahid_last_error()->report_id == 1U);
     AOAHID_CHECK(aoahid_last_error()->length == report.size());
-    AOAHID_CHECK(aoahid_node_close(node, kControlTimeoutMs, session_drain_timeout_ms) == AOAHID_OK);
+    // The failed close still consumed the Node.
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
                  AOAHID_OK);
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, session_drain_timeout_ms) ==
@@ -2443,7 +2517,8 @@ void test_context_destroy_aggregates_unregister_error() {
     AOAHID_CHECK(aoahid_last_error()->transport_status == LIBUSB_ERROR_PIPE);
     AOAHID_CHECK(aoahid_last_error()->aoa_request == 55);
     AOAHID_CHECK(aoahid_last_error()->node_id == hid_id);
-    AOAHID_CHECK(controls_for(55U).size() == 2U);
+    // The failed unregister consumed the Node, so teardown does not send request 55 again.
+    AOAHID_CHECK(controls_for(55U).size() == 1U);
     aoahid_fake_libusb_reset();
 }
 
@@ -2482,7 +2557,7 @@ void test_graveyard_publishes_unregister_and_cancel_errors() {
     const std::uint16_t unregister_hid_id = aoahid_node_id(node);
     submit_delayed_public_report(node);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
-                 AOAHID_CLOSE_PENDING);
+                 AOAHID_OK);
     aoahid_fake_libusb_queue_control_result(LIBUSB_ERROR_PIPE);
     AOAHID_CHECK(aoahid_context_poll(context, 0U) == AOAHID_ERR_STALL);
     AOAHID_CHECK(aoahid_last_error()->transport_status == LIBUSB_ERROR_PIPE);
@@ -2501,11 +2576,7 @@ void test_graveyard_publishes_unregister_and_cancel_errors() {
                  AOAHID_OK);
     aoahid_fake_libusb_queue_cancel_result(LIBUSB_ERROR_BUSY);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
-                 AOAHID_CLOSE_PENDING);
-    AOAHID_CHECK(aoahid_last_error()->transport_status == LIBUSB_ERROR_BUSY);
-    AOAHID_CHECK(aoahid_last_error()->aoa_request == 57);
-    AOAHID_CHECK(aoahid_last_error()->node_id == cancel_hid_id);
-    AOAHID_CHECK(aoahid_last_error()->length == report.size());
+                 AOAHID_OK);
     aoahid_fake_libusb_make_pending_transfers_ready();
     AOAHID_CHECK(aoahid_context_poll(context, 0U) == AOAHID_ERR_BUSY);
     AOAHID_CHECK(aoahid_last_error()->transport_status == LIBUSB_ERROR_BUSY);
@@ -2523,6 +2594,45 @@ void submit_delayed_public_report(aoahid_node* node) {
     AOAHID_CHECK(aoahid_raw_submit(node, report.data(), report.size(), kSendTimeoutMs) ==
                  AOAHID_OK);
     AOAHID_CHECK(aoahid_fake_libusb_pending_transfer_count() == 1U);
+}
+
+void test_node_close_with_report_in_flight_keeps_node() {
+    aoahid_fake_libusb_reset();
+    aoahid_context* context = nullptr;
+    aoahid_device* device = nullptr;
+    aoahid_node* node = nullptr;
+    open_public_raw_session(&context, &device, &node);
+    submit_delayed_public_report(node);
+    AOAHID_CHECK(aoahid_node_close(node, kControlTimeoutMs, 1U) == AOAHID_CLOSE_PENDING);
+    AOAHID_CHECK(aoahid_node_id(node) != 0U);
+    aoahid_fake_libusb_make_pending_transfers_ready();
+    AOAHID_CHECK(aoahid_context_poll(context, 0U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(node, kControlTimeoutMs, session_drain_timeout_ms) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
+                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, session_drain_timeout_ms) ==
+                 AOAHID_OK);
+    aoahid_fake_libusb_reset();
+}
+
+void test_node_close_failed_unregister_consumes_node() {
+    aoahid_fake_libusb_reset();
+    aoahid_context* context = nullptr;
+    aoahid_device* device = nullptr;
+    aoahid_node* node = nullptr;
+    open_public_raw_session(&context, &device, &node);
+    const std::uint16_t hid_id = aoahid_node_id(node);
+    aoahid_fake_libusb_queue_control_result(LIBUSB_ERROR_PIPE);
+    AOAHID_CHECK(aoahid_node_close(node, kControlTimeoutMs, session_drain_timeout_ms) ==
+                 AOAHID_ERR_STALL);
+    AOAHID_CHECK(aoahid_last_error()->aoa_request == 55);
+    AOAHID_CHECK(aoahid_last_error()->node_id == hid_id);
+    AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
+                 AOAHID_OK);
+    AOAHID_CHECK(controls_for(55U).size() == 1U);
+    AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, session_drain_timeout_ms) ==
+                 AOAHID_OK);
+    aoahid_fake_libusb_reset();
 }
 
 void open_public_touch_session(aoahid_context** context, aoahid_device** device, aoahid_node** node,
@@ -3000,7 +3110,7 @@ void test_public_graveyard_delayed_cancel() {
     submit_delayed_public_report(node);
 
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
-                 AOAHID_CLOSE_PENDING);
+                 AOAHID_OK);
     AOAHID_CHECK(aoahid_fake_libusb_cancel_count() == 1U);
     AOAHID_CHECK(aoahid_fake_libusb_pending_transfer_count() == 1U);
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, session_drain_timeout_ms) ==
@@ -3024,14 +3134,18 @@ void test_public_graveyard_blocking_destroy() {
     submit_delayed_public_report(node);
 
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
-                 AOAHID_CLOSE_PENDING);
+                 AOAHID_OK);
+    // A zero deadline is an unset timeout like any other, and destroys nothing.
+    AOAHID_CHECK(aoahid_context_destroy_blocking(context, kControlTimeoutMs,
+                                                 session_drain_timeout_ms,
+                                                 0U) == AOAHID_ERR_UNSET_FIELD);
     AOAHID_CHECK(aoahid_context_destroy_blocking(context, kControlTimeoutMs,
                                                  session_drain_timeout_ms, 50U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_fake_libusb_pending_transfer_count() == 0U);
     aoahid_fake_libusb_reset();
 }
 
-void test_blocking_destroy_timeout_retains_context() {
+void test_blocking_destroy_deadline_retains_context() {
     aoahid_fake_libusb_reset();
     aoahid_context* context = nullptr;
     aoahid_device* device = nullptr;
@@ -3044,13 +3158,13 @@ void test_blocking_destroy_timeout_retains_context() {
                  AOAHID_OK);
     aoahid_fake_libusb_queue_cancel_result(LIBUSB_ERROR_BUSY);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
-                 AOAHID_CLOSE_PENDING);
+                 AOAHID_OK);
 
     AOAHID_CHECK(aoahid_context_destroy_blocking(context, kControlTimeoutMs,
                                                  session_drain_timeout_ms,
-                                                 2U) == AOAHID_ERR_TIMEOUT);
-    AOAHID_CHECK(aoahid_last_error()->code == AOAHID_ERR_TIMEOUT);
-    // TIMEOUT retains Context. Make the original accepted transfer terminal,
+                                                 2U) == AOAHID_CLOSE_PENDING);
+    AOAHID_CHECK(aoahid_last_error()->code == AOAHID_CLOSE_PENDING);
+    // CLOSE_PENDING retains Context. Make the original accepted transfer terminal,
     // publish the stored cancel failure, and then finish destruction.
     aoahid_fake_libusb_make_pending_transfers_ready();
     AOAHID_CHECK(aoahid_context_poll(context, 0U) == AOAHID_ERR_BUSY);
@@ -3131,8 +3245,12 @@ void test_submit_blocking_waits_for_a_free_slot_without_spinning() {
 #endif
     AOAHID_CHECK(aoahid_keyboard_key(holder, 0x04U, 0U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_keyboard_key(waiter, 0x05U, 0U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
+    // Both Nodes send a neutral report on close; a 1 ms budget would make this test timing-bound.
+    constexpr std::uint32_t close_drain_timeout_ms = 1000U;
+    AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, close_drain_timeout_ms) ==
+                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, close_drain_timeout_ms) ==
+                 AOAHID_OK);
     aoahid_fake_libusb_reset();
 }
 
@@ -3156,6 +3274,7 @@ void test_transport() {
     test_open_sends_no_aoa_request();
     test_required_device_policies_precede_usb_io();
     test_tuning_values_required_and_zero_reservation();
+    test_initializers_open_a_working_session();
     test_cancel_and_device_isolation();
     test_blocking_event_wait_is_woken_by_cancel();
     test_public_touchpad_button_only_close();
@@ -3174,6 +3293,8 @@ void test_transport() {
     test_node_open_host_policy_failure_precedes_request54();
     test_node_close_timeout_distinction_and_loss_freeze();
     test_node_close_retains_terminal_link_loss();
+    test_node_close_with_report_in_flight_keeps_node();
+    test_node_close_failed_unregister_consumes_node();
     test_caller_poll_hot_path_is_lock_and_allocation_free();
     test_channel_hot_path_is_lock_and_allocation_free();
     test_accepted_submit_defers_opportunistic_poll_error();
@@ -3182,5 +3303,5 @@ void test_transport() {
     test_graveyard_publishes_unregister_and_cancel_errors();
     test_public_graveyard_delayed_cancel();
     test_public_graveyard_blocking_destroy();
-    test_blocking_destroy_timeout_retains_context();
+    test_blocking_destroy_deadline_retains_context();
 }

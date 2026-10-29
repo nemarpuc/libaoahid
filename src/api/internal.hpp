@@ -331,12 +331,7 @@ struct aoahid_device {
     std::uint32_t close_control_timeout_ms{};
     std::uint32_t close_drain_timeout_ms{};
     std::uint32_t aoa_descriptor_policy_bytes{};
-    std::uint32_t linux_descriptor_policy_bytes{};
-    std::uint32_t linux_hid_fields_per_report_policy{};
-    std::uint32_t linux_hid_global_stack_depth_policy{};
-    std::uint64_t linux_hid_usages_policy{};
-    std::uint64_t linux_hid_report_data_policy_bits{};
-    std::uint32_t linux_hid_report_size_policy_bits{};
+    aoahid_linux_hid_policy linux_hid{};
     std::uint32_t target_ep0_policy_bytes{};
     std::uint32_t host_control_policy_bytes{};
     std::size_t hid_id_domain_index{};

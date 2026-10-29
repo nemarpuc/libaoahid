@@ -66,8 +66,7 @@ int main(int argc, char** argv) {
         accessory.strings.manufacturer = argv[1];
         accessory.strings.model = argv[2];
         accessory.strings.description = "libaoahid verify_accessory";
-        accessory.control_timeout_ms = 500U;
-        result = aoahid_accessory_start(context, phone, &accessory);
+        result = aoahid_accessory_start(context, phone, &accessory, 500U);
         aoahid_discovery_destroy(discovery);
         discovery = NULL;
         if (result != AOAHID_OK) {

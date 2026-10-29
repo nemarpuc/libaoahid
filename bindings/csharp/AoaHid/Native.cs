@@ -27,7 +27,7 @@ public enum Result : int
 }
 
 public enum EventMode : int { CallerPoll = 1, InternalThread = 2 }
-public enum ChannelReadMode : int { Stream = 0, Request = 1 }
+public enum ChannelReadMode : int { Stream = 1, Request = 2 }
 public enum ClaimPolicy : int { None = 1, Explicit = 2 }
 public enum LogLevel : int { Disabled = 1, Error = 2, Info = 3, Trace = 4 }
 public enum DpadRepresentation : int { None = 1, Hat = 2, Buttons = 3 }
@@ -507,8 +507,8 @@ public static class Native
             ["AOAHID_ERR_INTERNAL"] = 16,
             ["AOAHID_EVENT_CALLER_POLL"] = 1,
             ["AOAHID_EVENT_INTERNAL_THREAD"] = 2,
-            ["AOAHID_CHANNEL_READ_STREAM"] = 0,
-            ["AOAHID_CHANNEL_READ_REQUEST"] = 1,
+            ["AOAHID_CHANNEL_READ_STREAM"] = 1,
+            ["AOAHID_CHANNEL_READ_REQUEST"] = 2,
             ["AOAHID_INTERFACE_CLAIM_NONE"] = 1,
             ["AOAHID_INTERFACE_CLAIM_EXPLICIT"] = 2,
             ["AOAHID_LOG_DISABLED"] = 1,

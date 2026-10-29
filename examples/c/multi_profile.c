@@ -160,14 +160,14 @@ static aoahid_device_options device_options(void) {
     options.maximum_report_bytes = k_host_report_policy_bytes;
     options.validate_reports = 1U;
     options.aoa_descriptor_wire_policy_bytes = k_descriptor_policy_bytes;
-    options.linux_descriptor_policy_bytes = k_descriptor_policy_bytes;
+    options.linux_hid.descriptor_bytes = k_descriptor_policy_bytes;
     /* These policies mirror Linux HID core limits
      * (include/linux/hid.h); check them against the target kernel. */
-    options.linux_hid_fields_per_report_policy = 256U;
-    options.linux_hid_global_stack_depth_policy = 4U;
-    options.linux_hid_usages_policy = 12288U;
-    options.linux_hid_report_data_policy_bits = 65528U;
-    options.linux_hid_report_size_policy_bits = 256U;
+    options.linux_hid.fields_per_report = 256U;
+    options.linux_hid.global_stack_depth = 4U;
+    options.linux_hid.usages = 12288U;
+    options.linux_hid.report_data_bits = 65528U;
+    options.linux_hid.report_size_bits = 256U;
     options.target_ep0_data_policy_bytes = k_descriptor_policy_bytes;
     options.host_control_buffer_policy_bytes = k_host_report_policy_bytes;
     options.interface_claim_policy = AOAHID_INTERFACE_CLAIM_NONE;

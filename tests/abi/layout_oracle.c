@@ -124,6 +124,14 @@ int main(void) {
     AOAHID_FIELD(aoahid_aoa_strings, uri);
     AOAHID_FIELD(aoahid_aoa_strings, serial);
 
+    AOAHID_BEGIN(aoahid_linux_hid_policy);
+    AOAHID_FIELD(aoahid_linux_hid_policy, descriptor_bytes);
+    AOAHID_FIELD(aoahid_linux_hid_policy, fields_per_report);
+    AOAHID_FIELD(aoahid_linux_hid_policy, global_stack_depth);
+    AOAHID_FIELD(aoahid_linux_hid_policy, report_size_bits);
+    AOAHID_FIELD(aoahid_linux_hid_policy, usages);
+    AOAHID_FIELD(aoahid_linux_hid_policy, report_data_bits);
+
     AOAHID_BEGIN(aoahid_device_options);
     AOAHID_FIELD(aoahid_device_options, struct_size);
     AOAHID_FIELD(aoahid_device_options, reserved);
@@ -131,12 +139,7 @@ int main(void) {
     AOAHID_FIELD(aoahid_device_options, transfer_pool_slots);
     AOAHID_FIELD(aoahid_device_options, maximum_report_bytes);
     AOAHID_FIELD(aoahid_device_options, aoa_descriptor_wire_policy_bytes);
-    AOAHID_FIELD(aoahid_device_options, linux_descriptor_policy_bytes);
-    AOAHID_FIELD(aoahid_device_options, linux_hid_fields_per_report_policy);
-    AOAHID_FIELD(aoahid_device_options, linux_hid_global_stack_depth_policy);
-    AOAHID_FIELD(aoahid_device_options, linux_hid_usages_policy);
-    AOAHID_FIELD(aoahid_device_options, linux_hid_report_data_policy_bits);
-    AOAHID_FIELD(aoahid_device_options, linux_hid_report_size_policy_bits);
+    AOAHID_FIELD(aoahid_device_options, linux_hid);
     AOAHID_FIELD(aoahid_device_options, target_ep0_data_policy_bytes);
     AOAHID_FIELD(aoahid_device_options, host_control_buffer_policy_bytes);
     AOAHID_FIELD(aoahid_device_options, interface_claim_policy);
@@ -147,7 +150,6 @@ int main(void) {
     AOAHID_FIELD(aoahid_accessory_options, struct_size);
     AOAHID_FIELD(aoahid_accessory_options, reserved);
     AOAHID_FIELD(aoahid_accessory_options, strings);
-    AOAHID_FIELD(aoahid_accessory_options, control_timeout_ms);
 
     AOAHID_BEGIN(aoahid_channel_options);
     AOAHID_FIELD(aoahid_channel_options, struct_size);

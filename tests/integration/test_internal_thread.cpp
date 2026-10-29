@@ -39,12 +39,12 @@ aoahid_device_options make_device_options() noexcept {
     options.maximum_report_bytes = 64U;
     options.validate_reports = 1U;
     options.aoa_descriptor_wire_policy_bytes = 1024U;
-    options.linux_descriptor_policy_bytes = 1024U;
-    options.linux_hid_fields_per_report_policy = 256U;
-    options.linux_hid_global_stack_depth_policy = 4U;
-    options.linux_hid_usages_policy = 12288U;
-    options.linux_hid_report_data_policy_bits = 65528U;
-    options.linux_hid_report_size_policy_bits = 256U;
+    options.linux_hid.descriptor_bytes = 1024U;
+    options.linux_hid.fields_per_report = 256U;
+    options.linux_hid.global_stack_depth = 4U;
+    options.linux_hid.usages = 12288U;
+    options.linux_hid.report_data_bits = 65528U;
+    options.linux_hid.report_size_bits = 256U;
     options.target_ep0_data_policy_bytes = 4096U;
     options.host_control_buffer_policy_bytes = 4096U;
     options.interface_claim_policy = AOAHID_INTERFACE_CLAIM_NONE;
@@ -239,13 +239,9 @@ int main() {
 
     const aoahid_result first_device_close =
         aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs);
-    // Node completion has a narrower callback-exit barrier than Device
-    // reclamation: after the Node callback publishes its terminal state, the
-    // transport may still be leaving that callback.  Device close consumes the
-    // handle in both outcomes and may therefore hand this transient lifetime
-    // to the Context graveyard.
-    if (first_device_close != AOAHID_OK && first_device_close != AOAHID_CLOSE_PENDING) {
-        static_cast<void>(require_ok(first_device_close, "device_close"));
+    // The transport may still be leaving the Node's callback, in which case the Context
+    // graveyard finishes the teardown; the call returns AOAHID_OK either way.
+    if (!require_ok(first_device_close, "device_close")) {
         return 1;
     }
     if (!require_ok(
@@ -347,7 +343,8 @@ int main() {
         std::fputs("failed event thread did not exit while retaining a join handle\n", stderr);
         return 1;
     }
-    if (aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs) != AOAHID_CLOSE_PENDING) {
+    if (aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs) != AOAHID_OK ||
+        aoahid_fake_libusb_pending_transfer_count() == 0U) {
         std::fputs("failed-pump Device did not move to the graveyard\n", stderr);
         return 1;
     }

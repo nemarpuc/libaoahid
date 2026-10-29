@@ -81,6 +81,17 @@ class AoaStrings(c.Structure):
     ]
 
 
+class LinuxHidPolicy(c.Structure):
+    _fields_ = [
+        ("descriptor_bytes", U32),
+        ("fields_per_report", U32),
+        ("global_stack_depth", U32),
+        ("report_size_bits", U32),
+        ("usages", U64),
+        ("report_data_bits", U64),
+    ]
+
+
 class DeviceOptions(c.Structure):
     _fields_ = [
         ("struct_size", U32),
@@ -89,12 +100,7 @@ class DeviceOptions(c.Structure):
         ("transfer_pool_slots", U32),
         ("maximum_report_bytes", U32),
         ("aoa_descriptor_wire_policy_bytes", U32),
-        ("linux_descriptor_policy_bytes", U32),
-        ("linux_hid_fields_per_report_policy", U32),
-        ("linux_hid_global_stack_depth_policy", U32),
-        ("linux_hid_usages_policy", U64),
-        ("linux_hid_report_data_policy_bits", U64),
-        ("linux_hid_report_size_policy_bits", U32),
+        ("linux_hid", LinuxHidPolicy),
         ("target_ep0_data_policy_bytes", U32),
         ("host_control_buffer_policy_bytes", U32),
         ("interface_claim_policy", I32),
@@ -108,7 +114,6 @@ class AccessoryOptions(c.Structure):
         ("struct_size", U32),
         ("reserved", U32),
         ("strings", AoaStrings),
-        ("control_timeout_ms", U32),
     ]
 
 
@@ -446,6 +451,7 @@ GOLDEN_STRUCTS = {
     "aoahid_context_options": ContextOptions,
     "aoahid_device_info": DeviceInfo,
     "aoahid_aoa_strings": AoaStrings,
+    "aoahid_linux_hid_policy": LinuxHidPolicy,
     "aoahid_device_options": DeviceOptions,
     "aoahid_accessory_options": AccessoryOptions,
     "aoahid_channel_options": ChannelOptions,
@@ -496,8 +502,8 @@ GOLDEN_CONSTANTS = {
     "AOAHID_ERR_INTERNAL": 16,
     "AOAHID_EVENT_CALLER_POLL": 1,
     "AOAHID_EVENT_INTERNAL_THREAD": 2,
-    "AOAHID_CHANNEL_READ_STREAM": 0,
-    "AOAHID_CHANNEL_READ_REQUEST": 1,
+    "AOAHID_CHANNEL_READ_STREAM": 1,
+    "AOAHID_CHANNEL_READ_REQUEST": 2,
     "AOAHID_INTERFACE_CLAIM_NONE": 1,
     "AOAHID_INTERFACE_CLAIM_EXPLICIT": 2,
     "AOAHID_LOG_DISABLED": 1,

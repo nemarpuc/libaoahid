@@ -21,5 +21,19 @@ _Static_assert(sizeof(aoahid_dpad_representation) == sizeof(int32_t),
 _Static_assert(sizeof(aoahid_usage_semantic) == sizeof(int32_t), "aoahid_usage_semantic ABI width");
 
 int main(void) {
-    return AOAHID_OK == 0 && AOAHID_ERR_INTERNAL == 16 && AOAHID_USAGE_NAMED_ARRAY == 10 ? 0 : 1;
+    aoahid_device_options device;
+    device.validate_reports = 1U;
+    aoahid_device_options_init(&device);
+    aoahid_touchpad_options touchpad;
+    aoahid_touchpad_options_init(&touchpad);
+    aoahid_capability_manifest manifest;
+    aoahid_capability_manifest_init(&manifest);
+    aoahid_keyboard_options_init(NULL);
+    const int initialized = device.struct_size == sizeof(device) && device.validate_reports == 0U &&
+                            touchpad.struct_size == sizeof(touchpad) &&
+                            manifest.struct_size == sizeof(manifest);
+    return initialized && AOAHID_OK == 0 && AOAHID_ERR_INTERNAL == 16 &&
+                   AOAHID_USAGE_NAMED_ARRAY == 10
+               ? 0
+               : 1;
 }

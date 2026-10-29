@@ -2,11 +2,14 @@
 // Copyright (c) 2026 libaoahid contributors
 #pragma once
 
-/* Every function of the C ABI in aoahid.h, forwarded unchanged under namespace
- * aoahid without the aoahid_ prefix. Types, arguments, return values and the
- * documentation are those of aoahid.h; this header adds nothing else. */
+/* Every function of the C ABI in aoahid.h, forwarded unchanged under namespace aoahid without the
+ * aoahid_ prefix; types, arguments, results and documentation are those of aoahid.h. On top of
+ * them, at the end of this file: functions that return initialized options, and owning handles for
+ * the two objects whose release cannot fail. */
 
 #include "aoahid.h"
+
+#include <memory>
 
 namespace aoahid {
 
@@ -51,10 +54,11 @@ namespace aoahid {
 inline void discovery_destroy(aoahid_discovery* discovery) noexcept {
     aoahid_discovery_destroy(discovery);
 }
-[[nodiscard]] inline aoahid_result
-accessory_start(aoahid_context* context, const aoahid_device_info* selected,
-                const aoahid_accessory_options* options) noexcept {
-    return aoahid_accessory_start(context, selected, options);
+[[nodiscard]] inline aoahid_result accessory_start(aoahid_context* context,
+                                                   const aoahid_device_info* selected,
+                                                   const aoahid_accessory_options* options,
+                                                   uint32_t control_timeout_ms) noexcept {
+    return aoahid_accessory_start(context, selected, options, control_timeout_ms);
 }
 [[nodiscard]] inline aoahid_result device_open(aoahid_context* context,
                                                const aoahid_device_info* selected,
@@ -221,5 +225,99 @@ digitizer_update(aoahid_node* node, const aoahid_digitizer_sample* sample) noexc
                                               size_t length, uint32_t send_timeout_ms) noexcept {
     return aoahid_raw_submit(node, report, length, send_timeout_ms);
 }
+
+// ---- Initialized options ----------------------------------------------------------------
+// Each returns what the C *_init function of the same name fills in:
+//   auto options = aoahid::device_options();
+[[nodiscard]] inline aoahid_context_options context_options() noexcept {
+    aoahid_context_options value;
+    aoahid_context_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_device_options device_options() noexcept {
+    aoahid_device_options value;
+    aoahid_device_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_accessory_options accessory_options() noexcept {
+    aoahid_accessory_options value;
+    aoahid_accessory_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_channel_options channel_options() noexcept {
+    aoahid_channel_options value;
+    aoahid_channel_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_node_options node_options() noexcept {
+    aoahid_node_options value;
+    aoahid_node_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_keyboard_options keyboard_options() noexcept {
+    aoahid_keyboard_options value;
+    aoahid_keyboard_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_mouse_options mouse_options() noexcept {
+    aoahid_mouse_options value;
+    aoahid_mouse_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_toggle_options toggle_options() noexcept {
+    aoahid_toggle_options value;
+    aoahid_toggle_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_gamepad_options gamepad_options() noexcept {
+    aoahid_gamepad_options value;
+    aoahid_gamepad_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_touchscreen_options touchscreen_options() noexcept {
+    aoahid_touchscreen_options value;
+    aoahid_touchscreen_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_touchpad_options touchpad_options() noexcept {
+    aoahid_touchpad_options value;
+    aoahid_touchpad_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_pen_options pen_options() noexcept {
+    aoahid_pen_options value;
+    aoahid_pen_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_digitizer_options digitizer_options() noexcept {
+    aoahid_digitizer_options value;
+    aoahid_digitizer_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_raw_options raw_options() noexcept {
+    aoahid_raw_options value;
+    aoahid_raw_options_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_capability_manifest capability_manifest() noexcept {
+    aoahid_capability_manifest value;
+    aoahid_capability_manifest_init(&value);
+    return value;
+}
+
+// ---- Owning handles ---------------------------------------------------------------------
+// A Context, Device, Node or Channel is closed with timeouts and may answer AOAHID_CLOSE_PENDING,
+// which a destructor could neither report nor retry, so those stay plain pointers.
+struct SpecRelease {
+    void operator()(aoahid_spec* spec) const noexcept { aoahid_spec_release(spec); }
+};
+struct DiscoveryDestroy {
+    void operator()(aoahid_discovery* discovery) const noexcept {
+        aoahid_discovery_destroy(discovery);
+    }
+};
+// Holds one reference: aoahid_spec* raw; aoahid::spec_create_mouse(&o, &raw); SpecPtr spec{raw};
+using SpecPtr = std::unique_ptr<aoahid_spec, SpecRelease>;
+using DiscoveryPtr = std::unique_ptr<aoahid_discovery, DiscoveryDestroy>;
 
 } // namespace aoahid

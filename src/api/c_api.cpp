@@ -280,12 +280,9 @@ bool required_tuning_nonzero(const aoahid_device_options& options) noexcept {
 
 bool required_product_policies_nonzero(const aoahid_device_options& options) noexcept {
     return options.aoa_descriptor_wire_policy_bytes != 0U &&
-           options.linux_descriptor_policy_bytes != 0U &&
-           options.linux_hid_fields_per_report_policy != 0U &&
-           options.linux_hid_global_stack_depth_policy != 0U &&
-           options.linux_hid_usages_policy != 0U &&
-           options.linux_hid_report_data_policy_bits != 0U &&
-           options.linux_hid_report_size_policy_bits != 0U &&
+           options.linux_hid.descriptor_bytes != 0U && options.linux_hid.fields_per_report != 0U &&
+           options.linux_hid.global_stack_depth != 0U && options.linux_hid.usages != 0U &&
+           options.linux_hid.report_data_bits != 0U && options.linux_hid.report_size_bits != 0U &&
            options.target_ep0_data_policy_bytes != 0U &&
            options.host_control_buffer_policy_bytes != 0U;
 }
@@ -735,64 +732,74 @@ bool touch_frame_in_progress(const aoahid_node* node) noexcept {
     return touch != nullptr && touch->packet_cursor != 0U;
 }
 
+// The Node stays live only while a transfer of it is in flight, because the transfer's callback
+// still points at it: that case returns AOAHID_CLOSE_PENDING. Every other result means the Node is
+// gone. A step that fails does not stop the ones after it, and the first failure is returned.
 aoahid_result close_live_node_until(aoahid_node* node,
                                     const std::chrono::steady_clock::time_point deadline,
                                     const std::uint32_t control_timeout_ms) {
-    if (node == nullptr || node->device == nullptr || node->device->transport == nullptr) {
-        set_error(AOAHID_ERR_PARAM, "node.close",
-                  "A live node with an attached transport is required.");
-        return AOAHID_ERR_PARAM;
-    }
-    // A successful touch callback can finish between the in-flight check and
-    // the next packet submission. packet_cursor then remains nonzero while no
-    // transfer is active. Finish that immutable frame before replacing state
-    // with the close-time neutral frame.
+    aoahid_device* device = node->device;
+    aoa::detail::DeferredError failure{};
+    // Every step records its own error detail, which is kept for the first failure.
+    const auto keep_first = [&](const aoahid_result result) {
+        if (result != AOAHID_OK && !failure.pending)
+            failure = current_deferred_error(result, "node.close", "A close step failed.", node);
+    };
+    const auto still_in_flight = [&]() {
+        if (!node->transfer_inflight.load(std::memory_order_acquire))
+            return false;
+        set_error(AOAHID_CLOSE_PENDING, "node.close",
+                  "A report transfer of the Node was still in flight at the close deadline.", 0, 57,
+                  node->hid_id, report_id(node), 0U,
+                  static_cast<std::uint32_t>(node->spec->layout.wire_bytes));
+        return true;
+    };
+
+    // A touch frame that has started must be finished before the neutral frame replaces it.
     if (node->transfer_inflight.load(std::memory_order_acquire) || touch_frame_in_progress(node)) {
         const std::uint32_t remaining = remaining_milliseconds(deadline);
-        if (remaining == 0U) {
-            return AOAHID_ERR_TIMEOUT;
-        }
-        const aoahid_result wait = poll_until_idle(node, remaining, true);
-        if (wait != AOAHID_OK) {
-            return wait;
-        }
+        if (remaining != 0U)
+            keep_first(poll_until_idle(node, remaining, true));
     }
-
-    const aoahid_result terminal = consume_completion(node, "node.completion");
-    if (terminal != AOAHID_OK)
-        return terminal;
+    if (still_in_flight())
+        return AOAHID_CLOSE_PENDING;
+    keep_first(consume_completion(node, "node.completion"));
     node->battery_dirty = false;
 
-    aoahid_device* device = node->device;
     if (device->transport->present()) {
         make_neutral(node);
         if (node->dirty) {
             const std::uint32_t remaining = remaining_milliseconds(deadline);
             if (remaining == 0U) {
-                return AOAHID_ERR_TIMEOUT;
+                set_error(AOAHID_ERR_TIMEOUT, "node.close",
+                          "No time was left to send the neutral report.");
+                keep_first(AOAHID_ERR_TIMEOUT);
+            } else {
+                keep_first(poll_until_idle(node, remaining, true));
             }
-            const aoahid_result neutral = poll_until_idle(node, remaining, true);
-            if (neutral != AOAHID_OK) {
-                return neutral;
-            }
+            if (still_in_flight())
+                return AOAHID_CLOSE_PENDING;
         }
         const aoahid_result unregister =
             device->transport->unregister_hid(node->hid_id, control_timeout_ms);
-        if (unregister != AOAHID_OK && unregister != AOAHID_ERR_NO_DEVICE) {
-            return unregister;
+        if (unregister != AOAHID_ERR_NO_DEVICE) {
+            keep_first(finish_transport_result(unregister, "node.unregister",
+                                               "AOA request 55 failed while closing the Node.",
+                                               node, 55));
         }
     }
-    const aoahid_result clear_reservation = device->transport->clear_reservation(node->reservation);
-    if (clear_reservation != AOAHID_OK) {
-        return clear_reservation;
+    if (device->transport->clear_reservation(node->reservation) != AOAHID_OK) {
+        set_error(AOAHID_CLOSE_PENDING, "node.reserved_slots",
+                  "The Node's reserved transfer slot is still in use.", 0, 57, node->hid_id);
+        return AOAHID_CLOSE_PENDING;
     }
 
     auto& nodes = device->nodes;
     nodes.erase(std::remove(nodes.begin(), nodes.end(), node), nodes.end());
     aoa::detail::log_event(device->context, AOAHID_LOG_INFO, "node_close", device, node,
-                           aoa::detail::LogEventStatus{AOAHID_OK, 0, 55});
+                           aoa::detail::LogEventStatus{failure.transport.result, 0, 55});
     release_node_storage(node);
-    return AOAHID_OK;
+    return publish_deferred_error(failure);
 }
 
 void remember_terminal_completion(aoahid_device* device, aoahid_node* node) noexcept {
@@ -1179,11 +1186,12 @@ aoahid_result AOAHID_CALL aoahid_discover(aoahid_context* context,
     aoa::detail::clear_error();
     if (out_discovery != nullptr)
         *out_discovery = nullptr;
-    if (context == nullptr || out_discovery == nullptr || control_timeout_ms == 0U) {
-        set_error(AOAHID_ERR_PARAM, "discover",
-                  "Context, nonzero timeout, and output are required.");
+    if (context == nullptr || out_discovery == nullptr) {
+        set_error(AOAHID_ERR_PARAM, "discover", "A Context and an output pointer are required.");
         return AOAHID_ERR_PARAM;
     }
+    if (!timeout_is_set(control_timeout_ms, "control_timeout_ms"))
+        return AOAHID_ERR_UNSET_FIELD;
     const aoahid_result deferred = preflight_context(context);
     if (deferred != AOAHID_OK)
         return deferred;
@@ -1254,9 +1262,12 @@ AOAHID_C_VOID_CATCH("discovery.destroy")
 
 aoahid_result AOAHID_CALL aoahid_accessory_start(aoahid_context* context,
                                                  const aoahid_device_info* selected,
-                                                 const aoahid_accessory_options* options) try {
+                                                 const aoahid_accessory_options* options,
+                                                 const std::uint32_t control_timeout_ms) try {
     AOAHID_SERIALIZED(context, "aoahid_accessory_start");
     aoa::detail::clear_error();
+    if (!timeout_is_set(control_timeout_ms, "control_timeout_ms"))
+        return AOAHID_ERR_UNSET_FIELD;
     if (context == nullptr || selected == nullptr) {
         set_error(AOAHID_ERR_PARAM, "accessory.start", "Context and selection are required.");
         return AOAHID_ERR_PARAM;
@@ -1280,12 +1291,10 @@ aoahid_result AOAHID_CALL aoahid_accessory_start(aoahid_context* context,
         return AOAHID_ERR_PARAM;
     }
     const aoahid_aoa_strings& strings = options->strings;
-    if (options->reserved != 0U || options->control_timeout_ms == 0U ||
-        strings.manufacturer == nullptr || strings.manufacturer[0] == '\0' ||
-        strings.model == nullptr || strings.model[0] == '\0') {
+    if (options->reserved != 0U || strings.manufacturer == nullptr ||
+        strings.manufacturer[0] == '\0' || strings.model == nullptr || strings.model[0] == '\0') {
         set_error(AOAHID_ERR_UNSET_FIELD, "accessory_options",
-                  "control_timeout_ms and a nonempty manufacturer and model are required, and "
-                  "reserved must be zero.");
+                  "A nonempty manufacturer and model are required, and reserved must be zero.");
         return AOAHID_ERR_UNSET_FIELD;
     }
     const std::array<const char*, 6U> values{strings.manufacturer, strings.model,
@@ -1303,7 +1312,7 @@ aoahid_result AOAHID_CALL aoahid_accessory_start(aoahid_context* context,
         }
     }
     const aoahid_result result = context->runtime->start_accessory(
-        copy_candidate(*selected), values.data(), options->control_timeout_ms);
+        copy_candidate(*selected), values.data(), control_timeout_ms);
     if (result != AOAHID_OK) {
         return finish_transport_result(result, "accessory.start",
                                        "An AOA accessory-mode start request failed.");
@@ -1352,16 +1361,7 @@ aoahid_result AOAHID_CALL aoahid_device_open(aoahid_context* context,
         device->context = context;
         device->config = copy_config(effective_options, context->options.event_mode);
         device->aoa_descriptor_policy_bytes = effective_options.aoa_descriptor_wire_policy_bytes;
-        device->linux_descriptor_policy_bytes = effective_options.linux_descriptor_policy_bytes;
-        device->linux_hid_fields_per_report_policy =
-            effective_options.linux_hid_fields_per_report_policy;
-        device->linux_hid_global_stack_depth_policy =
-            effective_options.linux_hid_global_stack_depth_policy;
-        device->linux_hid_usages_policy = effective_options.linux_hid_usages_policy;
-        device->linux_hid_report_data_policy_bits =
-            effective_options.linux_hid_report_data_policy_bits;
-        device->linux_hid_report_size_policy_bits =
-            effective_options.linux_hid_report_size_policy_bits;
+        device->linux_hid = effective_options.linux_hid;
         device->target_ep0_policy_bytes = effective_options.target_ep0_data_policy_bytes;
         device->host_control_policy_bytes = effective_options.host_control_buffer_policy_bytes;
         device->validate_reports = effective_options.validate_reports == 1U;
@@ -1455,59 +1455,58 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
                   "The descriptor exceeds the caller's AOA wire-size policy.");
         return AOAHID_ERR_OVERFLOW;
     }
-    if (spec->descriptor.size() > device->linux_descriptor_policy_bytes) {
+    if (spec->descriptor.size() > device->linux_hid.descriptor_bytes) {
         set_error(AOAHID_ERR_OVERFLOW, "spec.descriptor.linux_policy",
                   "The descriptor exceeds the caller's Linux descriptor byte policy.");
         return AOAHID_ERR_OVERFLOW;
     }
-    if (spec->requirements.maximum_fields_per_report > device->linux_hid_fields_per_report_policy) {
+    if (spec->requirements.maximum_fields_per_report > device->linux_hid.fields_per_report) {
         set_error(AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_fields_per_report",
                   "The descriptor exceeds the caller-selected per-report field policy for the "
                   "exact target HID parser revision.",
-                  0, 0, 0, 0, device->linux_hid_fields_per_report_policy,
+                  0, 0, 0, 0, device->linux_hid.fields_per_report,
                   spec->requirements.maximum_fields_per_report);
         return AOAHID_ERR_OVERFLOW;
     }
-    if (spec->requirements.maximum_global_stack_depth >
-        device->linux_hid_global_stack_depth_policy) {
+    if (spec->requirements.maximum_global_stack_depth > device->linux_hid.global_stack_depth) {
         set_error(AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_global_stack_depth",
                   "The descriptor exceeds the caller-selected Global stack-depth policy for the "
                   "exact target HID parser revision.",
-                  0, 0, 0, 0, device->linux_hid_global_stack_depth_policy,
+                  0, 0, 0, 0, device->linux_hid.global_stack_depth,
                   spec->requirements.maximum_global_stack_depth);
         return AOAHID_ERR_OVERFLOW;
     }
-    if (spec->requirements.maximum_report_size_bits > device->linux_hid_report_size_policy_bits) {
+    if (spec->requirements.maximum_report_size_bits > device->linux_hid.report_size_bits) {
         set_error(AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_report_size_bits",
                   "The descriptor exceeds the caller-selected Report Size declaration policy for "
                   "the exact target HID parser revision.",
-                  0, 0, 0, 0, device->linux_hid_report_size_policy_bits,
+                  0, 0, 0, 0, device->linux_hid.report_size_bits,
                   spec->requirements.maximum_report_size_bits);
         return AOAHID_ERR_OVERFLOW;
     }
-    if (spec->requirements.maximum_usages > device->linux_hid_usages_policy) {
+    if (spec->requirements.maximum_usages > device->linux_hid.usages) {
         set_error(
             AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_usages",
             "The descriptor exceeds the caller-selected Usage policy for the exact target HID "
             "parser revision.",
             0, 0, 0, 0,
             static_cast<std::uint32_t>(std::min<std::uint64_t>(
-                device->linux_hid_usages_policy, std::numeric_limits<std::uint32_t>::max())),
+                device->linux_hid.usages, std::numeric_limits<std::uint32_t>::max())),
             static_cast<std::uint32_t>(std::min<std::uint64_t>(
                 spec->requirements.maximum_usages, std::numeric_limits<std::uint32_t>::max())));
         return AOAHID_ERR_OVERFLOW;
     }
-    if (spec->requirements.maximum_report_data_bits > device->linux_hid_report_data_policy_bits) {
-        set_error(AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_report_data_bits",
-                  "The descriptor exceeds the caller-selected report data-bit policy for the exact "
-                  "target HID parser revision.",
-                  0, 0, 0, 0,
-                  static_cast<std::uint32_t>(
-                      std::min<std::uint64_t>(device->linux_hid_report_data_policy_bits,
-                                              std::numeric_limits<std::uint32_t>::max())),
-                  static_cast<std::uint32_t>(
-                      std::min<std::uint64_t>(spec->requirements.maximum_report_data_bits,
-                                              std::numeric_limits<std::uint32_t>::max())));
+    if (spec->requirements.maximum_report_data_bits > device->linux_hid.report_data_bits) {
+        set_error(
+            AOAHID_ERR_OVERFLOW, "spec.requirements.maximum_report_data_bits",
+            "The descriptor exceeds the caller-selected report data-bit policy for the exact "
+            "target HID parser revision.",
+            0, 0, 0, 0,
+            static_cast<std::uint32_t>(std::min<std::uint64_t>(
+                device->linux_hid.report_data_bits, std::numeric_limits<std::uint32_t>::max())),
+            static_cast<std::uint32_t>(
+                std::min<std::uint64_t>(spec->requirements.maximum_report_data_bits,
+                                        std::numeric_limits<std::uint32_t>::max())));
         return AOAHID_ERR_OVERFLOW;
     }
     for (const auto& report : spec->report_capabilities) {
@@ -1873,66 +1872,15 @@ aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node,
         return AOAHID_ERR_UNSET_FIELD;
     }
     if (node == nullptr || node->closed || node->device == nullptr ||
+        node->device->transport == nullptr ||
         node->device->closing.load(std::memory_order_acquire)) {
         set_error(AOAHID_ERR_PARAM, "node.close",
                   "The Node handle is null, closed, detached, or owned by a closing Device.");
         return AOAHID_ERR_PARAM;
     }
-    if (node->transfer_inflight.load(std::memory_order_acquire) || touch_frame_in_progress(node)) {
-        const aoahid_result wait = poll_until_idle(node, drain_timeout_ms, true);
-        if (wait != AOAHID_OK) {
-            if (wait == AOAHID_ERR_TIMEOUT &&
-                node->transfer_inflight.load(std::memory_order_acquire)) {
-                set_error(
-                    AOAHID_CLOSE_PENDING, "node.close",
-                    "The close drain budget expired while a terminal callback is still pending.", 0,
-                    57, node->hid_id, report_id(node), 0U,
-                    static_cast<std::uint32_t>(node->spec->layout.wire_bytes));
-                return AOAHID_CLOSE_PENDING;
-            }
-            return wait;
-        }
-    }
-    const aoahid_result terminal = consume_completion(node, "node.completion");
-    if (terminal != AOAHID_OK)
-        return terminal;
-    node->battery_dirty = false;
-    if (node->device->transport->present()) {
-        make_neutral(node);
-        const aoahid_result neutral = poll_until_idle(node, drain_timeout_ms, true);
-        if (neutral != AOAHID_OK) {
-            if (neutral == AOAHID_ERR_TIMEOUT &&
-                node->transfer_inflight.load(std::memory_order_acquire)) {
-                set_error(AOAHID_CLOSE_PENDING, "node.close",
-                          "The neutral report callback did not drain before the close deadline.", 0,
-                          57, node->hid_id, report_id(node), 0U,
-                          static_cast<std::uint32_t>(node->spec->layout.wire_bytes));
-                return AOAHID_CLOSE_PENDING;
-            }
-            return neutral;
-        }
-        const aoahid_result unregister =
-            node->device->transport->unregister_hid(node->hid_id, control_timeout_ms);
-        if (unregister != AOAHID_OK && unregister != AOAHID_ERR_NO_DEVICE) {
-            return finish_transport_result(unregister, "node.unregister",
-                                           "AOA request 55 failed while closing the Node.", node,
-                                           55);
-        }
-    }
-    const aoahid_result clear_reservation =
-        node->device->transport->clear_reservation(node->reservation);
-    if (clear_reservation != AOAHID_OK) {
-        return finish_transport_result(clear_reservation, "node.reserved_slots",
-                                       "The Node still owns an in-use reserved transfer slot.",
-                                       node);
-    }
-    aoa::detail::log_event(node->device->context, AOAHID_LOG_INFO, "node_close", node->device, node,
-                           aoa::detail::LogEventStatus{AOAHID_OK, 0, 55});
-    auto& nodes = node->device->nodes;
-    nodes.erase(std::remove(nodes.begin(), nodes.end(), node), nodes.end());
-    release_node_storage(node);
-    aoa::detail::clear_error();
-    return AOAHID_OK;
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(drain_timeout_ms);
+    return close_live_node_until(node, deadline, control_timeout_ms);
 }
 AOAHID_C_RESULT_CATCH("node.close")
 
@@ -1980,19 +1928,11 @@ static aoahid_result device_close_impl(aoahid_device* device, bool* consumed,
             aoahid_node* closing_node = device->nodes.back();
             const aoahid_result result =
                 close_live_node_until(closing_node, deadline, control_timeout_ms);
-            if (result != AOAHID_OK) {
-                const bool drain_budget_only =
-                    result == AOAHID_ERR_TIMEOUT &&
-                    closing_node->transfer_inflight.load(std::memory_order_acquire);
-                if (!drain_budget_only) {
-                    remember_current_close_error(device, result, "node.close",
-                                                 "A Node neutral, drain, unregister, or "
-                                                 "reservation step failed during Device teardown.",
-                                                 closing_node,
-                                                 result == AOAHID_ERR_TIMEOUT ? 57 : 0);
-                }
+            // The pending Node and the ones not closed yet go to the graveyard with the Device.
+            if (result == AOAHID_CLOSE_PENDING)
                 break;
-            }
+            remember_current_close_error(device, result, "node.close",
+                                         "A Node close step failed during Device teardown.");
         }
     } catch (const std::bad_alloc&) {
         remember_close_error(
@@ -2052,21 +1992,14 @@ static aoahid_result device_close_impl(aoahid_device* device, bool* consumed,
         return publish_deferred_error(outcome);
     }
 
-    // Ownership of the complete graph transfers to the Context: nodes and
-    // retained specs are callback user_data, while Device owns every transfer,
-    // buffer, USB handle, and its Runtime/Context lifetime dependency.
-    const aoahid_error_detail prior = *aoahid_last_error();
+    // The Context finishes the teardown once the callbacks have run (nodes and retained Specs are
+    // their user_data); aoahid_context_poll and aoahid_context_destroy report its errors.
     aoa::detail::log_event(context, AOAHID_LOG_INFO, "device_close_pending", device, nullptr,
                            aoa::detail::LogEventStatus{AOAHID_CLOSE_PENDING});
-    set_error(AOAHID_CLOSE_PENDING, "device.close",
-              "The Device was consumed and moved to the Context graveyard until terminal callbacks "
-              "drain.",
-              prior.transport_status, prior.aoa_request, prior.node_id, prior.report_id,
-              prior.offset, prior.length);
-    // Publication is the last operation that may touch the Device. In
-    // internal-thread mode the event thread may reap it immediately.
+    aoa::detail::clear_error();
+    // In internal-thread mode the event thread may reap the Device as soon as it is published.
     park_in_graveyard(context, device);
-    return AOAHID_CLOSE_PENDING;
+    return AOAHID_OK;
 }
 AOAHID_C_RESULT_CATCH("device.close")
 
@@ -2226,28 +2159,25 @@ aoahid_result AOAHID_CALL aoahid_channel_close(aoahid_channel* channel,
             return AOAHID_CLOSE_PENDING;
         }
         if (device->context->options.event_mode == AOAHID_EVENT_CALLER_POLL) {
-            const aoahid_result poll = device->context->runtime->poll(1U);
-            if (poll != AOAHID_OK) {
-                return finish_transport_result(poll, "context.poll",
-                                               "libusb event handling failed.");
+            if (device->context->runtime->poll(1U) != AOAHID_OK) {
+                set_error(AOAHID_CLOSE_PENDING, "channel.close",
+                          "libusb event handling failed before the cancelled Bulk transfers "
+                          "completed; the Channel remains caller-owned.",
+                          aoa::transport::last_error().native_status);
+                return AOAHID_CLOSE_PENDING;
             }
         } else {
-            // Cold path: cancellation completes on the event thread.
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
-    // Best effort: a report still in flight at the deadline does not keep the
-    // Channel open.
+    // A report still in flight at the deadline does not keep the Channel open.
     aoahid_result poll = AOAHID_OK;
-    if (!wait_for_report_drain(device, deadline, &poll) && poll != AOAHID_OK) {
-        return finish_transport_result(poll, "context.poll", "libusb event handling failed.");
-    }
+    static_cast<void>(wait_for_report_drain(device, deadline, &poll));
     auto& channels = device->channels;
     channels.erase(std::remove(channels.begin(), channels.end(), channel), channels.end());
     release_channel_storage(channel);
     aoa::detail::log_event(device->context, AOAHID_LOG_INFO, "channel_close", device, nullptr);
-    aoa::detail::clear_error();
-    return AOAHID_OK;
+    return finish_transport_result(poll, "context.poll", "libusb event handling failed.");
 }
 AOAHID_C_RESULT_CATCH("channel.close")
 
@@ -2411,15 +2341,14 @@ aoahid_result AOAHID_CALL aoahid_context_destroy_blocking(
     const std::uint32_t drain_timeout_ms, const std::uint32_t timeout_ms) try {
     AOAHID_SERIALIZED_PROBE(context, "aoahid_context_destroy_blocking");
     aoa::detail::clear_error();
-    if (context != nullptr && (!timeout_is_set(control_timeout_ms, "control_timeout_ms") ||
-                               !timeout_is_set(drain_timeout_ms, "drain_timeout_ms"))) {
-        return AOAHID_ERR_UNSET_FIELD;
-    }
-    if (context == nullptr || timeout_ms == 0U) {
-        set_error(AOAHID_ERR_PARAM, context == nullptr ? "context.destroy" : "timeout_ms",
-                  context == nullptr ? "The Context handle is null."
-                                     : "A nonzero destroy deadline is required.");
+    if (context == nullptr) {
+        set_error(AOAHID_ERR_PARAM, "context.destroy", "The Context handle is null.");
         return AOAHID_ERR_PARAM;
+    }
+    if (!timeout_is_set(control_timeout_ms, "control_timeout_ms") ||
+        !timeout_is_set(drain_timeout_ms, "drain_timeout_ms") ||
+        !timeout_is_set(timeout_ms, "timeout_ms")) {
+        return AOAHID_ERR_UNSET_FIELD;
     }
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
     aoa::detail::DeferredError observed{};
@@ -2479,12 +2408,12 @@ aoahid_result AOAHID_CALL aoahid_context_destroy_blocking(
     } else {
         static_cast<void>(peek_context_error(context, &deferred));
     }
-    set_error(AOAHID_ERR_TIMEOUT, "context.destroy",
+    set_error(AOAHID_CLOSE_PENDING, "context.destroy",
               "Teardown did not drain before the deadline; the Context remains caller-owned.",
               deferred.transport.native_status, deferred.transport.aoa_request,
               deferred.transport.hid_id, deferred.report_id, deferred.transport.offset,
               deferred.transport.length);
-    return AOAHID_ERR_TIMEOUT;
+    return AOAHID_CLOSE_PENDING;
 }
 AOAHID_C_RESULT_CATCH("context.destroy_blocking")
 

@@ -19,5 +19,24 @@ int main() {
         aoahid::last_error() != aoahid_last_error()) {
         return 1;
     }
+
+    const aoahid_device_options device = aoahid::device_options();
+    if (device.struct_size != sizeof(device) || device.interface_number != -1 ||
+        aoahid::channel_options().read_mode != AOAHID_CHANNEL_READ_REQUEST) {
+        return 1;
+    }
+
+    const aoahid_keyboard_options keyboard = aoahid::keyboard_options();
+    aoahid_spec* raw_spec = nullptr;
+    if (aoahid::spec_create_keyboard(&keyboard, &raw_spec) != AOAHID_OK) {
+        return 1;
+    }
+    const aoahid::SpecPtr spec{raw_spec};
+    aoahid_capability_manifest manifest = aoahid::capability_manifest();
+    if (aoahid::spec_manifest(spec.get(), &manifest) != AOAHID_OK ||
+        manifest.profile_kind != AOAHID_PROFILE_KEYBOARD) {
+        return 1;
+    }
+    const aoahid::DiscoveryPtr empty{};
     return 0;
 }

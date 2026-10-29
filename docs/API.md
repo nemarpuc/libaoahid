@@ -285,8 +285,8 @@ HID on EP0 is unaffected.
 
 | `read_mode` | IN transfers | Use when |
 |---|---|---|
-| `AOAHID_CHANNEL_READ_STREAM` (0) | `in_transfers` transfers of `transfer_bytes` stay submitted. | The device ends every message with a short or zero-length packet, or `transfer_bytes` is one `wMaxPacketSize`. |
-| `AOAHID_CHANNEL_READ_REQUEST` (1) | A read with nothing buffered submits one transfer of its `capacity` rounded up to `wMaxPacketSize` (at most `transfer_bytes`). `in_transfers` is ignored. | The protocol states each length up front, as ADB does. |
+| `AOAHID_CHANNEL_READ_STREAM` (1) | `in_transfers` transfers of `transfer_bytes` stay submitted. | The device ends every message with a short or zero-length packet, or `transfer_bytes` is one `wMaxPacketSize`. |
+| `AOAHID_CHANNEL_READ_REQUEST` (2) | A read with nothing buffered submits one transfer of its `capacity` rounded up to `wMaxPacketSize` (at most `transfer_bytes`). `in_transfers` is ignored. | The protocol states each length up front, as ADB does. |
 
 A Bulk IN transfer completes only when full or on a short packet. In stream
 mode, a message whose length is a multiple of `wMaxPacketSize` and is not
