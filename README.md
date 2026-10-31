@@ -7,7 +7,7 @@ an Android device over a plain USB cable. The device needs no root, no app,
 and no USB debugging: it sees an ordinary USB keyboard or touchscreen.
 Windows and Linux, and macOS builds that are not yet tested with a device;
 usable from C, C++, Python, C#, and Rust.
-
+[![libaoahid demo](https://img.youtube.com/vi/PP3kDM2asvw/maxresdefault.jpg)](https://youtu.be/PP3kDM2asvw)
 `libaoahid` is a C++20 library with a stable C ABI. It drives the HID feature
 of [Android Open Accessory 2.0](https://source.android.com/docs/core/interaction/accessories/aoa2)
 over libusb. You describe each input device (ranges, bit widths, Report IDs,
