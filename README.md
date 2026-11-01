@@ -8,6 +8,12 @@ and no USB debugging: it sees an ordinary USB keyboard or touchscreen.
 Windows and Linux, and macOS builds that are not yet tested with a device;
 usable from C, C++, Python, C#, and Rust.
 
+Sister library of [`libmimhid`](https://github.com/nemarpuc/libmimhid), which
+sends the same kind of input to any USB target (a PC, a console, and so on)
+through a microcontroller board, with no Android phone needed. The C ABI and
+C++ header follow the same shape, so code moves between the two with few
+changes; see [Moving between libaoahid and libmimhid](https://github.com/nemarpuc/libmimhid#moving-between-libaoahid-and-libmimhid).
+
 
 
 https://github.com/user-attachments/assets/f6a93ffe-34ea-438b-a09f-d6c55a1f5e23
