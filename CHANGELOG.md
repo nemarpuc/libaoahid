@@ -3,9 +3,12 @@
 All notable changes to libaoahid are recorded here. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.3] - 2026-11-02
 
-Build layout brought in line with libmimhid. The library, the C ABI and the wire behavior are unchanged.
+Not hardware-verified: the library, its ABI and its behavior are those of 2.0.2.
+The changes are in the build files, the examples, the tests and the tooling; the
+release archives carry the new `examples/CMakeLists.txt` and `examples/cpp/`. The
+build layout is now the one libmimhid has.
 
 ### Added
 

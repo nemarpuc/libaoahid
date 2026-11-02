@@ -10,10 +10,16 @@ if(NOT PROJECT_NAME)
 endif()
 
 # Inside the libaoahid build the executables carry the same sanitizer instrumentation as the
-# library; against an installed package there is nothing to instrument.
+# library and sit next to its DLL; against an installed package there is nothing to do.
 function(aoahid_example_instrument target)
   if(COMMAND aoahid_instrument_executable)
     aoahid_instrument_executable(${target})
+  endif()
+  # Windows finds aoahid.dll only next to the executable, and CTest runs the examples from the
+  # build tree: build them where the library is.
+  if(WIN32 AND TARGET aoahid)
+    set_target_properties(${target} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "$<TARGET_FILE_DIR:aoahid>")
   endif()
 endfunction()
 
