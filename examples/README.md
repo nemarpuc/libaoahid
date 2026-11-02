@@ -44,6 +44,19 @@ cc -std=c17 -O2 -Iinclude $EX/c/verify/verify_all.c      lib/libaoahid.a -lstdc+
 cc -std=c17 -O2 -Iinclude $EX/c/verify/verify_accessory.c lib/libaoahid.a -lstdc++ -lusb-1.0 -lpthread -o verify_accessory
 ```
 
+## C++ example
+
+`examples/cpp/multitouch_gesture.cpp` includes `aoahid.hpp` (C++20) and opens the first phone
+found:
+
+```sh
+EX=share/doc/libaoahid/examples
+c++ -std=c++20 -O2 -Iinclude $EX/cpp/multitouch_gesture.cpp lib/libaoahid.a -lusb-1.0 -lpthread -o multitouch_gesture
+```
+
+With CMake, `examples/CMakeLists.txt` builds every example against an installed package
+(`find_package(aoahid REQUIRED)`), or from a source checkout with `-DAOAHID_BUILD_EXAMPLES=ON`.
+
 If you downloaded the **shared** package instead (`lib/libaoahid.so` /
 `aoahid.dll`), replace `lib/libaoahid.a` with `-Llib -laoahid` in every
 command above, and make sure the shared library is on your loader's search

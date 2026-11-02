@@ -3,6 +3,20 @@
 All notable changes to libaoahid are recorded here. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Build layout brought in line with libmimhid. The library, the C ABI and the wire behavior are unchanged.
+
+### Added
+
+- `AOAHID_WERROR`, on by default, which keeps the warnings-as-errors the build always had and lets a build with a newer compiler turn it off.
+- `examples/CMakeLists.txt`: the examples build on their own against an installed package (`find_package(aoahid)`) as well as from the source tree; the targets and CTest names are those of before.
+- `examples/cpp/multitouch_gesture.cpp`: a C++ example of `aoahid.hpp`, built as `aoahid_example_cpp`.
+
+### Fixed
+
+- `docs/EXAMPLES.md` said the verification programs are seven; they are six.
+
 ## [2.0.2] - 2026-11-02
 
 Not hardware-verified: the library, its ABI and its behavior are those of 2.0.1.

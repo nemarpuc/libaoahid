@@ -129,6 +129,11 @@ For deterministic transport tests, configure with
 `ctest --test-dir build -C Release --output-on-failure`. The fake backend is
 test code and is never enabled in a release build.
 
+`AOAHID_BUILD_TESTS` and `AOAHID_BUILD_EXAMPLES` are off by default.
+`AOAHID_WERROR` (on by default) makes compiler warnings errors in the library, the tests and the
+ABI checks; turn it off when a newer compiler than CI's warns about code that is correct.
+`examples/CMakeLists.txt` also builds the examples against an installed package on its own.
+
 ### ThreadSanitizer and low-overhead checks
 
 On Linux with GCC or Clang:

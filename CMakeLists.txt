@@ -11,6 +11,7 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include(cmake/aoahid-check-libusb.cmake)
 
+option(AOAHID_WERROR "Treat compiler warnings as errors." ON)
 option(AOAHID_BUILD_SHARED "Build the shared library." ON)
 option(AOAHID_BUILD_STATIC "Build the static library." ON)
 option(AOAHID_BUILD_TESTS "Build tests." OFF)
@@ -185,11 +186,11 @@ function(aoahid_add_objects target export_api)
   endif()
 
   if(MSVC)
-    target_compile_options(${target} PRIVATE /W4 /WX /permissive- /EHsc /GR- /utf-8)
+    target_compile_options(${target} PRIVATE /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /permissive- /EHsc /GR- /utf-8)
   else()
     target_compile_options(${target} PRIVATE
         -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow
-        -Werror -fno-rtti -fvisibility=hidden)
+        $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fno-rtti -fvisibility=hidden)
   endif()
 
   if(AOAHID_INSTRUMENT_COMPILE_OPTIONS)
@@ -397,10 +398,10 @@ if(AOAHID_BUILD_TESTS)
         CXX_EXTENSIONS NO)
     if(MSVC)
       target_compile_options(aoahid_windows_libusb_minmax_compile PRIVATE
-          /W4 /WX /permissive- /EHsc /GR- /utf-8 /UNOMINMAX)
+          /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /permissive- /EHsc /GR- /utf-8 /UNOMINMAX)
     else()
       target_compile_options(aoahid_windows_libusb_minmax_compile PRIVATE
-          -Wall -Wextra -Wpedantic -Werror -fno-rtti -UNOMINMAX)
+          -Wall -Wextra -Wpedantic $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fno-rtti -UNOMINMAX)
     endif()
     add_test(NAME aoahid.windows-libusb-minmax
         COMMAND aoahid_windows_libusb_minmax_compile)
@@ -412,10 +413,10 @@ if(AOAHID_BUILD_TESTS)
       C_STANDARD_REQUIRED YES
       C_EXTENSIONS NO)
   if(MSVC)
-    target_compile_options(aoahid_abi_layout_oracle PRIVATE /W4 /WX /utf-8)
+    target_compile_options(aoahid_abi_layout_oracle PRIVATE /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /utf-8)
   else()
     target_compile_options(aoahid_abi_layout_oracle PRIVATE
-        -Wall -Wextra -Wpedantic -Werror -fshort-enums)
+        -Wall -Wextra -Wpedantic $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fshort-enums)
   endif()
   aoahid_instrument_executable(aoahid_abi_layout_oracle)
   add_test(
@@ -431,10 +432,10 @@ if(AOAHID_BUILD_TESTS)
       C_STANDARD_REQUIRED YES
       C_EXTENSIONS NO)
   if(MSVC)
-    target_compile_options(aoahid_c_abi_test PRIVATE /W4 /WX /utf-8)
+    target_compile_options(aoahid_c_abi_test PRIVATE /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /utf-8)
   else()
     target_compile_options(aoahid_c_abi_test PRIVATE
-        -Wall -Wextra -Wpedantic -Werror -fshort-enums)
+        -Wall -Wextra -Wpedantic $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fshort-enums)
   endif()
   aoahid_instrument_executable(aoahid_c_abi_test)
   add_test(NAME aoahid.c-abi COMMAND aoahid_c_abi_test)
@@ -447,10 +448,10 @@ if(AOAHID_BUILD_TESTS)
       CXX_EXTENSIONS NO)
   if(MSVC)
     target_compile_options(aoahid_cpp_wrapper_test PRIVATE
-        /W4 /WX /permissive- /EHsc /GR- /utf-8)
+        /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /permissive- /EHsc /GR- /utf-8)
   else()
     target_compile_options(aoahid_cpp_wrapper_test PRIVATE
-        -Wall -Wextra -Wpedantic -Werror -fno-rtti)
+        -Wall -Wextra -Wpedantic $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fno-rtti)
   endif()
   aoahid_instrument_executable(aoahid_cpp_wrapper_test)
   add_test(NAME aoahid.cpp-wrapper COMMAND aoahid_cpp_wrapper_test)
@@ -465,9 +466,9 @@ if(AOAHID_BUILD_TESTS)
   target_include_directories(aoahid_tests PRIVATE include src tests tests/fake_libusb)
   set_target_properties(aoahid_tests PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED YES)
   if(MSVC)
-    target_compile_options(aoahid_tests PRIVATE /W4 /WX /EHsc /GR-)
+    target_compile_options(aoahid_tests PRIVATE /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /EHsc /GR-)
   else()
-    target_compile_options(aoahid_tests PRIVATE -Wall -Wextra -Wpedantic -Werror -fno-rtti)
+    target_compile_options(aoahid_tests PRIVATE -Wall -Wextra -Wpedantic $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fno-rtti)
   endif()
   aoahid_instrument_executable(aoahid_tests)
   add_test(NAME aoahid.unit-and-integration COMMAND aoahid_tests)
@@ -483,10 +484,10 @@ if(AOAHID_BUILD_TESTS)
       CXX_EXTENSIONS NO)
   if(MSVC)
     target_compile_options(aoahid_internal_thread_test PRIVATE
-        /W4 /WX /permissive- /EHsc /GR- /utf-8)
+        /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /permissive- /EHsc /GR- /utf-8)
   else()
     target_compile_options(aoahid_internal_thread_test PRIVATE
-        -Wall -Wextra -Wpedantic -Werror -fno-rtti)
+        -Wall -Wextra -Wpedantic $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fno-rtti)
   endif()
   aoahid_instrument_executable(aoahid_internal_thread_test)
   add_test(NAME aoahid.internal-thread COMMAND aoahid_internal_thread_test)
@@ -503,10 +504,10 @@ if(AOAHID_BUILD_TESTS)
         CXX_EXTENSIONS NO)
     if(MSVC)
       target_compile_options(aoahid_serialization_check_test PRIVATE
-          /W4 /WX /permissive- /EHsc /GR- /utf-8)
+          /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /permissive- /EHsc /GR- /utf-8)
     else()
       target_compile_options(aoahid_serialization_check_test PRIVATE
-          -Wall -Wextra -Wpedantic -Werror -fno-rtti)
+          -Wall -Wextra -Wpedantic $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fno-rtti)
     endif()
     aoahid_instrument_executable(aoahid_serialization_check_test)
     add_test(NAME aoahid.serialization-check-ok
@@ -530,11 +531,11 @@ if(AOAHID_BUILD_TESTS)
       CXX_EXTENSIONS NO)
   if(MSVC)
     target_compile_options(aoahid_export_descriptors PRIVATE
-        /W4 /WX /permissive- /EHsc /GR- /utf-8)
+        /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /permissive- /EHsc /GR- /utf-8)
   else()
     target_compile_options(aoahid_export_descriptors PRIVATE
         -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow
-        -Werror -fno-rtti)
+        $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fno-rtti)
   endif()
   aoahid_instrument_executable(aoahid_export_descriptors)
   add_test(
@@ -555,68 +556,7 @@ if(AOAHID_BUILD_TESTS)
 endif()
 
 if(AOAHID_BUILD_EXAMPLES)
-  add_executable(aoahid_example_c examples/c/multi_profile.c)
-  target_link_libraries(aoahid_example_c PRIVATE aoahid::aoahid)
-  if(NOT WIN32)
-    find_package(Threads REQUIRED)
-    target_link_libraries(aoahid_example_c PRIVATE Threads::Threads)
-  endif()
-  aoahid_instrument_executable(aoahid_example_c)
-
-  # One example per aoahid_profile_kind value. Each builds a complete Spec and
-  # needs no device, so every one of them is runnable in CI.
-  set(AOAHID_PROFILE_EXAMPLES
-      keyboard
-      mouse
-      toggle
-      gamepad
-      touchscreen
-      touchpad
-      pen
-      digitizer
-      keyboard_battery
-      raw)
-  foreach(aoahid_profile_example IN LISTS AOAHID_PROFILE_EXAMPLES)
-    add_executable(aoahid_example_${aoahid_profile_example}
-        examples/c/profiles/${aoahid_profile_example}.c)
-    target_link_libraries(aoahid_example_${aoahid_profile_example} PRIVATE aoahid::aoahid)
-    set_target_properties(aoahid_example_${aoahid_profile_example} PROPERTIES
-        C_STANDARD 11
-        C_STANDARD_REQUIRED YES
-        C_EXTENSIONS NO)
-    aoahid_instrument_executable(aoahid_example_${aoahid_profile_example})
-    if(AOAHID_BUILD_TESTS)
-      string(REPLACE "_" "-" aoahid_profile_test_name "${aoahid_profile_example}")
-      add_test(NAME aoahid.example-profile-${aoahid_profile_test_name}
-          COMMAND aoahid_example_${aoahid_profile_example})
-    endif()
-  endforeach()
-
-  if(AOAHID_BUILD_TESTS)
-    add_test(NAME aoahid.example-c-shared COMMAND aoahid_example_c shared)
-    add_test(NAME aoahid.example-c-threaded COMMAND aoahid_example_c threaded)
-  endif()
-
-  # Human-observable real-device verification programs (docs/QUICKSTART.md).
-  # These need an actual phone and are meant to be watched, so unlike the
-  # examples above they are never registered as ctest cases.
-  set(AOAHID_VERIFY_EXAMPLES keyboard touch mouse toggle all accessory)
-  foreach(aoahid_verify_example IN LISTS AOAHID_VERIFY_EXAMPLES)
-    add_executable(aoahid_verify_${aoahid_verify_example}
-        examples/c/verify/verify_${aoahid_verify_example}.c)
-    target_link_libraries(aoahid_verify_${aoahid_verify_example} PRIVATE aoahid::aoahid)
-    target_include_directories(aoahid_verify_${aoahid_verify_example}
-        PRIVATE examples/c/verify)
-    if(NOT WIN32)
-      find_package(Threads REQUIRED)
-      target_link_libraries(aoahid_verify_${aoahid_verify_example} PRIVATE Threads::Threads m)
-    endif()
-    set_target_properties(aoahid_verify_${aoahid_verify_example} PROPERTIES
-        C_STANDARD 17
-        C_STANDARD_REQUIRED YES
-        C_EXTENSIONS NO)
-    aoahid_instrument_executable(aoahid_verify_${aoahid_verify_example})
-  endforeach()
+  add_subdirectory(examples)
 endif()
 
 if(AOAHID_BUILD_FUZZ AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")

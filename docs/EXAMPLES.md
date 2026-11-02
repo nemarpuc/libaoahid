@@ -84,6 +84,15 @@ The enumerate-only examples for the other languages are
 address, physical port path where the comprehensive form is used, VID/PID,
 product, and serial exactly as the discovery snapshot reports them.
 
+## C++ example
+
+`examples/cpp/multitouch_gesture.cpp` uses `aoahid.hpp`: it opens the first phone found, presents a
+two-contact touchscreen and spreads two fingers apart. It needs a phone, so CTest only builds it
+(`aoahid_example_cpp`). The C++ wrapper returns the same results as the C ABI; `aoahid::SpecPtr`
+and `aoahid::DiscoveryPtr` release a Spec and a discovery snapshot, and the Context, Device and
+Node are closed explicitly because their close calls take timeouts and can answer
+`AOAHID_CLOSE_PENDING`.
+
 ## Human-observable real-device verification programs
 
 `examples/c/verify/` is a third category: unlike `multi_profile.c` (an
@@ -99,7 +108,7 @@ and `verify_accessory.c` switches the phone to accessory mode first.
 They print what to do before they start (for example, focus a text field)
 and print a plain-language error instead of failing silently.
 `docs/QUICKSTART.md` is the full walkthrough these programs are built for;
-`CMakeLists.txt` builds all seven whenever `AOAHID_BUILD_EXAMPLES` is on, but
+`examples/CMakeLists.txt` builds all six whenever `AOAHID_BUILD_EXAMPLES` is on, but
 never registers them as CTest cases, since they need a physical phone and
 are meant to be watched rather than run unattended.
 
@@ -129,7 +138,7 @@ field is zero, and every required field is assigned. The
 immutable specs stay alive through reconnection and are released only after all
 Nodes have either closed or been handed to Device teardown.
 
-Build it by enabling `AOAHID_BUILD_EXAMPLES`, or compile it against an installed
+Build it by enabling `AOAHID_BUILD_EXAMPLES`, by configuring `examples/` on its own (`cmake -S examples -B build`, which runs `find_package(aoahid)`), or compile it against an installed
 CMake package target `aoahid::aoahid`. With no requested component, an installed
 package selects `shared` when present and otherwise selects `static`.
 `find_package(aoahid CONFIG REQUIRED COMPONENTS shared)` loads only the shared
