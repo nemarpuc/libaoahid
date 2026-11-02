@@ -238,11 +238,40 @@ value of a Null State field.
   `profiles`, `transport`, `identity`).
 - `tests/golden/*.hex` are the expected descriptors. A generator change that
   alters one of them changes what existing callers put on the wire.
-- `tests/abi/` and `tools/check_bindings.py` compare the C struct layout with
-  the layout oracle and with the Python, C#, and Rust bindings.
+- `tests/abi/` and the binding tests compare the C struct layout with the
+  layout oracle and with the Python, C#, and Rust bindings.
 - CI formats with clang-format 14 and lints with clang-tidy 14; a newer
   clang-format lays out some lines differently.
 - The `tsan` preset builds the tests and the C examples with ThreadSanitizer.
+
+## Language bindings
+
+`tools/bindings/generate.py` reads `include/aoahid.h` through
+`clang -Xclang -ast-dump=json` (structures, function pointer types, exported
+functions, enumerations) and `clang -E -dM` (integer macros). It writes the C
+layout oracle `tests/abi/layout_oracle.c` and, for each of Python, C#, and Rust,
+the declarations (`native.py`, `Native.cs`, `aoahid-sys/src/lib.rs`) and a layout
+test. Nothing in them is written by hand, so a change to the header is a
+regeneration, not a transcription. libmimhid uses the same file (the two copies
+differ only in the copyright line).
+
+- An enumeration is the anonymous `enum` after an `int32_t` typedef. It becomes
+  `int32_t` plus constants; in C# an `enum : int` whose members drop the prefix
+  they share. `CS_MEMBER_RENAMES` and `TYPE_RENAMES` hold the few names that are
+  not the C name with its prefix cut (`Result.Parameter`, `ReportId`,
+  `ClaimPolicy`); they exist because those names were already public.
+- Only exported functions are bound: `static inline` functions are skipped.
+- In C#, a function with a structure pointer has two forms with the same entry
+  point: `in`/`ref` for the common case, `nint` where `null` is allowed. An
+  array in a structure is a `fixed` buffer, which keeps the structure blittable.
+- The layout test of each language runs the oracle and compares every structure
+  size, field offset, and constant, and checks that a new options structure has
+  `struct_size` 0. `generate.py --check` fails when a committed file differs from
+  the header; CI runs it with `CLANG=clang-14`.
+- `bindings/python/tests/test_contract.py` is hand-written: what the package
+  exports, and that the binding fills no option field.
+- The generator refuses what it cannot bind (an unknown type, a field named like
+  a Python keyword, two types with one short name) instead of guessing.
 
 ## Version and release
 

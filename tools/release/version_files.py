@@ -60,7 +60,9 @@ class VersionSite:
         return text[:start] + replacement + text[end:]
 
 
-# Every location a release version must match. Order is documentation order,
+# Every location a release version must match. The constants inside the generated binding files
+# are not listed: they follow include/aoahid.h through tools/bindings/generate.py, whose --check
+# pins them. Order is documentation order,
 # not evaluation order.
 SITES: tuple[VersionSite, ...] = (
     VersionSite("CMakeLists.txt", r"project\(libaoahid VERSION (\d+\.\d+\.\d+)"),
@@ -70,52 +72,13 @@ SITES: tuple[VersionSite, ...] = (
     VersionSite("vcpkg.json", r'"version-semver":\s*"(\d+\.\d+\.\d+)"'),
     VersionSite("tools/docs/Doxyfile", r"^PROJECT_NUMBER\s*=\s*(\d+\.\d+\.\d+)\s*$"),
     VersionSite("bindings/python/pyproject.toml", r'^version = "(\d+\.\d+\.\d+)"$'),
-    VersionSite(
-        "bindings/python/aoahid/native.py", r"^AOAHID_VERSION_MAJOR = (\d+)$", "major"
-    ),
-    VersionSite(
-        "bindings/python/aoahid/native.py", r"^AOAHID_VERSION_MINOR = (\d+)$", "minor"
-    ),
-    VersionSite(
-        "bindings/python/aoahid/native.py", r"^AOAHID_VERSION_PATCH = (\d+)$", "patch"
-    ),
     VersionSite("bindings/csharp/AoaHid/AoaHid.csproj", r"<Version>(\d+\.\d+\.\d+)</Version>"),
-    VersionSite(
-        "bindings/csharp/AoaHid/Native.cs",
-        r"AOAHID_VERSION_MAJOR = (\d+);",
-        "major",
-    ),
-    VersionSite(
-        "bindings/csharp/AoaHid/Native.cs",
-        r"AOAHID_VERSION_MINOR = (\d+);",
-        "minor",
-    ),
-    VersionSite(
-        "bindings/csharp/AoaHid/Native.cs",
-        r"AOAHID_VERSION_PATCH = (\d+);",
-        "patch",
-    ),
     VersionSite("bindings/rust/aoahid/Cargo.toml", r'^version = "(\d+\.\d+\.\d+)"$'),
     VersionSite(
         "bindings/rust/aoahid/Cargo.toml",
         r'aoahid-sys = \{ path = "\.\./aoahid-sys", version = "(\d+\.\d+\.\d+)" \}',
     ),
     VersionSite("bindings/rust/aoahid-sys/Cargo.toml", r'^version = "(\d+\.\d+\.\d+)"$'),
-    VersionSite(
-        "bindings/rust/aoahid-sys/src/lib.rs",
-        r"AOAHID_VERSION_MAJOR: u32 = (\d+);",
-        "major",
-    ),
-    VersionSite(
-        "bindings/rust/aoahid-sys/src/lib.rs",
-        r"AOAHID_VERSION_MINOR: u32 = (\d+);",
-        "minor",
-    ),
-    VersionSite(
-        "bindings/rust/aoahid-sys/src/lib.rs",
-        r"AOAHID_VERSION_PATCH: u32 = (\d+);",
-        "patch",
-    ),
     VersionSite(
         "tests/abi/check_abi_golden.py",
         r'"AOAHID_VERSION_MAJOR": (\d+),',
@@ -130,11 +93,6 @@ SITES: tuple[VersionSite, ...] = (
         "tests/abi/check_abi_golden.py",
         r'"AOAHID_VERSION_PATCH": (\d+),',
         "patch",
-    ),
-    VersionSite("examples/rust/Cargo.toml", r'^version = "(\d+\.\d+\.\d+)"$'),
-    VersionSite(
-        "examples/rust/Cargo.toml",
-        r'aoahid-sys = \{ path = "\.\./\.\./bindings/rust/aoahid-sys", version = "(\d+\.\d+\.\d+)" \}',
     ),
 )
 

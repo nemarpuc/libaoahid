@@ -295,12 +295,15 @@ jobs:
 
       - name: Check preserved inputs, release metadata, and Python ABI layouts
         run: |
+          set -euo pipefail
+          sudo apt-get install --no-install-recommends -y clang-14
+          export CLANG=clang-14
           python tools/check_input_provenance.py
           python tools/check_public_contracts.py
           python tools/check_license_headers.py
-          python tools/check_bindings.py
+          python tools/bindings/generate.py --check
           python tests/release/test_release_tools.py
-          PYTHONPATH=bindings/python python -c "import runpy; s=runpy.run_path('bindings/python/tests/test_layout.py'); s['test_struct_size_is_not_filled_by_binding'](); s['test_context_options_exposes_explicit_choice_fields']()"
+          PYTHONPATH=bindings/python python bindings/python/tests/test_contract.py
 
       - name: Build API documentation for the exact source revision
         run: |
@@ -371,20 +374,18 @@ jobs:
             --target aoahid aoahid_abi_layout_oracle \
             --parallel
 
-      - name: Check binding declaration coverage and Python layout
+      - name: Check the generated bindings against the header, and the Python layout
         run: |
-          python tools/check_bindings.py
+          sudo apt-get install --no-install-recommends -y clang-14
+          export CLANG=clang-14
+          python tools/bindings/generate.py --check
+          PYTHONPATH=bindings/python python bindings/python/tests/test_contract.py
           PYTHONPATH=bindings/python \
             AOAHID_ABI_ORACLE="$PWD/build/bindings/aoahid_abi_layout_oracle" \
             python bindings/python/tests/test_layout.py
           PYTHONPATH=bindings/python \
             python examples/python/enumerate.py \
               "$PWD/build/bindings/libaoahid.so" 10
-          for mode in shared threaded; do
-            PYTHONPATH=bindings/python \
-              python examples/python/multi_profile.py \
-                "$PWD/build/bindings/libaoahid.so" 10 "$mode"
-          done
 
       - name: Check C# layout against compiled C
         run: >-
@@ -401,12 +402,6 @@ jobs:
             --project examples/csharp/Enumerate.csproj \
             --configuration Release \
             -- 10
-          for mode in shared threaded; do
-            dotnet run \
-              --project examples/csharp/MultiProfile/MultiProfile.csproj \
-              --configuration Release \
-              -- 10 "$mode"
-          done
 
       - name: Select exact Rust toolchain
         run: rustup toolchain install 1.89.0 --profile minimal --no-self-update
@@ -420,10 +415,6 @@ jobs:
           cargo +1.89.0 test --manifest-path bindings/rust/Cargo.toml --workspace --all-targets
           cargo +1.89.0 run --manifest-path bindings/rust/Cargo.toml \
             --package aoahid-sys --example enumerate -- 10
-          for mode in shared threaded; do
-            cargo +1.89.0 run --manifest-path examples/rust/Cargo.toml \
-              -- 10 "$mode"
-          done
 
   device-check-app:
     name: Android device-check application

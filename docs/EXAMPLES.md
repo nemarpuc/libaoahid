@@ -6,12 +6,11 @@ examples set every field themselves, since the initializers are inline C and
 not part of the binary ABI. The library itself never puts a value in place of a
 zero.
 
-## Multi-profile lifecycle examples
+## Multi-profile lifecycle example
 
-The comprehensive examples are `examples/c/multi_profile.c`,
-`examples/python/multi_profile.py`,
-`examples/csharp/MultiProfile/Program.cs`, and
-`examples/rust/src/main.rs`. Each exposes `shared` and `threaded` modes.
+The comprehensive example is `examples/c/multi_profile.c`. It exposes `shared`
+and `threaded` modes. The Python, C# and Rust examples only enumerate (see
+below); the full life cycle is shown once, in C.
 
 In `shared` mode, a runtime-sized collection holds every device from one
 point-in-time discovery. The example builds one immutable keyboard, mouse, and
@@ -79,7 +78,7 @@ The expected target-event strings
 in the toggle allow-list are placeholders: a product should use the event names
 it actually observes on its own target.
 
-The smaller enumerate-only examples remain available at
+The enumerate-only examples for the other languages are
 `examples/python/enumerate.py`, `examples/csharp/Program.cs`, and
 `bindings/rust/aoahid-sys/examples/enumerate.rs`. They print bus, current USB
 address, physical port path where the comprehensive form is used, VID/PID,
@@ -190,15 +189,12 @@ detail on the same calling thread.
 
 ## Threading references
 
-Official documentation for the threading calls the examples use:
+Official documentation for the threading calls `multi_profile.c` uses:
 
 | Scope | Official source | Section or symbol used |
 |---|---|---|
 | POSIX hosts | https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_create.html and https://pubs.opengroup.org/onlinepubs/9799919799/functions/pthread_join.html | `pthread_create`, `pthread_join` |
 | Windows hosts only | https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/beginthread-beginthreadex?view=msvc-170, https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createthread, and https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject | `_beginthreadex` for a worker that uses the CRT; `WaitForSingleObject` and `CloseHandle` for its returned handle |
-| Python 3.9 minimum and CI's Python 3.13 | https://docs.python.org/3.9/library/threading.html and https://docs.python.org/3.13/library/threading.html | `threading.Thread.start`, `Thread.join`, non-daemon cleanup |
-| .NET | https://learn.microsoft.com/en-us/dotnet/api/system.threading.thread.start?view=net-8.0 and https://learn.microsoft.com/en-us/dotnet/api/system.threading.thread.join?view=net-8.0 | `Thread.Start`, `Thread.Join` |
-| Rust | https://doc.rust-lang.org/std/thread/fn.scope.html | `std::thread::scope` and joined scoped workers |
 
 The published Python wheel and NuGet package contain declarations only. The
 Python caller passes the exact shared-library path to `aoahid.load`; the .NET

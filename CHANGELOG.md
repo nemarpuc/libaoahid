@@ -3,6 +3,20 @@
 All notable changes to libaoahid are recorded here. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-11-02
+
+Not hardware-verified: the library, its ABI and its behavior are those of 2.0.1.
+The changes are in the language bindings, the examples and the tooling, and are
+tested against the fake libusb backend and the compiled C ABI.
+
+### Changed
+
+- The Python, C#, and Rust declarations and `tests/abi/layout_oracle.c` are generated from `include/aoahid.h` by `tools/bindings/generate.py`; `tools/check_bindings.py` is gone, replaced by `generate.py --check`. Public names are unchanged. Additions: the three `AOAHID_*_TIMEOUT_MS` constants in the layout oracle and the bindings, the C# `nint` forms of the functions that take a structure pointer, and in C# the `AbiStructs` dictionary and `fixed` buffers for array fields. The C# `AbiConstants` values are `long`. `sync_version.py` now runs the generator.
+
+### Removed
+
+- The Python, C# and Rust `multi_profile` examples (`examples/python/multi_profile.py`, `examples/csharp/MultiProfile/`, `examples/rust/`, together about 2,200 lines) and the CI steps that ran them. The life cycle with reconnection and threads is shown once, in `examples/c/multi_profile.c`; each other language keeps its short enumerate example. The bindings keep their public names.
+
 ## [2.0.1] - 2026-10-30
 
 Not hardware-verified: only comments in `aoahid.h` change. The library, its ABI

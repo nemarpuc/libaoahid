@@ -199,8 +199,9 @@ callbacks have run.
   the header, so they add nothing to the binary ABI.
 - `AOAHID_VERSION_MAJOR/MINOR/PATCH` and `aoahid_version()` report the version.
 - Layout is guarded by `tests/abi` (C and C++ ABI tests, a layout oracle, and
-  `check_abi_golden.py`) and by `tools/check_bindings.py`, which checks that the
-  Python, C#, and Rust bindings mirror the C structs.
+  `check_abi_golden.py`) and by the generated bindings: the Python, C#, and
+  Rust declarations come from `aoahid.h` through `tools/bindings/generate.py`,
+  and each language compares its layout with the oracle.
 - The library is built with `-fvisibility=hidden`; only `AOAHID_API` symbols
   are exported.
 

@@ -61,7 +61,8 @@ does not link). See `docs/PORTING.md` for platform-specific notes.
 
 ## Python, Rust, and C# examples
 
-See `examples/python/`, `examples/rust/`, and `examples/csharp/` directly;
-each has its own build file (`Cargo.toml`, `.csproj`) that names the exact
-dependency versions it was written against. `docs/EXAMPLES.md` in this
+Each is a short enumerate-only program: `examples/python/enumerate.py`,
+`examples/csharp/Enumerate.csproj`, and the Rust one at
+`bindings/rust/aoahid-sys/examples/enumerate.rs`. The `.csproj` and
+`Cargo.toml` name the exact dependency versions they were written against. `docs/EXAMPLES.md` in this
 package explains what each example demonstrates.

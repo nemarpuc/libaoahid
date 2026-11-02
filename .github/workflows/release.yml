@@ -47,7 +47,6 @@ jobs:
           test "$source_commit" = "$(git rev-parse "${GITHUB_SHA}^{commit}")"
           python tools/check_input_provenance.py
           python tools/check_public_contracts.py
-          python tools/check_bindings.py
           python tests/release/test_release_tools.py
           python tools/release/validate_release.py --tag "${GITHUB_REF_NAME}" --notes-out build/release-notes.md
           python tools/symbol-lint/symbol_lint.py --header include/aoahid.h
@@ -1095,7 +1094,6 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse "${GITHUB_REF_NAME}^{commit}")" = "$(git rev-parse "${GITHUB_SHA}^{commit}")"
           python tools/check_input_provenance.py
-          python tools/check_bindings.py
           python tools/release/validate_release.py --tag "$GITHUB_REF_NAME" --notes-out build/release-notes.md
           python tools/release/collect_release.py \
             --directory dist \

@@ -195,7 +195,7 @@ class VersionSyncTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             self._copy_tracked_files(root)
-            with mock.patch("sys.argv", ["sync_version.py", "1.2.3", "--root", str(root)]):
+            with mock.patch("sys.argv", ["sync_version.py", "1.2.3", "--root", str(root), "--no-generate"]):
                 exit_code = sync_version.main()
             self.assertEqual(exit_code, 0)
             after = version_files.assembled_versions(root)
