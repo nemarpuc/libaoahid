@@ -12,6 +12,7 @@ Build layout brought in line with libmimhid. The library, the C ABI and the wire
 - `AOAHID_WERROR`, on by default, which keeps the warnings-as-errors the build always had and lets a build with a newer compiler turn it off.
 - `examples/CMakeLists.txt`: the examples build on their own against an installed package (`find_package(aoahid)`) as well as from the source tree; the targets and CTest names are those of before.
 - `examples/cpp/multitouch_gesture.cpp`: a C++ example of `aoahid.hpp`, built as `aoahid_example_cpp`.
+- `tools/check_input_provenance.py` also fails when the README, CONTRIBUTING or the docs name an `AOAHID_*` build option (in a `-D` argument or, for option-shaped names, in code quotes) that the CMake files do not declare; it used to check only the spelling of the prefix.
 
 ### Fixed
 
