@@ -37,7 +37,7 @@ makes no timing claims that were not measured.
 - Relative axes retain 64-bit pending totals and emit bounded field-sized
   fragments; completion consumes exactly the submitted fragment.
 - No callback sleeps, and the library never sleeps to retry. A STALLed report
-  stays pending for the caller's own resend ([API.md](API.md#submission-semantics)).
+  stays pending for the caller's own resend ([API.md](API.md#submission)).
 - An internal event-pump failure is followed by an interruptible 10 ms
   condition-variable wait, preventing an immediately failing backend from
   turning that error path into a busy loop.

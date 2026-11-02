@@ -66,6 +66,8 @@ libusb0). Two things commonly get in the way:
   ```
 
   and close any app that might restart it (Android Studio, scrcpy, Vysor).
+  To use `adb` on the same phone while your program runs, see
+  [ADB on the same phone](../README.md#adb-on-the-same-phone).
 - The manufacturer installed its own driver instead of WinUSB. Samsung
   devices are one example: HID can work while a Channel on the ADB interface
   fails with libusb status `-12` (`LIBUSB_ERROR_NOT_SUPPORTED`). Replacing the

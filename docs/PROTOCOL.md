@@ -118,10 +118,8 @@ The request implementations are in `src/transport/discovery.cpp` (51 probe),
 
 ## Hardware status
 
-Input has been confirmed working on a Samsung Galaxy Tab S11 and a POCO F6
-Pro, from Windows 10 x64 and Arch Linux hosts, for touchscreen, keyboard,
-mouse, gamepad, and media keys. Pen and the other profiles have not been
-tested on hardware yet.
+Which devices, hosts, and profiles have been confirmed on real hardware is
+recorded in [TARGET_MATRIX.md](TARGET_MATRIX.md).
 
 See also: [README.md](https://github.com/nemarpuc/libaoahid#readme), [ARCHITECTURE.md](ARCHITECTURE.md),
 [QUICKSTART.md](QUICKSTART.md), [LIMITS.md](LIMITS.md).

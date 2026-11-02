@@ -73,7 +73,8 @@ adb kill-server
 ```
 
 and close Android Studio, Vysor, scrcpy, or anything else that restarts the
-server.
+server. To keep `adb` working on the same phone while your application runs,
+use [aoahid_adb_proxy](../README.md#adb-on-the-same-phone).
 
 Some manufacturers bind their own driver instead of WinUSB. On a Samsung Galaxy
 Tab S11 with Samsung's `dg_ssudbus` driver under Windows 10 x64, HID worked

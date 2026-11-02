@@ -234,8 +234,6 @@ clang-format, clang-tidy, the symbol lint, and the `tools/check_*.py` scripts.
 
 ## Hardware status
 
-Input has been confirmed on real hardware (Samsung Galaxy Tab S11 and POCO F6
-Pro, from Windows 10 x64 and Arch Linux hosts) for the touchscreen, keyboard,
-mouse, gamepad, and media-key profiles. Pen and the other profiles have not
-been tested on hardware yet. See [TARGET_MATRIX.md](TARGET_MATRIX.md) and
+Which devices, hosts, and profiles have been confirmed on real hardware is
+recorded in [TARGET_MATRIX.md](TARGET_MATRIX.md); the profiles are described in
 [PROFILES.md](PROFILES.md).

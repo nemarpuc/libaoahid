@@ -283,6 +283,15 @@ differ only in the copyright line).
 - A pushed `v*` tag runs `.github/workflows/release.yml`, which builds and
   publishes the GitHub Release. The PyPI and NuGet jobs run only when the
   repository variable `AOAHID_PUBLISH_BINDINGS` is `true`.
+- Registry publication also needs setup by the repository owner: PyPI Trusted
+  Publishing for the `aoahid` project and workflow, and a scoped `NUGET_API_KEY`
+  secret with authority for the `AoaHid` package ID. This source tree does not
+  establish registry ownership. Neither package contains native libraries, so
+  users still install a version-matched shared archive from the GitHub Release.
+- The same workflow always builds, byte-rebuilds, installs, and validates the
+  wheel and the NuGet package before the native GitHub Release job can publish.
+  A workflow failure cannot undo an already-pushed tag; it prevents creation of
+  the GitHub Release and its assets.
 - Downstream projects pin a libaoahid release by tag in their own CI, and
   download its release assets, so a tag must exist before they can move to it.
 
