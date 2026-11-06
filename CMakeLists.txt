@@ -2,7 +2,7 @@
 # Copyright (c) 2026 libaoahid contributors
 cmake_minimum_required(VERSION 3.20)
 
-project(libaoahid VERSION 2.0.3
+project(libaoahid VERSION 2.0.4
     DESCRIPTION "Explicit host-side Android Open Accessory HID input library"
     HOMEPAGE_URL "https://github.com/nemarpuc/libaoahid"
     LANGUAGES C CXX)
@@ -108,8 +108,14 @@ if(AOAHID_BUILD_TESTS AND NOT AOAHID_USE_FAKE_LIBUSB)
 endif()
 
 set(AOAHID_SOURCES
-    src/api/c_api.cpp
+    src/api/c_api_channel.cpp
+    src/api/c_api_context.cpp
+    src/api/c_api_device.cpp
+    src/api/c_api_node.cpp
+    src/api/c_api_send.cpp
+    src/api/context_ops.cpp
     src/api/error_detail.cpp
+    src/api/node_ops.cpp
     src/hid/item_writer.cpp
     src/hid/descriptor_builder.cpp
     src/hid/validator.cpp

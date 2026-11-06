@@ -3,6 +3,21 @@
 All notable changes to libaoahid are recorded here. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.4] - 2026-11-06
+
+Not hardware-verified: the library, its ABI and its behavior are those of 2.0.3.
+The only change is the layout of the sources.
+
+### Changed
+
+- `src/api/c_api.cpp` (2,427 lines) is split by what an entry point works on:
+  `c_api_context.cpp` (Context and event thread), `c_api_device.cpp` (discovery,
+  accessory start, Devices), `c_api_node.cpp`, `c_api_send.cpp` and
+  `c_api_channel.cpp`. Their shared internals are in `context_ops.cpp` (deferred
+  errors, option checks, the graveyard, HID ID allocation) and `node_ops.cpp`
+  (report state, drain and teardown), declared in `support.hpp`. The exported
+  functions are the same 53.
+
 ## [2.0.3] - 2026-11-02
 
 Not hardware-verified: the library, its ABI and its behavior are those of 2.0.2.

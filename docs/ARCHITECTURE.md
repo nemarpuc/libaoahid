@@ -211,7 +211,7 @@ callbacks have run.
 | --- | --- |
 | `include/aoahid.h` | The stable C ABI, with per-function ownership, blocking, synchronization, and result contracts. |
 | `include/aoahid.hpp` | Header-only C++ forwarders to the C ABI (namespace `aoahid`). |
-| `src/api/` | `c_api.cpp` (ABI boundary, lifetimes, HID ID allocation, event thread), `error_detail.cpp` (thread-local error record, struct validation). |
+| `src/api/` | the ABI boundary in `c_api_context.cpp` (Context and event thread), `c_api_device.cpp` (discovery, accessory start, Devices), `c_api_node.cpp`, `c_api_send.cpp` and `c_api_channel.cpp`; their shared internals in `context_ops.cpp` (deferred errors, option checks, graveyard, HID ID allocation) and `node_ops.cpp` (report state, drain and teardown), declared in `support.hpp`; `error_detail.cpp` (thread-local error record, struct validation). |
 | `src/hid/` | Item writer, descriptor builder, descriptor validator, report layout. |
 | `src/profiles/` | `spec.cpp` (Spec factories and descriptor generation), `state.cpp` (per-Node report state machines and serialization). |
 | `src/transport/` | `discovery.cpp` (runtime, event pumping, request-51 probing), `port.cpp` (shared USB handle, accessory start), `transport.cpp` (requests 54–57, transfer pool), `channel.cpp` (bulk Channels). |
