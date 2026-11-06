@@ -228,7 +228,7 @@ class SourcePackageTests(unittest.TestCase):
             "README.md": "# libaoahid\n",
             "LICENSE": "fixture license\n",
             "include/aoahid.h": "#pragma once\n",
-            "src/api/c_api.cpp": "int fixture;\n",
+            "src/api/c_api_context.cpp": "int fixture;\n",
             ".github/workflows/release.yml": "name: Release\n",
             "tools/release/package_source.py": "# fixture\n",
         }

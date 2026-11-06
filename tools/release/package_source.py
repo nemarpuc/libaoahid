@@ -107,7 +107,7 @@ def validate_members(data: bytes, version: str, source_sha: str) -> None:
         f"{root}/README.md",
         f"{root}/LICENSE",
         f"{root}/include/aoahid.h",
-        f"{root}/src/api/c_api.cpp",
+        f"{root}/src/api/c_api_context.cpp",
         f"{root}/.github/workflows/release.yml",
         f"{root}/tools/release/package_source.py",
     }

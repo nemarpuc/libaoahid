@@ -522,7 +522,7 @@ public static class Native
     public const uint AOAHID_SEND_TIMEOUT_MS = 500;
     public const uint AOAHID_VERSION_MAJOR = 2;
     public const uint AOAHID_VERSION_MINOR = 0;
-    public const uint AOAHID_VERSION_PATCH = 4;
+    public const uint AOAHID_VERSION_PATCH = 5;
     public const int AOAHID_OK = 0;
     public const int AOAHID_ERR_PARAM = 1;
     public const int AOAHID_ERR_UNSET_FIELD = 2;
@@ -634,7 +634,7 @@ public static class Native
             ["AOAHID_SEND_TIMEOUT_MS"] = 500,
             ["AOAHID_VERSION_MAJOR"] = 2,
             ["AOAHID_VERSION_MINOR"] = 0,
-            ["AOAHID_VERSION_PATCH"] = 4,
+            ["AOAHID_VERSION_PATCH"] = 5,
             ["AOAHID_OK"] = 0,
             ["AOAHID_ERR_PARAM"] = 1,
             ["AOAHID_ERR_UNSET_FIELD"] = 2,

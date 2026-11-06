@@ -3,7 +3,14 @@
 All notable changes to libaoahid are recorded here. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.4] - 2026-11-06
+## [2.0.5] - 2026-11-07
+
+Not hardware-verified: the library, its ABI and its behavior are those of 2.0.3.
+The only changes are the layout of the sources (below, first made in 2.0.4) and the
+release packaging check, which still required the removed `src/api/c_api.cpp`.
+Tag `v2.0.4` exists but its release failed and was never published; use 2.0.5.
+
+## [2.0.4] - 2026-11-06 (tag exists, release never published)
 
 Not hardware-verified: the library, its ABI and its behavior are those of 2.0.3.
 The only change is the layout of the sources.
