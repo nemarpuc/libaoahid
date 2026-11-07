@@ -396,7 +396,7 @@ void test_registration_reservations_and_async_results() {
     AOAHID_CHECK(device->clear_reservation(reservation7) == AOAHID_OK);
     AOAHID_CHECK(device->clear_reservation(reservation8) == AOAHID_OK);
 
-    // Since 2.0.0 a STALL, even on a Node's first report, is returned as is:
+    // A STALL, even on a Node's first report, is returned as is:
     // exactly one request 57 goes out and the caller decides what to do.
     CompletionState stalled{};
     PreparedTransfer stalled_transfer{};
