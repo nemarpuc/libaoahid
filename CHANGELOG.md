@@ -24,3 +24,5 @@ the bindings against the compiled C ABI.
 - `aoahid.hpp`: a header-only C++ facade forwarding to every C function.
 - Bindings generated from the C header for Python (ctypes), C# (P/Invoke) and
   Rust (`aoahid-sys` and the typed `aoahid` crate).
+- `find_package(aoahid 0.1)` is met by a 0.1.x install only: before 1.0.0 a change of the minor
+  number may change the API or the ABI.
