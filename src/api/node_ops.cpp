@@ -668,9 +668,9 @@ aoahid_result device_close_impl(aoahid_device* device, bool* consumed,
         device->close_drain_timeout_ms = drain_timeout_ms;
     }
 
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(device->close_drain_timeout_ms);
     try {
-        const auto deadline = std::chrono::steady_clock::now() +
-                              std::chrono::milliseconds(device->close_drain_timeout_ms);
         while (!device->nodes.empty()) {
             aoahid_node* closing_node = device->nodes.back();
             const aoahid_result result =
@@ -731,6 +731,15 @@ aoahid_result device_close_impl(aoahid_device* device, bool* consumed,
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
+        }
+    }
+    if (context->options.event_mode == AOAHID_EVENT_INTERNAL_THREAD) {
+        // A Node close returns as soon as its last completion has published,
+        // while the event thread may still be returning from that callback.
+        // Give it what is left of the drain budget instead of parking a Device
+        // whose transfers have all completed.
+        while (!graph_drained(device) && remaining_milliseconds(deadline) != 0U) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
 

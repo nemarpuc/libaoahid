@@ -35,6 +35,10 @@
 inline constexpr std::uint32_t kControlTimeoutMs = 20U;
 inline constexpr std::uint32_t kSendTimeoutMs = 20U;
 inline constexpr std::uint32_t kDrainTimeoutMs = 1U;
+// In internal-thread mode the event thread delivers cancellations and callbacks
+// asynchronously, so a close waits for it. This is only the upper bound of that
+// wait: the call returns as soon as the transfers have drained.
+inline constexpr std::uint32_t kThreadDrainTimeoutMs = 2000U;
 
 namespace allocation_probe {
 
@@ -1045,11 +1049,12 @@ void test_channel_shares_the_device_handle_internal_thread() {
                  AOAHID_ERR_NO_DEVICE);
     AOAHID_CHECK(aoahid_channel_write(channel, cnxn.data(), cnxn.size(), &written, 0U) ==
                  AOAHID_ERR_NO_DEVICE);
-    AOAHID_CHECK(aoahid_channel_close(channel, kDrainTimeoutMs) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_channel_close(channel, kThreadDrainTimeoutMs) == AOAHID_OK);
     AOAHID_CHECK(aoahid_channel_close(nullptr, kDrainTimeoutMs) == AOAHID_ERR_PARAM);
-    static_cast<void>(aoahid_node_close(node, kControlTimeoutMs, kDrainTimeoutMs));
-    static_cast<void>(aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs));
-    AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
+    static_cast<void>(aoahid_node_close(node, kControlTimeoutMs, kThreadDrainTimeoutMs));
+    static_cast<void>(aoahid_device_close(device, kControlTimeoutMs, kThreadDrainTimeoutMs));
+    AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kThreadDrainTimeoutMs) ==
+                 AOAHID_OK);
     AOAHID_CHECK(aoahid_fake_libusb_open_handle_count() == 0U);
     aoahid_fake_libusb_reset();
 }
@@ -1159,9 +1164,10 @@ void test_channel_request_reads() {
     aoahid_fake_libusb_unplug(0U);
     AOAHID_CHECK(aoahid_channel_read(channel, buffer.data(), 24U, &received, 1000U) ==
                  AOAHID_ERR_NO_DEVICE);
-    AOAHID_CHECK(aoahid_channel_close(channel, kDrainTimeoutMs) == AOAHID_OK);
-    static_cast<void>(aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs));
-    AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_channel_close(channel, kThreadDrainTimeoutMs) == AOAHID_OK);
+    static_cast<void>(aoahid_device_close(device, kControlTimeoutMs, kThreadDrainTimeoutMs));
+    AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kThreadDrainTimeoutMs) ==
+                 AOAHID_OK);
     AOAHID_CHECK(aoahid_fake_libusb_open_handle_count() == 0U);
     aoahid_fake_libusb_reset();
 }
@@ -1270,12 +1276,14 @@ void test_hid_adb_and_accessory_bulk_run_together() {
     AOAHID_CHECK(controls_for(57U).size() == 16U);
     AOAHID_CHECK(aoahid_fake_libusb_bulk_out_count() == 2U);
 
-    AOAHID_CHECK(aoahid_channel_close(app, kDrainTimeoutMs) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(node, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_channel_close(app, kThreadDrainTimeoutMs) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(node, kControlTimeoutMs, kThreadDrainTimeoutMs) == AOAHID_OK);
     // The Device close also consumes the still-open ADB Channel.
-    AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, kThreadDrainTimeoutMs) ==
+                 AOAHID_OK);
     AOAHID_CHECK(aoahid_fake_libusb_open_handle_count() == 0U);
-    AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kThreadDrainTimeoutMs) ==
+                 AOAHID_OK);
     aoahid_fake_libusb_reset();
 }
 
