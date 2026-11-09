@@ -36,12 +36,27 @@
         "AOAHID_USE_FAKE_LIBUSB": "ON",
         "AOAHID_TSAN": "ON"
       }
+    },
+    {
+      "name": "coverage",
+      "displayName": "gcov line and branch coverage build",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/coverage",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "AOAHID_BUILD_TESTS": "ON",
+        "AOAHID_BUILD_EXAMPLES": "OFF",
+        "AOAHID_USE_FAKE_LIBUSB": "ON",
+        "AOAHID_CHECK_SERIALIZATION": "ON",
+        "AOAHID_COVERAGE": "ON"
+      }
     }
   ],
   "buildPresets": [
     { "name": "dev", "configurePreset": "dev" },
     { "name": "release", "configurePreset": "release" },
-    { "name": "tsan", "configurePreset": "tsan" }
+    { "name": "tsan", "configurePreset": "tsan" },
+    { "name": "coverage", "configurePreset": "coverage" }
   ],
   "testPresets": [
     { "name": "dev", "configurePreset": "dev", "output": { "outputOnFailure": true } },
@@ -50,6 +65,7 @@
       "configurePreset": "tsan",
       "output": { "outputOnFailure": true },
       "environment": { "TSAN_OPTIONS": "halt_on_error=1" }
-    }
+    },
+    { "name": "coverage", "configurePreset": "coverage", "output": { "outputOnFailure": true } }
   ]
 }

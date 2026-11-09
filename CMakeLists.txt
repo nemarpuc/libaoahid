@@ -21,6 +21,7 @@ option(AOAHID_SANITIZE "Enable AddressSanitizer and UndefinedBehaviorSanitizer."
 option(AOAHID_TSAN "Enable ThreadSanitizer for race detection." OFF)
 option(AOAHID_CHECK_SERIALIZATION "Abort when two threads are inside calls on one Context (debugging aid)." OFF)
 option(AOAHID_USE_FAKE_LIBUSB "Use the deterministic test-only libusb backend." OFF)
+option(AOAHID_COVERAGE "Instrument every target for gcov line and branch coverage (GCC or Clang)." OFF)
 
 if(AOAHID_SANITIZE AND AOAHID_TSAN)
   message(FATAL_ERROR
@@ -86,6 +87,30 @@ if(AOAHID_TSAN)
         "AOAHID_TSAN was requested, but the selected C/C++ toolchain cannot "
         "compile and link against a usable ThreadSanitizer runtime.")
   endif()
+endif()
+
+if(AOAHID_COVERAGE)
+  if(AOAHID_SANITIZE OR AOAHID_TSAN)
+    message(FATAL_ERROR
+        "AOAHID_COVERAGE cannot be combined with AOAHID_SANITIZE or AOAHID_TSAN: the sanitizer "
+        "runtimes change the generated code and the counts would not describe a plain build.")
+  endif()
+  if(AOAHID_BUILD_FUZZ)
+    message(FATAL_ERROR
+        "AOAHID_COVERAGE cannot be combined with AOAHID_BUILD_FUZZ, which sets its own "
+        "instrumentation.")
+  endif()
+  if(NOT CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$" OR
+     NOT CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$")
+    message(FATAL_ERROR
+        "AOAHID_COVERAGE requires GNU or Clang C and C++ compilers; found "
+        "C='${CMAKE_C_COMPILER_ID}' and CXX='${CMAKE_CXX_COMPILER_ID}'.")
+  endif()
+  # gcov notes and counters for every target. -O0 keeps each source line its
+  # own block; atomic counter updates keep the multi-threaded tests (the
+  # internal event thread, the channel threads) from losing counts.
+  add_compile_options(--coverage -O0 -fprofile-update=atomic)
+  add_link_options(--coverage)
 endif()
 
 set(AOAHID_INSTRUMENT_COMPILE_OPTIONS "")

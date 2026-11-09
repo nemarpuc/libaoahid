@@ -451,6 +451,56 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install gcovr
+        run: pipx install gcovr==8.8
+
+      # The unit and sim suites run against the fake libusb; hardware behaviour
+      # is outside these numbers (tests/hw/README.md).
+      - name: Build every test with coverage instrumentation
+        run: |
+          set -euo pipefail
+          cmake -B build/cov -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug -DAOAHID_BUILD_TESTS=ON \
+            -DAOAHID_BUILD_EXAMPLES=OFF -DAOAHID_USE_FAKE_LIBUSB=ON \
+            -DAOAHID_CHECK_SERIALIZATION=ON -DAOAHID_COVERAGE=ON
+          cmake --build build/cov --parallel
+
+      - name: Run the tests
+        run: ctest --test-dir build/cov --output-on-failure
+
+      # gcovr writes every report before it checks the floor, so the summary is there either way.
+      - name: Report coverage of src/
+        run: |
+          set -euo pipefail
+          mkdir -p build/cov/coverage
+          status=0
+          gcovr --root . --object-directory build/cov --filter 'src/' \
+            --exclude-throw-branches --exclude-unreachable-branches \
+            --txt build/cov/coverage/coverage.txt \
+            --markdown build/cov/coverage/coverage.md \
+            --cobertura build/cov/coverage/coverage.xml \
+            --html-details build/cov/coverage/index.html \
+            --print-summary --fail-under-line 78 || status=$?
+          cat build/cov/coverage/coverage.md >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Keep the coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage
+          path: build/cov/coverage/
+          if-no-files-found: warn
+
   fuzz-smoke:
     name: libFuzzer builder/serializer/raw smoke
     runs-on: ubuntu-22.04

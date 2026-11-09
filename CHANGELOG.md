@@ -5,6 +5,12 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+- Tests: the fake-libusb tests are called what they are, `sim` (`tests/sim`,
+  ctest `aoahid.unit`, `aoahid.sim`, `aoahid.sim-*`); `hw` is kept for runs on
+  a real phone.
+- Build: `AOAHID_COVERAGE` (GCC or Clang, off by default, not combinable with
+  the sanitizers or fuzzing), a `coverage` preset and a CI job "Coverage" that
+  writes the gcovr table for `src/` into the job summary and keeps the report.
 - **The release no longer publishes `*-runtime` bundles.** The `*-shared`
   archive already carries the shared library, the libusb runtime, and the same
   license material (`LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, libusb's
