@@ -257,12 +257,14 @@ matrix produces and architecture-checks:
 - headers, relocatable CMake/pkg-config metadata, notices, checksums, and an
   SPDX SBOM.
 
-For version `X.Y.Z`, the GitHub Release contains exactly 27 uploaded assets:
+For version `X.Y.Z`, the GitHub Release contains exactly 10 uploaded assets:
 
-- twelve archives: `libaoahid-X.Y.Z-linux-{x86_64,aarch64}-ubuntu22.04-{shared,static}.tar.gz`,
-  `libaoahid-X.Y.Z-macos-{arm64,x86_64}-{shared,static}.tar.gz`, and
-  `libaoahid-X.Y.Z-windows-{x86_64,arm64}-{shared,static}.zip`;
-- twelve matching `.spdx.json` sidecars;
+- six archives, one per platform: `libaoahid-X.Y.Z-linux-{x86_64,aarch64}-ubuntu22.04.tar.gz`,
+  `libaoahid-X.Y.Z-macos-{arm64,x86_64}.tar.gz`, and
+  `libaoahid-X.Y.Z-windows-{x86_64,arm64}.zip`;
+- one SPDX 2.3 SBOM, `libaoahid-X.Y.Z.spdx.json`, with one package per archive
+  (its SHA-256 and every file it contains, each with its own license) and the
+  source archive they are built from;
 - the deterministic tagged-tree archive `libaoahid-X.Y.Z-source.tar.gz`;
 - `release-manifest.json` and `SHA256SUMS`.
 
@@ -270,15 +272,26 @@ GitHub also displays its automatically generated source-code links separately;
 the uploaded `*-source.tar.gz` is the release workflow's byte-validated archive
 and is covered by `release-manifest.json` and `SHA256SUMS`.
 
-The complete `*-shared` or `*-static` archive is what you build against: it is
-the only asset carrying headers, the import library, and CMake/pkg-config
-metadata. To deploy next to an application that is already built, take the
-libraries from the `*-shared` archive: it carries the libaoahid shared library,
-the libusb runtime it loads, and the full license set for both - `LICENSE`,
-`NOTICE`, `THIRD_PARTY_NOTICES.md`, libusb's LGPL-2.1 text, and libusb's
-official corresponding source archive. No bare `.so` or `.dll` is published on its own,
-because an asset that ships the libusb runtime has to carry libusb's license and
-corresponding source in the same distribution unit.
+Each archive carries both flavours of libaoahid from one build: the shared
+library (`libaoahid.so.X.Y.Z`, `libaoahid.X.Y.Z.dylib`, or `aoahid.dll` with
+`aoahid.lib`) and the static one (`libaoahid_static.a` or
+`aoahid_static.lib`), with the headers, the libusb runtime the shared library
+loads, and the libusb header and link library a static link needs. Its CMake
+package provides both components, so `find_package(aoahid CONFIG REQUIRED
+COMPONENTS shared)` or `COMPONENTS static` (or both) work from the same
+unpacked directory, and pkg-config has `aoahid` (shared) and `aoahid-static`
+(use with `--static`). To deploy next to an application that is already built,
+take the libraries from the archive: it carries the license set for both -
+`LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, libusb's LGPL-2.1 text, and
+libusb's official corresponding source archive. No bare `.so` or `.dll` is
+published on its own, because an asset that ships the libusb runtime has to
+carry libusb's license and corresponding source in the same distribution unit.
+
+`release.yml` can also be started by hand (`workflow_dispatch`, `dry_run`
+true): it validates, builds, packages, and assembles the whole set with every
+check, takes the version from the newest dated `CHANGELOG.md` section, and
+keeps the result as the `release-dist` workflow artifact. A dry run creates no
+GitHub Release and publishes nothing to a registry.
 
 Platform baselines: Linux archives require at most glibc 2.35
 ([PORTING.md](docs/PORTING.md#release-baseline)); macOS archives target macOS 11,
@@ -286,8 +299,8 @@ are signed ad hoc and not notarized, and have not been run against a phone
 ([PORTING.md](docs/PORTING.md#macos)); Windows archives use the MSVC dynamic
 runtime (`/MD`), so deploy the architecture-matching Visual C++ v14
 Redistributable as well as the libusb runtime included next to the DLL. The
-Python wheel and NuGet package contain no native libraries, so install a
-version-matched shared archive as well. How the release workflow and registry
+Python wheel and NuGet package contain no native libraries, so install the
+version-matched archive as well. How the release workflow and registry
 publication work is in [INTERNALS.md](docs/INTERNALS.md#version-and-release).
 
 ## Documentation
@@ -314,7 +327,7 @@ carry the same MIT license and ship a copy of that file inside their packages.
 
 libusb is a **separate work under LGPL-2.1-or-later**. It is never statically
 absorbed into `libaoahid`: every release links it dynamically, including the
-archives labelled `static` (that label describes `libaoahid` itself, not
+static libaoahid in every archive (`static` describes `libaoahid` itself, not
 libusb). Each binary archive therefore also carries libusb's own license and
 its official source tarball under
 `share/doc/libaoahid/third-party/`.
@@ -328,8 +341,8 @@ its official source tarball under
 Every first-party source file carries its own
 `SPDX-License-Identifier: MIT` and copyright line, so a single file stays
 identifiable after it is copied out of this repository;
-`tools/check_license_headers.py` enforces that in CI. The SPDX sidecar in each
-release states the license of every packaged file individually rather than
+`tools/check_license_headers.py` enforces that in CI. The release SBOM, and the
+SPDX document inside each archive, state the license of every packaged file individually rather than
 `NOASSERTION`. Redistributing a release archive unchanged satisfies both
 licenses as shipped. If you relink against a modified libusb, the LGPL
 obligations apply to that copy. [NOTICE](NOTICE) and

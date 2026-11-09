@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 libaoahid contributors
-"""Validate the complete six-target release set and write checksums."""
+"""Validate the complete six-target release set and write the release metadata.
+
+Each target has one binary archive carrying both libaoahid flavours (shared
+and static). After every archive and its embedded SPDX document are checked,
+this writes the one release SBOM that describes them all, then
+release-manifest.json and SHA256SUMS.
+"""
 
 from __future__ import annotations
 
@@ -32,7 +38,8 @@ TARGETS = (
 )
 # Platforms whose archives are .tar.gz; Windows alone ships .zip.
 TAR_PLATFORMS = ("linux", "macos")
-VARIANTS = ("shared", "static")
+COMPONENTS = generate_spdx.COMPONENTS
+EMBEDDED_SPDX_NAME = generate_spdx.SPDX_NAME
 LIBUSB_SOURCE_NAME = "share/doc/libaoahid/third-party/source/libusb-1.0.30.tar.bz2"
 LIBUSB_SOURCE_SHA256 = "fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf"
 LIBUSB_LICENSE_NAME = "share/doc/libaoahid/third-party/libusb-copyright"
@@ -43,7 +50,8 @@ VCPKG_LICENSE_SHA256 = "1ee376fc340e0aa6ad6a3581c94126e741468705096ac92263048a21
 # libaoahid links libusb dynamically, so any asset carrying the libusb runtime
 # must carry libusb's license and its corresponding source in the same
 # distribution unit; require_layout enforces that for every archive. A bare
-# shared object cannot, which is why one is never uploaded.
+# shared object cannot, which is why one is never uploaded. The release SBOM
+# repeats the per-file attribution for every archive.
 
 
 class CollectionError(RuntimeError):
@@ -58,14 +66,12 @@ def expected_release_asset_names(version: str) -> frozenset[str]:
     """Return the exact set of files uploaded to one GitHub Release."""
     names = {
         package_source.source_archive_name(version),
+        generate_spdx.release_sbom_name(version),
         "release-manifest.json",
         "SHA256SUMS",
     }
-    for platform, arch, qualifier, extension in TARGETS:
-        part = platform_part(platform, arch, qualifier)
-        for variant in VARIANTS:
-            base = f"libaoahid-{version}-{part}-{variant}"
-            names.update((base + extension, base + ".spdx.json"))
+    for platform, arch, _qualifier, _extension in TARGETS:
+        names.add(generate_spdx.release_archive_name(version, platform, arch))
     return frozenset(names)
 
 
@@ -207,23 +213,30 @@ def validate_runtime_architecture(data: bytes, platform: str, arch: str) -> None
         )
 
 
+def _one(members: set[str], pattern: str) -> int:
+    return sum(re.fullmatch(pattern, name) is not None for name in members)
+
+
 def require_layout(
     path: Path,
     platform: str,
     arch: str,
-    variant: str,
     version: str,
     source_sha: str,
     created_epoch: int,
 ) -> tuple[str, str]:
+    """Require one archive to carry both flavours and all license material."""
     members = archive_members(path)
     required = {
         "include/aoahid.h",
         "include/aoahid.hpp",
+        "include/libusb-1.0/libusb.h",
         "lib/cmake/aoahid/aoahid-config.cmake",
         "lib/cmake/aoahid/aoahid-config-version.cmake",
         "lib/cmake/aoahid/aoahid-check-libusb.cmake",
         "lib/pkgconfig/aoahid.pc",
+        "lib/pkgconfig/aoahid-static.pc",
+        "lib/pkgconfig/libusb-1.0.pc",
         "share/doc/libaoahid/LICENSE",
         "share/doc/libaoahid/NOTICE",
         "share/doc/libaoahid/CHANGELOG.md",
@@ -231,14 +244,12 @@ def require_layout(
         "share/doc/libaoahid/build-metadata.json",
         LIBUSB_LICENSE_NAME,
         LIBUSB_SOURCE_NAME,
-        "share/doc/libaoahid/libaoahid.spdx.json",
+        EMBEDDED_SPDX_NAME,
     }
     if platform == "windows":
         required.add("share/doc/libaoahid/third-party/vcpkg-libusb-port/vcpkg.json")
         required.add("share/doc/libaoahid/third-party/vcpkg-libusb-port/portfile.cmake")
         required.add(VCPKG_LICENSE_NAME)
-    if variant == "static":
-        required.add("lib/pkgconfig/libusb-1.0.pc")
     if platform == "linux":
         required.add("share/doc/libaoahid/glibc-requirements.json")
     missing = sorted(required - members)
@@ -259,29 +270,20 @@ def require_layout(
                 raise CollectionError(
                     f"{path.name}: bundled pinned vcpkg material changed: {relative}"
                 )
-    component = "shared" if variant == "shared" else "static"
-    other_component = "static" if variant == "shared" else "shared"
-    target_export = f"lib/cmake/aoahid/aoahid-{component}-targets.cmake"
-    target_configs = {
-        name
-        for name in members
-        if re.fullmatch(
-            rf"lib/cmake/aoahid/aoahid-{component}-targets-[^/]+\.cmake",
-            name,
-        )
-    }
-    unexpected_exports = {
-        name
-        for name in members
-        if re.fullmatch(
-            rf"lib/cmake/aoahid/aoahid-{other_component}-targets(?:-[^/]+)?\.cmake",
-            name,
-        )
-    }
-    if target_export not in members or len(target_configs) != 1 or unexpected_exports:
-        raise CollectionError(
-            f"{path.name}: incomplete or mixed CMake {component} target exports"
-        )
+    for component in COMPONENTS:
+        target_export = f"lib/cmake/aoahid/aoahid-{component}-targets.cmake"
+        target_configs = {
+            name
+            for name in members
+            if re.fullmatch(
+                rf"lib/cmake/aoahid/aoahid-{component}-targets-[^/]+\.cmake",
+                name,
+            )
+        }
+        if target_export not in members or len(target_configs) != 1:
+            raise CollectionError(
+                f"{path.name}: incomplete CMake {component} target exports"
+            )
     try:
         pkg_config_metadata.validate_relocatable(
             archive_bytes(path, "lib/pkgconfig/aoahid.pc"),
@@ -289,127 +291,61 @@ def require_layout(
             expected_name="libaoahid",
             expected_version=version,
             expected_url=package_source.REPOSITORY_URL,
-            expected_library=(
-                "aoahid_static"
-                if platform == "windows" and variant == "static"
-                else "aoahid"
-            ),
-            expected_requires_private=(
-                "libusb-1.0 >= 1.0.30" if variant == "static" else None
-            ),
+            expected_library="aoahid",
+            expected_requires_private=None,
+            expected_private_libraries=None,
+        )
+        pkg_config_metadata.validate_relocatable(
+            archive_bytes(path, "lib/pkgconfig/aoahid-static.pc"),
+            label=f"{path.name}: aoahid-static.pc",
+            expected_name="libaoahid static",
+            expected_version=version,
+            expected_url=package_source.REPOSITORY_URL,
+            expected_library="aoahid_static",
+            expected_requires_private="libusb-1.0 >= 1.0.30",
             expected_private_libraries=(
-                ("-lstdc++", "-lc++")
-                if variant == "static" and platform in ("linux", "macos")
-                else None
+                ("-lstdc++", "-lc++") if platform in TAR_PLATFORMS else None
             ),
         )
-        if variant == "static":
-            pkg_config_metadata.validate_relocatable(
-                archive_bytes(path, "lib/pkgconfig/libusb-1.0.pc"),
-                label=f"{path.name}: libusb-1.0.pc",
-                expected_name="libusb-1.0",
-                expected_version="1.0.30",
-                expected_library=("libusb-1.0" if platform == "windows" else "usb-1.0"),
-            )
+        pkg_config_metadata.validate_relocatable(
+            archive_bytes(path, "lib/pkgconfig/libusb-1.0.pc"),
+            label=f"{path.name}: libusb-1.0.pc",
+            expected_name="libusb-1.0",
+            expected_version="1.0.30",
+            expected_library=("libusb-1.0" if platform == "windows" else "usb-1.0"),
+        )
     except (KeyError, pkg_config_metadata.PkgConfigError) as error:
         raise CollectionError(f"{path.name}: invalid pkg-config metadata: {error}") from error
-    if platform == "linux" and variant == "shared":
+    if platform == "linux":
         okay = (
-            any(name.startswith("lib/libaoahid.so.") for name in members)
-            and sum(
-                name.startswith("lib/libusb-1.0.so.0.")
-                and name.count(".") >= 5
-                for name in members
-            )
-            == 1
-        )
-    elif platform == "linux":
-        okay = (
-            "lib/libaoahid.a" in members
+            _one(members, r"lib/libaoahid\.so\.[0-9]+\.[0-9]+\.[0-9]+") == 1
+            and "lib/libaoahid_static.a" in members
             and "lib/libusb-1.0.so" in members
-            and "include/libusb-1.0/libusb.h" in members
-            and sum(
-                name.startswith("lib/libusb-1.0.so.0.")
-                and name.count(".") >= 5
-                for name in members
-            )
-            == 1
-        )
-    elif platform == "macos" and variant == "shared":
-        okay = (
-            any(
-                re.fullmatch(r"lib/libaoahid\.[0-9]+\.[0-9]+\.[0-9]+\.dylib", name)
-                for name in members
-            )
-            and "lib/libusb-1.0.0.dylib" in members
-            and not any(name.endswith(".a") for name in members)
+            and _one(members, r"lib/libusb-1\.0\.so\.0\.[0-9]+\.[0-9]+") == 1
         )
     elif platform == "macos":
         okay = (
-            "lib/libaoahid.a" in members
+            _one(members, r"lib/libaoahid\.[0-9]+\.[0-9]+\.[0-9]+\.dylib") == 1
+            and "lib/libaoahid_static.a" in members
             and "lib/libusb-1.0.dylib" in members
             and "lib/libusb-1.0.0.dylib" in members
-            and "include/libusb-1.0/libusb.h" in members
-            and not any(name.startswith("lib/libaoahid") and name.endswith(".dylib") for name in members)
-        )
-    elif variant == "shared":
-        dependency_dlls = {
-            name
-            for name in members
-            if name.startswith("bin/")
-            and "usb" in name.lower()
-            and name.endswith(".dll")
-        }
-        dependency_imports = {
-            name
-            for name in members
-            if name.startswith("lib/dependencies/")
-            and "usb" in name.lower()
-            and name.endswith(".lib")
-        }
-        okay = (
-            {"bin/aoahid.dll", "lib/aoahid.lib"}.issubset(members)
-            and len(dependency_dlls) == 1
-            and len(dependency_imports) == 1
         )
     else:
-        dependency_dlls = {
-            name
-            for name in members
-            if name.startswith("bin/")
-            and "usb" in name.lower()
-            and name.endswith(".dll")
-        }
-        dependency_link_libraries = {
-            name
-            for name in members
-            if name.startswith("lib/")
-            and name.count("/") == 1
-            and "usb" in name.lower()
-            and name.endswith(".lib")
-        }
-        dependency_imports = {
-            name
-            for name in members
-            if name.startswith("lib/dependencies/")
-            and "usb" in name.lower()
-            and name.endswith(".lib")
-        }
         okay = (
-            "lib/aoahid_static.lib" in members
-            and "include/libusb-1.0/libusb.h" in members
-            and len(dependency_dlls) == 1
-            and len(dependency_link_libraries) == 1
-            and len(dependency_imports) == 1
+            {"bin/aoahid.dll", "lib/aoahid.lib", "lib/aoahid_static.lib"}.issubset(members)
+            and _one(members, r"(?i)bin/[^/]*usb[^/]*\.dll") == 1
+            and _one(members, r"(?i)lib/[^/]*usb[^/]*\.lib") == 1
+            and _one(members, r"(?i)lib/dependencies/[^/]*usb[^/]*\.lib") == 1
         )
     if not okay:
-        raise CollectionError(f"{path.name}: expected {platform}/{variant} library files are missing")
+        raise CollectionError(
+            f"{path.name}: expected {platform} shared and static library files are missing"
+        )
     if platform == "macos":
         validate_runtime_architecture(
             archive_bytes(path, "lib/libusb-1.0.0.dylib"), platform, arch
         )
-    if variant == "shared":
-        validate_shared_runtime(path, platform, arch)
+    validate_shared_runtime(path, platform, arch)
 
     try:
         metadata = json.loads(archive_bytes(path, "share/doc/libaoahid/build-metadata.json"))
@@ -423,15 +359,17 @@ def require_layout(
         "version": version,
         "platform": platform,
         "architecture": arch,
-        "variant": variant,
+        "components": list(COMPONENTS),
         "repository": package_source.REPOSITORY_URL,
         "release_download_url": generate_spdx.release_download_url(
-            version, platform, arch, variant
+            version, platform, arch
         ),
         "source_commit": source_sha,
         "source_date_epoch": created_epoch,
     }
     differing = {key: (metadata.get(key), value) for key, value in expected.items() if metadata.get(key) != value}
+    if "variant" in metadata:
+        differing["variant"] = (metadata["variant"], None)
     if differing:
         raise CollectionError(f"{path.name}: build metadata mismatch: {differing}")
     libusb_version = metadata.get("libusb_version")
@@ -475,29 +413,31 @@ def require_layout(
     return libusb_version, glibc_maximum_required
 
 
-def validate_sidecar(
-    path: Path,
+def validate_embedded_sbom(
     archive: Path,
     version: str,
     platform: str,
     arch: str,
-    variant: str,
     source_sha: str,
     created_epoch: int,
     libusb_version: str,
 ) -> str:
+    """Check the SPDX document embedded in one archive against its contents."""
+    label = f"{archive.name}: {EMBEDDED_SPDX_NAME}"
     try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise CollectionError(f"invalid SPDX sidecar {path.name}: {error}") from error
+        document = json.loads(archive_bytes(archive, EMBEDDED_SPDX_NAME))
+    except (KeyError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise CollectionError(f"invalid embedded SPDX document {label}: {error}") from error
+    if not isinstance(document, dict):
+        raise CollectionError(f"{label}: not a JSON object")
     if document.get("spdxVersion") != "SPDX-2.3" or document.get("dataLicense") != "CC0-1.0":
-        raise CollectionError(f"{path.name}: not an SPDX-2.3 document")
-    expected_name = f"libaoahid-{version}-{platform}-{arch}-{variant}"
+        raise CollectionError(f"{label}: not an SPDX-2.3 document")
+    expected_name = f"libaoahid-{version}-{platform}-{arch}"
     if document.get("name") != expected_name:
-        raise CollectionError(f"{path.name}: SPDX name is not {expected_name}")
+        raise CollectionError(f"{label}: SPDX name is not {expected_name}")
     packages = document.get("packages", [])
     if not isinstance(packages, list):
-        raise CollectionError(f"{path.name}: SPDX packages list is invalid")
+        raise CollectionError(f"{label}: SPDX packages list is invalid")
     own = next((p for p in packages if isinstance(p, dict) and p.get("name") == "libaoahid"), None)
     if (
         own is None
@@ -505,37 +445,35 @@ def validate_sidecar(
         or own.get("versionInfo") != version
         or own.get("filesAnalyzed") is not True
     ):
-        raise CollectionError(f"{path.name}: incomplete libaoahid package record")
+        raise CollectionError(f"{label}: incomplete libaoahid package record")
     if own.get("sourceInfo") != f"Git commit {source_sha}":
-        raise CollectionError(f"{path.name}: SPDX source commit is inconsistent")
+        raise CollectionError(f"{label}: SPDX source commit is inconsistent")
     if own.get("homepage") != package_source.REPOSITORY_URL:
-        raise CollectionError(f"{path.name}: SPDX homepage is not the canonical repository")
-    expected_download = generate_spdx.release_download_url(
-        version, platform, arch, variant
-    )
+        raise CollectionError(f"{label}: SPDX homepage is not the canonical repository")
+    expected_download = generate_spdx.release_download_url(version, platform, arch)
     if own.get("downloadLocation") != expected_download:
         raise CollectionError(
-            f"{path.name}: SPDX download location is not the exact release asset"
+            f"{label}: SPDX download location is not the exact release asset"
         )
     if own.get("packageFileName") != archive.name:
-        raise CollectionError(f"{path.name}: SPDX package file name is inconsistent")
+        raise CollectionError(f"{label}: SPDX package file name is inconsistent")
     dependency = next(
         (p for p in packages if isinstance(p, dict) and p.get("name") == "libusb"),
         None,
     )
     if dependency is None or dependency.get("SPDXID") != "SPDXRef-Package-libusb":
-        raise CollectionError(f"{path.name}: libusb dependency record is missing")
+        raise CollectionError(f"{label}: libusb dependency record is missing")
     if dependency.get("versionInfo") != libusb_version:
-        raise CollectionError(f"{path.name}: SPDX libusb version is inconsistent")
+        raise CollectionError(f"{label}: SPDX libusb version is inconsistent")
     if dependency.get("packageFileName") != "libusb-1.0.30.tar.bz2":
-        raise CollectionError(f"{path.name}: SPDX libusb source-package name is inconsistent")
+        raise CollectionError(f"{label}: SPDX libusb source-package name is inconsistent")
     dependency_checksums = {
         item.get("algorithm"): item.get("checksumValue")
         for item in dependency.get("checksums", [])
         if isinstance(item, dict)
     }
     if dependency_checksums.get("SHA256") != LIBUSB_SOURCE_SHA256:
-        raise CollectionError(f"{path.name}: SPDX libusb source-package checksum is inconsistent")
+        raise CollectionError(f"{label}: SPDX libusb source-package checksum is inconsistent")
     vcpkg = next(
         (p for p in packages if isinstance(p, dict) and p.get("name") == "vcpkg"),
         None,
@@ -547,7 +485,7 @@ def validate_sidecar(
     )
     if platform == "windows":
         if len(packages) != 3:
-            raise CollectionError(f"{path.name}: Windows SPDX must contain three packages")
+            raise CollectionError(f"{label}: Windows SPDX must contain three packages")
         if (
             not isinstance(vcpkg, dict)
             or vcpkg.get("SPDXID") != "SPDXRef-Package-vcpkg"
@@ -556,7 +494,7 @@ def validate_sidecar(
             or vcpkg.get("licenseConcluded") != "MIT"
             or vcpkg.get("licenseDeclared") != "MIT"
         ):
-            raise CollectionError(f"{path.name}: SPDX vcpkg build-material record is missing")
+            raise CollectionError(f"{label}: SPDX vcpkg build-material record is missing")
         vcpkg_sha1 = sorted(
             hashlib.sha1(archive_bytes(archive, relative)).hexdigest()
             for relative in vcpkg_files
@@ -567,27 +505,27 @@ def validate_sidecar(
             not isinstance(vcpkg_code, dict)
             or vcpkg_code.get("packageVerificationCodeValue") != expected_vcpkg_code
         ):
-            raise CollectionError(f"{path.name}: SPDX vcpkg verification code is inconsistent")
+            raise CollectionError(f"{label}: SPDX vcpkg verification code is inconsistent")
     elif vcpkg is not None or len(packages) != 2:
         raise CollectionError(
-            f"{path.name}: a non-Windows SPDX must contain only libaoahid and libusb"
+            f"{label}: a non-Windows SPDX must contain only libaoahid and libusb"
         )
     created = datetime.fromtimestamp(created_epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     creation_info = document.get("creationInfo")
     if not isinstance(creation_info, dict) or creation_info.get("created") != created:
-        raise CollectionError(f"{path.name}: SPDX creation time is inconsistent")
+        raise CollectionError(f"{label}: SPDX creation time is inconsistent")
 
     members = archive_members(archive)
-    expected_files = members - {"share/doc/libaoahid/libaoahid.spdx.json"}
+    expected_files = members - {EMBEDDED_SPDX_NAME}
     listed = document.get("files")
     if not isinstance(listed, list) or not all(isinstance(item, dict) for item in listed):
-        raise CollectionError(f"{path.name}: SPDX files list is invalid")
+        raise CollectionError(f"{label}: SPDX files list is invalid")
     listed_names = [str(item.get("fileName", "")) for item in listed]
     if not all(name.startswith("./") for name in listed_names):
-        raise CollectionError(f"{path.name}: SPDX file names must start with ./")
+        raise CollectionError(f"{label}: SPDX file names must start with ./")
     normalized_names = [name.removeprefix("./") for name in listed_names]
     if len(normalized_names) != len(set(normalized_names)) or set(normalized_names) != expected_files:
-        raise CollectionError(f"{path.name}: SPDX file list differs from archive contents")
+        raise CollectionError(f"{label}: SPDX file list differs from archive contents")
     sha1_values = []
     expected_file_ids: set[str] = set()
     observed_licenses: set[str] = set()
@@ -595,7 +533,7 @@ def validate_sidecar(
         expected_identifier = generate_spdx.file_id(relative)
         if item.get("SPDXID") != expected_identifier:
             raise CollectionError(
-                f"{path.name}: SPDX identifier is inconsistent for {relative}"
+                f"{label}: SPDX identifier is inconsistent for {relative}"
             )
         expected_file_ids.add(expected_identifier)
         contents = archive_bytes(archive, relative)
@@ -605,7 +543,7 @@ def validate_sidecar(
         }
         checksum_entries = item.get("checksums")
         if not isinstance(checksum_entries, list):
-            raise CollectionError(f"{path.name}: SPDX checksums are invalid for {relative}")
+            raise CollectionError(f"{label}: SPDX checksums are invalid for {relative}")
         checksums = {
             value.get("algorithm"): value.get("checksumValue")
             for value in checksum_entries
@@ -615,7 +553,7 @@ def validate_sidecar(
             checksums.get("SHA1") != expected_checksums["SHA1"]
             or checksums.get("SHA256") != expected_checksums["SHA256"]
         ):
-            raise CollectionError(f"{path.name}: SPDX checksum mismatch for {relative}")
+            raise CollectionError(f"{label}: SPDX checksum mismatch for {relative}")
         license_expression, copyright_text = generate_spdx.file_license(relative)
         observed_licenses.add(license_expression)
         if (
@@ -624,7 +562,7 @@ def validate_sidecar(
             or item.get("copyrightText") != copyright_text
         ):
             raise CollectionError(
-                f"{path.name}: SPDX file-level license is inconsistent for {relative}"
+                f"{label}: SPDX file-level license is inconsistent for {relative}"
             )
         sha1_values.append(expected_checksums["SHA1"])
     if (
@@ -633,22 +571,22 @@ def validate_sidecar(
         or own.get("licenseInfoFromFiles") != sorted(observed_licenses)
     ):
         raise CollectionError(
-            f"{path.name}: SPDX package license summary disagrees with its files"
+            f"{label}: SPDX package license summary disagrees with its files"
         )
     if generate_spdx.LIBUSB_LICENSE not in observed_licenses:
         raise CollectionError(
-            f"{path.name}: no packaged file is attributed to the bundled libusb runtime"
+            f"{label}: no packaged file is attributed to the bundled libusb runtime"
         )
     verification = hashlib.sha1("".join(sorted(sha1_values)).encode("ascii")).hexdigest()
     code = own.get("packageVerificationCode")
     if not isinstance(code, dict) or code.get("packageVerificationCodeValue") != verification:
-        raise CollectionError(f"{path.name}: SPDX package verification code is inconsistent")
+        raise CollectionError(f"{label}: SPDX package verification code is inconsistent")
 
     relationships = document.get("relationships")
     if not isinstance(relationships, list):
-        raise CollectionError(f"{path.name}: SPDX relationships list is invalid")
+        raise CollectionError(f"{label}: SPDX relationships list is invalid")
     if document.get("documentDescribes") != ["SPDXRef-Package-libaoahid"]:
-        raise CollectionError(f"{path.name}: SPDX documentDescribes is inconsistent")
+        raise CollectionError(f"{label}: SPDX documentDescribes is inconsistent")
 
     expected_relationships = {
         (
@@ -684,24 +622,106 @@ def validate_sidecar(
     actual_relationships: list[tuple[str, str, str]] = []
     for item in relationships:
         if not isinstance(item, dict):
-            raise CollectionError(f"{path.name}: SPDX relationship is not an object")
+            raise CollectionError(f"{label}: SPDX relationship is not an object")
         element = item.get("spdxElementId")
         relation = item.get("relationshipType")
         related = item.get("relatedSpdxElement")
         if not all(isinstance(value, str) for value in (element, relation, related)):
-            raise CollectionError(f"{path.name}: SPDX relationship is incomplete")
+            raise CollectionError(f"{label}: SPDX relationship is incomplete")
         actual_relationships.append((element, relation, related))
     if (
         len(actual_relationships) != len(set(actual_relationships))
         or set(actual_relationships) != expected_relationships
     ):
         raise CollectionError(
-            f"{path.name}: SPDX relationship graph is incomplete or contains extras"
+            f"{label}: SPDX relationship graph is incomplete or contains extras"
         )
     namespace = document.get("documentNamespace")
     if not isinstance(namespace, str):
-        raise CollectionError(f"{path.name}: documentNamespace is missing")
+        raise CollectionError(f"{label}: documentNamespace is missing")
     return namespace
+
+
+def archive_record(path: Path, platform: str, arch: str) -> generate_spdx.ArchiveRecord:
+    """Digest every file of one archive for the release SBOM."""
+    members = archive_members(path) - {EMBEDDED_SPDX_NAME}
+    root = path.name.removesuffix(".tar.gz").removesuffix(".zip")
+    files: dict[str, tuple[str, str]] = {}
+
+    def add(name: str, contents: bytes) -> None:
+        relative = PurePosixPath(name).relative_to(root).as_posix()
+        if relative in members:
+            files[relative] = (
+                hashlib.sha1(contents).hexdigest(),
+                hashlib.sha256(contents).hexdigest(),
+            )
+
+    # One pass over the archive; archive_bytes() would reopen it per member.
+    if path.name.endswith(".tar.gz"):
+        with tarfile.open(path, "r:gz") as archive:
+            for member in archive:
+                if member.issym():
+                    # SPDX lists the bytes a symlink resolves to, as the
+                    # embedded document does for the extracted tree.
+                    continue
+                if member.isfile():
+                    stream = archive.extractfile(member)
+                    if stream is None:
+                        raise CollectionError(f"{path.name}: {member.name} is not extractable")
+                    add(member.name, stream.read())
+            for member in archive.getmembers():
+                if member.issym():
+                    # tarfile resolves the link to its target member.
+                    stream = archive.extractfile(member)
+                    if stream is None:
+                        raise CollectionError(f"{path.name}: {member.name} does not resolve")
+                    add(member.name, stream.read())
+    else:
+        with zipfile.ZipFile(path) as archive:
+            for info in archive.infolist():
+                if not info.is_dir():
+                    add(info.filename, archive.read(info))
+    if set(files) != members:
+        raise CollectionError(f"{path.name}: could not digest every archive member")
+    return generate_spdx.ArchiveRecord(
+        platform=platform, arch=arch, name=path.name, sha256=sha256(path), files=files
+    )
+
+
+def write_release_sbom(
+    directory: Path,
+    archives: list[generate_spdx.ArchiveRecord],
+    source: generate_spdx.SourceRecord,
+    *,
+    version: str,
+    source_sha: str,
+    created_epoch: int,
+    libusb_version: str,
+) -> tuple[Path, str]:
+    """Write the one release SBOM, then validate it again from its bytes."""
+    path = directory / generate_spdx.release_sbom_name(version)
+    try:
+        document = generate_spdx.create_release_document(
+            archives,
+            source,
+            version=version,
+            source_sha=source_sha,
+            created_epoch=created_epoch,
+            libusb_version=libusb_version,
+        )
+        path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        namespace = generate_spdx.validate_release_document(
+            json.loads(path.read_text(encoding="utf-8")),
+            archives,
+            source,
+            version=version,
+            source_sha=source_sha,
+            created_epoch=created_epoch,
+            libusb_version=libusb_version,
+        )
+    except generate_spdx.SpdxError as error:
+        raise CollectionError(f"{path.name}: {error}") from error
+    return path, namespace
 
 
 def parse_args() -> argparse.Namespace:
@@ -722,6 +742,8 @@ def main() -> int:
         if re.fullmatch(r"[0-9a-f]{40}", args.source_sha) is None:
             raise CollectionError("source SHA must be 40 lowercase hexadecimal characters")
         records = []
+        archive_records: list[generate_spdx.ArchiveRecord] = []
+        libusb_versions: set[str] = set()
         expected: set[str] = set()
         source_archive = args.directory / package_source.source_archive_name(args.version)
         if not source_archive.is_file():
@@ -740,53 +762,61 @@ def main() -> int:
             raise CollectionError(f"invalid source archive: {error}") from error
         expected.add(source_archive.name)
         for platform, arch, qualifier, extension in TARGETS:
-            platform_part = f"{platform}-{arch}" + (f"-{qualifier}" if qualifier else "")
-            for variant in VARIANTS:
-                base = f"libaoahid-{args.version}-{platform_part}-{variant}"
-                archive = args.directory / (base + extension)
-                sidecar = args.directory / (base + ".spdx.json")
-                expected.update((archive.name, sidecar.name))
-                if not archive.is_file() or not sidecar.is_file():
-                    raise CollectionError(f"required artifact pair is missing: {base}")
-                libusb_version, glibc_maximum_required = require_layout(
-                    archive,
-                    platform,
-                    arch,
-                    variant,
-                    args.version,
-                    args.source_sha,
-                    args.created_epoch,
-                )
-                namespace = validate_sidecar(
-                    sidecar,
-                    archive,
-                    args.version,
-                    platform,
-                    arch,
-                    variant,
-                    args.source_sha,
-                    args.created_epoch,
-                    libusb_version,
-                )
-                internal_spdx = archive_bytes(archive, "share/doc/libaoahid/libaoahid.spdx.json")
-                if internal_spdx != sidecar.read_bytes():
-                    raise CollectionError(f"{archive.name}: embedded and sidecar SPDX documents differ")
-                records.append(
-                    record := {
-                        "platform": platform,
-                        "architecture": arch,
-                        "qualifier": qualifier or None,
-                        "variant": variant,
-                        "archive": archive.name,
-                        "archive_sha256": sha256(archive),
-                        "spdx": sidecar.name,
-                        "spdx_sha256": sha256(sidecar),
-                        "spdx_namespace": namespace,
-                    }
-                )
-                if platform == "linux":
-                    record["glibc_baseline"] = glibc_versions.BASELINE
-                    record["glibc_maximum_required"] = glibc_maximum_required
+            archive_name = generate_spdx.release_archive_name(args.version, platform, arch)
+            if not archive_name.endswith(extension):
+                raise CollectionError("internal archive extension policy is inconsistent")
+            archive = args.directory / archive_name
+            expected.add(archive.name)
+            if not archive.is_file():
+                raise CollectionError(f"required archive is missing: {archive.name}")
+            libusb_version, glibc_maximum_required = require_layout(
+                archive,
+                platform,
+                arch,
+                args.version,
+                args.source_sha,
+                args.created_epoch,
+            )
+            namespace = validate_embedded_sbom(
+                archive,
+                args.version,
+                platform,
+                arch,
+                args.source_sha,
+                args.created_epoch,
+                libusb_version,
+            )
+            libusb_versions.add(libusb_version)
+            archive_records.append(archive_record(archive, platform, arch))
+            records.append(
+                record := {
+                    "platform": platform,
+                    "architecture": arch,
+                    "qualifier": qualifier or None,
+                    "components": list(COMPONENTS),
+                    "archive": archive.name,
+                    "archive_sha256": sha256(archive),
+                    "embedded_spdx_sha256": hashlib.sha256(
+                        archive_bytes(archive, EMBEDDED_SPDX_NAME)
+                    ).hexdigest(),
+                    "embedded_spdx_namespace": namespace,
+                }
+            )
+            if platform == "linux":
+                record["glibc_baseline"] = glibc_versions.BASELINE
+                record["glibc_maximum_required"] = glibc_maximum_required
+        if len(libusb_versions) != 1:
+            raise CollectionError(f"archives disagree on the libusb version: {sorted(libusb_versions)}")
+        sbom_path, sbom_namespace = write_release_sbom(
+            args.directory,
+            archive_records,
+            generate_spdx.SourceRecord(name=source_archive.name, sha256=sha256(source_archive)),
+            version=args.version,
+            source_sha=args.source_sha,
+            created_epoch=args.created_epoch,
+            libusb_version=libusb_versions.pop(),
+        )
+        expected.add(sbom_path.name)
         expected_uploads = expected_release_asset_names(args.version)
         if expected != expected_uploads - {"release-manifest.json", "SHA256SUMS"}:
             raise CollectionError("internal release asset-name policy is inconsistent")
@@ -812,6 +842,11 @@ def main() -> int:
                 "archive_sha256": sha256(source_archive),
                 "download_url": package_source.source_download_url(args.version),
             },
+            "sbom": {
+                "file": sbom_path.name,
+                "sha256": sha256(sbom_path),
+                "namespace": sbom_namespace,
+            },
             "targets": records,
         }
         manifest_path = args.directory / "release-manifest.json"
@@ -820,12 +855,19 @@ def main() -> int:
         (args.directory / "SHA256SUMS").write_text(
             "".join(f"{sha256(path)}  {path.name}\n" for path in checksum_files), encoding="utf-8"
         )
-    except (OSError, ValueError, CollectionError, tarfile.TarError, zipfile.BadZipFile) as error:
+    except (
+        OSError,
+        ValueError,
+        KeyError,
+        CollectionError,
+        tarfile.TarError,
+        zipfile.BadZipFile,
+    ) as error:
         print(f"collect-release: error: {error}", file=sys.stderr)
         return 1
     print(
-        f"collect-release: validated {len(TARGETS) * len(VARIANTS)} packages and 1 source archive; "
-        "wrote release-manifest.json and SHA256SUMS"
+        f"collect-release: validated {len(TARGETS)} archives and 1 source archive; "
+        f"wrote {generate_spdx.release_sbom_name(args.version)}, release-manifest.json and SHA256SUMS"
     )
     return 0
 

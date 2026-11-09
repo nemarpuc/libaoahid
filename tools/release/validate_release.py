@@ -143,17 +143,57 @@ def release_notes(root: Path, version: str) -> str:
     return notes
 
 
+def newest_dated_version(root: Path) -> str:
+    """Return the version of the newest dated CHANGELOG section.
+
+    A dry run has no tag, so it validates the release this source tree would
+    produce: the topmost dated section, which must also be the highest dated
+    version. The version files must then agree with it, as with a tag.
+    """
+    changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
+    dated = re.findall(
+        r"^## \[([0-9]+\.[0-9]+\.[0-9]+)\] - [0-9]{4}-[0-9]{2}-[0-9]{2}\s*$",
+        changelog,
+        re.MULTILINE,
+    )
+    if not dated:
+        raise ValidationError("CHANGELOG.md has no dated release section")
+    newest = dated[0]
+    if VERSION_RE.fullmatch(newest) is None:
+        raise ValidationError(f"CHANGELOG.md newest version {newest!r} is not MAJOR.MINOR.PATCH")
+
+    def key(value: str) -> tuple[int, ...]:
+        return tuple(int(part) for part in value.split("."))
+
+    if any(key(other) >= key(newest) for other in dated[1:]):
+        raise ValidationError(
+            f"CHANGELOG.md topmost dated section [{newest}] is not the highest version"
+        )
+    return newest
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path("."))
-    parser.add_argument("--tag", required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--tag")
+    mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="validate the version of the newest dated CHANGELOG section instead of a tag",
+    )
     parser.add_argument("--notes-out", type=Path)
+    parser.add_argument(
+        "--version-out", type=Path, help="write the validated MAJOR.MINOR.PATCH here"
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     try:
+        if args.dry_run:
+            args.tag = f"v{newest_dated_version(args.root)}"
         tag_match = re.fullmatch(r"v(.+)", args.tag)
         if tag_match is None or VERSION_RE.fullmatch(tag_match.group(1)) is None:
             raise ValidationError("tag must have the exact form vMAJOR.MINOR.PATCH")
@@ -168,10 +208,14 @@ def main() -> int:
         if args.notes_out:
             args.notes_out.parent.mkdir(parents=True, exist_ok=True)
             args.notes_out.write_text(notes, encoding="utf-8")
+        if args.version_out:
+            args.version_out.parent.mkdir(parents=True, exist_ok=True)
+            args.version_out.write_text(version + "\n", encoding="utf-8")
     except (OSError, json.JSONDecodeError, ValidationError) as error:
         print(f"release-validation: error: {error}", file=sys.stderr)
         return 1
-    print(f"release-validation: {args.tag} is internally consistent")
+    mode = " (dry run: version from the newest dated CHANGELOG section)" if args.dry_run else ""
+    print(f"release-validation: {args.tag} is internally consistent{mode}")
     return 0
 
 

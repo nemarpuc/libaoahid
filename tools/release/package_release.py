@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 libaoahid contributors
-"""Create one deterministic binary distribution and its SPDX sidecar."""
+"""Create one deterministic binary distribution with an embedded SPDX document.
+
+The archive carries both libaoahid flavours (shared and static) from one
+install tree. The release-level SBOM that describes every archive is written
+later by collect_release.py.
+"""
 
 from __future__ import annotations
 
@@ -42,9 +47,9 @@ def validate_arguments(args: argparse.Namespace) -> None:
     }
     if args.arch not in allowed_architectures[args.platform]:
         raise PackageError(f"unsupported platform/architecture pair: {args.platform}/{args.arch}")
-    expected_base_name = generate_spdx.release_archive_name(
-        args.version, args.platform, args.arch, args.variant
-    ).removesuffix(".tar.gz").removesuffix(".zip")
+    expected_base_name = generate_spdx.release_archive_root(
+        args.version, args.platform, args.arch
+    )
     if args.base_name != expected_base_name:
         raise PackageError(
             f"base name is {args.base_name!r}, expected exact release name "
@@ -60,7 +65,23 @@ def require_one(root: Path, patterns: tuple[str, ...], label: str) -> Path:
     return matches[0]
 
 
-def validate_layout(root: Path, platform: str, variant: str, version: str) -> None:
+def validate_libusb_pc(root: Path, platform: str) -> None:
+    libusb_pc = require_one(
+        root,
+        ("lib/pkgconfig/libusb-1.0.pc",),
+        "bundled libusb pkg-config metadata",
+    )
+    pkg_config_metadata.validate_relocatable(
+        libusb_pc.read_bytes(),
+        label="libusb-1.0.pc",
+        expected_name="libusb-1.0",
+        expected_version="1.0.30",
+        expected_library="libusb-1.0" if platform == "windows" else "usb-1.0",
+    )
+
+
+def validate_layout(root: Path, platform: str, version: str) -> None:
+    """Require one install tree to carry both the shared and static flavours."""
     for relative in (
         "include/aoahid.h",
         "include/aoahid.hpp",
@@ -81,105 +102,64 @@ def validate_layout(root: Path, platform: str, variant: str, version: str) -> No
         ("lib/cmake/aoahid/aoahid-config-version.cmake",),
         "CMake package version config",
     )
-    component = "shared" if variant == "shared" else "static"
-    other_component = "static" if variant == "shared" else "shared"
-    require_one(
-        root,
-        (f"lib/cmake/aoahid/aoahid-{component}-targets.cmake",),
-        f"CMake {component} target export",
-    )
-    require_one(
-        root,
-        (f"lib/cmake/aoahid/aoahid-{component}-targets-*.cmake",),
-        f"configuration-specific CMake {component} target export",
-    )
-    if list(root.glob(f"lib/cmake/aoahid/aoahid-{other_component}-targets*.cmake")):
-        raise PackageError(f"{variant} package contains the {other_component} CMake target export")
-    aoahid_pc = require_one(root, ("lib/pkgconfig/aoahid.pc",), "aoahid pkg-config metadata")
+    for component in generate_spdx.COMPONENTS:
+        require_one(
+            root,
+            (f"lib/cmake/aoahid/aoahid-{component}-targets.cmake",),
+            f"CMake {component} target export",
+        )
+        require_one(
+            root,
+            (f"lib/cmake/aoahid/aoahid-{component}-targets-*.cmake",),
+            f"configuration-specific CMake {component} target export",
+        )
+    shared_pc = require_one(root, ("lib/pkgconfig/aoahid.pc",), "shared pkg-config metadata")
     pkg_config_metadata.validate_relocatable(
-        aoahid_pc.read_bytes(),
+        shared_pc.read_bytes(),
         label="aoahid.pc",
         expected_name="libaoahid",
         expected_version=version,
         expected_url=package_source.REPOSITORY_URL,
-        expected_library=(
-            "aoahid_static" if platform == "windows" and variant == "static" else "aoahid"
-        ),
-        expected_requires_private=(
-            "libusb-1.0 >= 1.0.30" if variant == "static" else None
-        ),
+        expected_library="aoahid",
+        expected_requires_private=None,
+        expected_private_libraries=None,
+    )
+    static_pc = require_one(
+        root, ("lib/pkgconfig/aoahid-static.pc",), "static pkg-config metadata"
+    )
+    pkg_config_metadata.validate_relocatable(
+        static_pc.read_bytes(),
+        label="aoahid-static.pc",
+        expected_name="libaoahid static",
+        expected_version=version,
+        expected_url=package_source.REPOSITORY_URL,
+        expected_library="aoahid_static",
+        expected_requires_private="libusb-1.0 >= 1.0.30",
         expected_private_libraries=(
-            ("-lstdc++", "-lc++")
-            if variant == "static" and platform in ("linux", "macos")
-            else None
+            ("-lstdc++", "-lc++") if platform in ("linux", "macos") else None
         ),
     )
+    validate_libusb_pc(root, platform)
+    require_one(root, ("include/libusb-1.0/libusb.h",), "libusb public header")
     source_archive = root / generate_spdx.LIBUSB_SOURCE_NAME
     if hashlib.sha256(source_archive.read_bytes()).hexdigest() != generate_spdx.LIBUSB_SOURCE_SHA256:
         raise PackageError("bundled libusb source archive has the wrong SHA-256")
     license_text = root / generate_spdx.LIBUSB_LICENSE_NAME
     if hashlib.sha256(license_text.read_bytes()).hexdigest() != generate_spdx.LIBUSB_LICENSE_SHA256:
         raise PackageError("bundled libusb license text has the wrong SHA-256")
-    if platform == "linux" and variant == "shared":
+    if platform == "linux":
         require_one(root, ("lib/libaoahid.so.*.*",), "versioned Linux shared object")
-        require_one(root, ("lib/libusb-1.0.so.0.*.*",), "versioned libusb runtime")
-        if list(root.glob("lib/*.a")):
-            raise PackageError("shared package contains a static archive")
-    elif platform == "linux":
-        require_one(root, ("lib/libaoahid.a",), "Linux static archive")
+        require_one(root, ("lib/libaoahid_static.a",), "Linux static archive")
         require_one(root, ("lib/libusb-1.0.so",), "linkable libusb shared library")
         require_one(root, ("lib/libusb-1.0.so.0.*.*",), "versioned libusb runtime")
-        require_one(root, ("include/libusb-1.0/libusb.h",), "libusb public header")
-        libusb_pc = require_one(
-            root,
-            ("lib/pkgconfig/libusb-1.0.pc",),
-            "bundled libusb pkg-config metadata",
-        )
-        pkg_config_metadata.validate_relocatable(
-            libusb_pc.read_bytes(),
-            label="libusb-1.0.pc",
-            expected_name="libusb-1.0",
-            expected_version="1.0.30",
-            expected_library="usb-1.0",
-        )
-        if list(root.glob("lib/libaoahid.so*")):
-            raise PackageError("static package contains the libaoahid shared object")
-    elif platform == "macos" and variant == "shared":
-        require_one(root, ("lib/libaoahid.*.*.*.dylib",), "versioned macOS shared library")
-        require_one(root, ("lib/libusb-1.0.0.dylib",), "libusb runtime")
-        if list(root.glob("lib/*.a")):
-            raise PackageError("shared package contains a static archive")
     elif platform == "macos":
-        require_one(root, ("lib/libaoahid.a",), "macOS static archive")
+        require_one(root, ("lib/libaoahid.*.*.*.dylib",), "versioned macOS shared library")
+        require_one(root, ("lib/libaoahid_static.a",), "macOS static archive")
         require_one(root, ("lib/libusb-1.0.dylib",), "linkable libusb shared library")
         require_one(root, ("lib/libusb-1.0.0.dylib",), "libusb runtime")
-        require_one(root, ("include/libusb-1.0/libusb.h",), "libusb public header")
-        libusb_pc = require_one(
-            root,
-            ("lib/pkgconfig/libusb-1.0.pc",),
-            "bundled libusb pkg-config metadata",
-        )
-        pkg_config_metadata.validate_relocatable(
-            libusb_pc.read_bytes(),
-            label="libusb-1.0.pc",
-            expected_name="libusb-1.0",
-            expected_version="1.0.30",
-            expected_library="usb-1.0",
-        )
-        if list(root.glob("lib/libaoahid*.dylib")):
-            raise PackageError("static package contains the libaoahid shared library")
-    elif variant == "shared":
+    else:
         require_one(root, ("bin/aoahid.dll",), "Windows DLL")
         require_one(root, ("lib/aoahid.lib",), "Windows import library")
-        require_one(root, ("bin/*usb*.dll",), "bundled libusb DLL")
-        require_one(
-            root,
-            ("lib/dependencies/*usb*.lib",),
-            "bundled libusb import library",
-        )
-        if list(root.glob("lib/aoahid_static.lib")):
-            raise PackageError("shared package contains the aoahid static archive")
-    else:
         require_one(root, ("lib/aoahid_static.lib",), "Windows static archive")
         require_one(root, ("bin/*usb*.dll",), "bundled libusb DLL")
         require_one(root, ("lib/*usb*.lib",), "linkable libusb import library")
@@ -187,21 +167,6 @@ def validate_layout(root: Path, platform: str, variant: str, version: str) -> No
             root,
             ("lib/dependencies/*usb*.lib",),
             "bundled libusb import library",
-        )
-        require_one(root, ("include/libusb-1.0/libusb.h",), "libusb public header")
-        if list(root.glob("bin/aoahid.dll")):
-            raise PackageError("static package contains the aoahid DLL")
-        libusb_pc = require_one(
-            root,
-            ("lib/pkgconfig/libusb-1.0.pc",),
-            "bundled libusb pkg-config metadata",
-        )
-        pkg_config_metadata.validate_relocatable(
-            libusb_pc.read_bytes(),
-            label="libusb-1.0.pc",
-            expected_name="libusb-1.0",
-            expected_version="1.0.30",
-            expected_library="libusb-1.0",
         )
     if platform == "windows":
         vcpkg_manifest = require_one(
@@ -269,13 +234,13 @@ def metadata(args: argparse.Namespace) -> dict[str, object]:
         "version": args.version,
         "platform": args.platform,
         "architecture": args.arch,
-        "variant": args.variant,
+        "components": list(generate_spdx.COMPONENTS),
         "source_commit": args.source_sha,
         "source_date_epoch": args.created_epoch,
         "libusb_version": args.libusb_version,
         "repository": package_source.REPOSITORY_URL,
         "release_download_url": generate_spdx.release_download_url(
-            args.version, args.platform, args.arch, args.variant
+            args.version, args.platform, args.arch
         ),
         "packager_python": runtime_platform.python_version(),
     }
@@ -334,7 +299,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--version", required=True)
     parser.add_argument("--platform", choices=("linux", "macos", "windows"), required=True)
     parser.add_argument("--arch", choices=("x86_64", "aarch64", "arm64"), required=True)
-    parser.add_argument("--variant", choices=("shared", "static"), required=True)
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--created-epoch", type=int, required=True)
     parser.add_argument("--libusb-version", required=True)
@@ -353,8 +317,7 @@ def main() -> int:
         if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.base_name) is None:
             raise PackageError("base name contains a path separator or unsupported character")
         archive = args.out_dir / (args.base_name + extension)
-        sidecar = args.out_dir / (args.base_name + ".spdx.json")
-        if archive.exists() or sidecar.exists():
+        if archive.exists():
             raise PackageError("refusing to overwrite an existing release artifact")
 
         with tempfile.TemporaryDirectory(prefix="libaoahid-package-") as temporary:
@@ -376,7 +339,7 @@ def main() -> int:
             (documentation / "build-metadata.json").write_text(
                 json.dumps(metadata(args), indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
-            validate_layout(package_root, args.platform, args.variant, args.version)
+            validate_layout(package_root, args.platform, args.version)
 
             internal_sbom = package_root / generate_spdx.SPDX_NAME
             spdx_args = argparse.Namespace(
@@ -384,7 +347,6 @@ def main() -> int:
                 version=args.version,
                 platform=args.platform,
                 arch=args.arch,
-                variant=args.variant,
                 source_sha=args.source_sha,
                 created_epoch=args.created_epoch,
                 libusb_version=args.libusb_version,
@@ -393,7 +355,6 @@ def main() -> int:
             internal_sbom.parent.mkdir(parents=True, exist_ok=True)
             internal_sbom.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             generate_spdx.validate_document(package_root, document)
-            shutil.copy2(internal_sbom, sidecar)
 
             if args.platform == "windows":
                 write_zip(package_root, archive, args.created_epoch)
@@ -409,7 +370,7 @@ def main() -> int:
     ) as error:
         print(f"package-release: error: {error}", file=sys.stderr)
         return 1
-    print(f"package-release: wrote {archive.name} and {sidecar.name}")
+    print(f"package-release: wrote {archive.name}")
     return 0
 
 

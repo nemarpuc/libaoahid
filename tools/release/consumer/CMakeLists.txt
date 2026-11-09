@@ -18,6 +18,27 @@ if(NOT TARGET "${AOAHID_CONSUMER_TARGET}")
       "Requested installed target does not exist: ${AOAHID_CONSUMER_TARGET}")
 endif()
 
+# One archive carries both components, so a smoke run states which flavour it
+# must have linked and which other targets the same find_package() must define.
+set(AOAHID_CONSUMER_EXPECTED_TYPE "" CACHE STRING
+    "When set, the TYPE the consumer target must have (SHARED_LIBRARY or STATIC_LIBRARY).")
+if(AOAHID_CONSUMER_EXPECTED_TYPE)
+  get_target_property(_aoahid_consumer_type "${AOAHID_CONSUMER_TARGET}" TYPE)
+  if(NOT _aoahid_consumer_type STREQUAL AOAHID_CONSUMER_EXPECTED_TYPE)
+    message(FATAL_ERROR
+        "${AOAHID_CONSUMER_TARGET} has TYPE ${_aoahid_consumer_type}, "
+        "expected ${AOAHID_CONSUMER_EXPECTED_TYPE}")
+  endif()
+endif()
+set(AOAHID_CONSUMER_REQUIRED_TARGETS "" CACHE STRING
+    "Semicolon-separated installed targets that must also exist.")
+foreach(_aoahid_required_target IN LISTS AOAHID_CONSUMER_REQUIRED_TARGETS)
+  if(NOT TARGET "${_aoahid_required_target}")
+    message(FATAL_ERROR
+        "Required installed target does not exist: ${_aoahid_required_target}")
+  endif()
+endforeach()
+
 add_executable(aoahid_consumer main.c)
 target_link_libraries(aoahid_consumer PRIVATE "${AOAHID_CONSUMER_TARGET}")
 set_target_properties(aoahid_consumer PROPERTIES

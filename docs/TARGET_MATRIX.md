@@ -76,16 +76,17 @@ first `aoahid_node_open`, try `aoahid_accessory_start` (see
 
 ## Build targets
 
-Release archives are built by `.github/workflows/release.yml` for:
+Release archives are built by `.github/workflows/release.yml`, one per target,
+each holding both artifacts:
 
 | Host | Runner | Artifacts |
 |---|---|---|
-| Linux x86_64, glibc | `ubuntu-22.04` | `libaoahid.so`, `libaoahid.a` |
-| Linux aarch64, glibc | `ubuntu-22.04-arm` | `libaoahid.so`, `libaoahid.a` |
+| Linux x86_64, glibc | `ubuntu-22.04` | `libaoahid.so`, `libaoahid_static.a` |
+| Linux aarch64, glibc | `ubuntu-22.04-arm` | `libaoahid.so`, `libaoahid_static.a` |
 | Windows x86_64 | `windows-2025-vs2026` | `aoahid.dll` + import library, `aoahid_static.lib` |
 | Windows ARM64 | `windows-11-vs2026-arm` | `aoahid.dll` + import library, `aoahid_static.lib` |
-| macOS arm64 | `macos-15` | `libaoahid.dylib`, `libaoahid.a` |
-| macOS x86_64 | `macos-15-intel` | `libaoahid.dylib`, `libaoahid.a` |
+| macOS arm64 | `macos-15` | `libaoahid.dylib`, `libaoahid_static.a` |
+| macOS x86_64 | `macos-15-intel` | `libaoahid.dylib`, `libaoahid_static.a` |
 
 The macOS archives are built with the fake libusb backend's tests and an
 installed-package consumer, and have not been tested with a real device or
