@@ -98,7 +98,9 @@ harness, not the library:
   catch blocks in `src/api/error_detail.cpp` and `c_api_context.cpp`). They
   turn an exception into `AOAHID_ERR_INTERNAL` so none crosses the C ABI.
   `aoahid.sim-allocation-failure` reaches the ones an allocation can reach;
-  the rest guard calls that cannot throw today.
+  the rest guard calls that cannot throw today. That test is not run with MSVC: with the
+  global `operator new` replaced it ends in a fast-fail (0xc0000409) on Windows that has not
+  been traced yet, so the failure paths it covers are checked on Linux and macOS only.
 - **Null results of `new (std::nothrow)`** in the transport and Channel
   (`port.cpp`, `channel.cpp`, `transport.cpp`). The allocation-failure test
   fails them, but some sit behind a branch only one platform takes.
