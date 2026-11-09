@@ -6,12 +6,15 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import gzip
+import json
 import io
 from io import BytesIO
 from pathlib import Path
 import os
 import re
+import shutil
 import stat
 import struct
 import subprocess
@@ -304,55 +307,62 @@ class SourcePackageTests(unittest.TestCase):
 
 class ReleaseIdentityTests(unittest.TestCase):
     def test_exact_release_archive_names_and_urls(self) -> None:
-        cases = {}
-        for platform, arch, qualifier, extension in collect_release.TARGETS:
-            platform_part = f"{platform}-{arch}" + (
-                f"-{qualifier}" if qualifier else ""
-            )
-            for variant in collect_release.VARIANTS:
-                cases[(platform, arch, variant)] = (
-                    f"libaoahid-0.1.0-{platform_part}-{variant}{extension}"
-                )
-        for (platform, arch, variant), expected in cases.items():
-            with self.subTest(platform=platform, arch=arch, variant=variant):
+        cases = {
+            ("linux", "x86_64"): "libaoahid-0.1.0-linux-x86_64-ubuntu22.04.tar.gz",
+            ("linux", "aarch64"): "libaoahid-0.1.0-linux-aarch64-ubuntu22.04.tar.gz",
+            ("macos", "arm64"): "libaoahid-0.1.0-macos-arm64.tar.gz",
+            ("macos", "x86_64"): "libaoahid-0.1.0-macos-x86_64.tar.gz",
+            ("windows", "x86_64"): "libaoahid-0.1.0-windows-x86_64.zip",
+            ("windows", "arm64"): "libaoahid-0.1.0-windows-arm64.zip",
+        }
+        self.assertEqual(
+            {(platform, arch) for platform, arch, _, _ in collect_release.TARGETS},
+            set(cases),
+        )
+        for (platform, arch), expected in cases.items():
+            with self.subTest(platform=platform, arch=arch):
                 self.assertEqual(
-                    generate_spdx.release_archive_name(
-                        "0.1.0", platform, arch, variant
-                    ),
+                    generate_spdx.release_archive_name("0.1.0", platform, arch),
                     expected,
                 )
                 self.assertEqual(
-                    generate_spdx.release_download_url(
-                        "0.1.0", platform, arch, variant
-                    ),
+                    generate_spdx.release_download_url("0.1.0", platform, arch),
                     f"{package_source.REPOSITORY_URL}/releases/download/v0.1.0/{expected}",
                 )
         with self.assertRaises(generate_spdx.SpdxError):
-            generate_spdx.release_archive_name(
-                "0.1.0", "linux", "arm64", "shared"
-            )
+            generate_spdx.release_archive_name("0.1.0", "linux", "arm64")
+        self.assertEqual(
+            generate_spdx.release_sbom_name("0.1.0"), "libaoahid-0.1.0.spdx.json"
+        )
         self.assertEqual(
             package_source.source_download_url("0.1.0"),
             f"{package_source.REPOSITORY_URL}/releases/download/v0.1.0/"
             "libaoahid-0.1.0-source.tar.gz",
         )
 
-    def test_exact_27_asset_contract(self) -> None:
+    def test_exact_10_asset_contract(self) -> None:
         assets = collect_release.expected_release_asset_names("0.1.0")
-        self.assertEqual(len(assets), 27)
+        self.assertEqual(len(assets), 10)
         self.assertEqual(
             sum(name.endswith((".tar.gz", ".zip")) for name in assets),
-            13,
+            7,
         )
-        self.assertEqual(sum(name.endswith(".spdx.json") for name in assets), 12)
+        self.assertEqual(
+            {name for name in assets if name.endswith(".spdx.json")},
+            {"libaoahid-0.1.0.spdx.json"},
+        )
         self.assertFalse(any("-runtime" in name for name in assets))
+        self.assertFalse(
+            any(re.search(r"-(shared|static)\.(tar\.gz|zip)$", name) for name in assets)
+        )
         # A bare shared library cannot carry libusb's license or corresponding
         # source, so no asset may be one.
         self.assertEqual(sum(name.endswith((".so", ".dylib", ".dll")) for name in assets), 0)
         self.assertIn("release-manifest.json", assets)
         self.assertIn("SHA256SUMS", assets)
         readme = (REPOSITORY / "README.md").read_text(encoding="utf-8")
-        self.assertIn("exactly 27 uploaded assets", readme)
+        self.assertIn("exactly 10 uploaded assets", readme)
+        self.assertNotIn("27 uploaded assets", readme)
 
     def test_shared_archive_runtime_architecture_is_checked(self) -> None:
         def elf(machine: int) -> bytes:
@@ -363,7 +373,7 @@ class ReleaseIdentityTests(unittest.TestCase):
             struct.pack_into("<HH", header, 16, 3, machine)
             return bytes(header)
 
-        root = "libaoahid-0.1.0-linux-x86_64-ubuntu22.04-shared"
+        root = "libaoahid-0.1.0-linux-x86_64-ubuntu22.04"
         with tempfile.TemporaryDirectory() as directory:
             for machine, accepted in ((62, True), (183, False)):
                 with self.subTest(machine=machine):
@@ -526,7 +536,6 @@ Cflags: -I${includedir}
             version="0.1.0",
             platform="windows",
             arch="arm64",
-            variant="shared",
             source_sha="a" * 40,
             created_epoch=0,
             libusb_version="1.0.30",
@@ -537,8 +546,10 @@ Cflags: -I${includedir}
         self.assertEqual(
             metadata["release_download_url"],
             f"{package_source.REPOSITORY_URL}/releases/download/v0.1.0/"
-            "libaoahid-0.1.0-windows-arm64-shared.zip",
+            "libaoahid-0.1.0-windows-arm64.zip",
         )
+        self.assertEqual(metadata["components"], ["shared", "static"])
+        self.assertNotIn("variant", metadata)
 
     def test_spdx_rejects_noncanonical_package_urls(self) -> None:
         own = {
@@ -547,12 +558,12 @@ Cflags: -I${includedir}
             "filesAnalyzed": True,
             "homepage": "https://github.com/wrong/repository",
             "downloadLocation": "https://example.invalid/archive.zip",
-            "packageFileName": "libaoahid-0.1.0-windows-arm64-shared.zip",
+            "packageFileName": "libaoahid-0.1.0-windows-arm64.zip",
         }
         document = {
             "spdxVersion": "SPDX-2.3",
             "dataLicense": "CC0-1.0",
-            "name": "libaoahid-0.1.0-windows-arm64-shared",
+            "name": "libaoahid-0.1.0-windows-arm64",
             "packages": [own],
         }
         with tempfile.TemporaryDirectory() as temporary:
@@ -584,7 +595,10 @@ Cflags: -I${includedir}
         self.assertIn("generator: Visual Studio 18 2026", workflow)
         self.assertIn("tools/release/package_source.py", workflow)
         self.assertIn("--source-root .", workflow)
-        self.assertIn('test "${#assets[@]}" -eq 27', workflow)
+        self.assertIn('test "${#assets[@]}" -eq 10', workflow)
+        self.assertNotIn("-eq 27", workflow)
+        self.assertNotRegex(workflow, r"-(shared|static)\.(tar\.gz|zip)")
+        self.assertNotIn("--variant", workflow)
         self.assertIn(
             "AOAHID_RELEASE_VERSION: ${{ needs.validate.outputs.version }}", workflow
         )
@@ -662,16 +676,21 @@ Cflags: -I${includedir}
         self.assertIn("set(_AOAHID_BUILT_STATIC @AOAHID_BUILD_STATIC@)", config)
         self.assertIn("if(_AOAHID_BUILT_SHARED AND", config)
         self.assertIn("if(_AOAHID_BUILT_STATIC AND", config)
+        # Linux, macOS, and Windows each link the static target alone and
+        # together with the shared one, from the same single install.
         self.assertEqual(
-            release.count("-DAOAHID_CONSUMER_TARGET=aoahid::aoahid_static"), 3
+            release.count("-DAOAHID_CONSUMER_TARGET=aoahid::aoahid_static"), 6
         )
-        for expected in (
-            '"build/$variant"',
-            '"build/stage-$variant"',
-            "shared package component exports are contaminated",
-            "static package component exports are contaminated",
-        ):
-            self.assertIn(expected, release)
+        self.assertEqual(release.count("-DAOAHID_CONSUMER_EXPECTED_TYPE=STATIC_LIBRARY"), 6)
+        self.assertEqual(release.count("-DAOAHID_CONSUMER_EXPECTED_TYPE=SHARED_LIBRARY"), 6)
+        self.assertEqual(release.count("-DAOAHID_FIND_COMPONENTS=shared;static"), 3)
+        self.assertEqual(release.count("-DAOAHID_BUILD_SHARED:BOOL=ON"), 3)
+        self.assertEqual(release.count("-DAOAHID_BUILD_STATIC:BOOL=ON"), 3)
+        self.assertNotIn("stage-$variant", release)
+        self.assertNotIn("stage-shared", release)
+        self.assertNotIn("stage-static", release)
+        self.assertIn("combined package component exports are incomplete", release)
+        self.assertIn("package accepted an unknown component", release)
         self.assertNotIn("CMakeCache.txt", release)
         self.assertNotIn("wrong AOAHID_BUILD_SHARED value", release)
         self.assertNotIn("wrong AOAHID_BUILD_STATIC value", release)
@@ -709,6 +728,587 @@ Cflags: -I${includedir}
 
     def test_repository_metadata_is_consistent(self) -> None:
         validate_release.validate_repository_identity(REPOSITORY)
+
+class DryRunTests(unittest.TestCase):
+    def test_dry_run_version_is_the_newest_dated_changelog_section(self) -> None:
+        self.assertEqual(
+            validate_release.newest_dated_version(REPOSITORY),
+            next(iter(validate_release.source_versions(REPOSITORY).values())),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            changelog = root / "CHANGELOG.md"
+            changelog.write_text(
+                "# Changelog\n\n## [Unreleased]\n\n- next\n\n"
+                "## [0.2.0] - 2026-12-01\n\n- b\n\n## [0.1.0] - 2026-11-07\n\n- a\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(validate_release.newest_dated_version(root), "0.2.0")
+            changelog.write_text(
+                "## [0.1.0] - 2026-11-07\n\n- a\n\n## [0.2.0] - 2026-12-01\n\n- b\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(validate_release.ValidationError, "highest"):
+                validate_release.newest_dated_version(root)
+            changelog.write_text("## [Unreleased]\n\n- a\n", encoding="utf-8")
+            with self.assertRaisesRegex(validate_release.ValidationError, "no dated"):
+                validate_release.newest_dated_version(root)
+
+    def test_dry_run_publishes_nothing_and_the_tag_path_is_kept(self) -> None:
+        workflow = (REPOSITORY / ".github/workflows/release.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("  workflow_dispatch:\n    inputs:\n      dry_run:", workflow)
+        self.assertIn("        type: boolean\n        default: true\n", workflow)
+        self.assertIn("validate_release.py --dry-run", workflow)
+        self.assertIn('validate_release.py --tag "${GITHUB_REF_NAME}"', workflow)
+        self.assertIn("GITHUB_STEP_SUMMARY", workflow)
+        self.assertIn("A dispatched run is always a dry run", workflow)
+        publish = workflow[workflow.index("\n  publish:\n") :]
+        publish = publish[: publish.index("\n  publish-pypi:\n")]
+        self.assertIn(
+            "if: needs.validate.outputs.dry_run == 'false' && "
+            "github.event_name == 'push' && github.ref_type == 'tag'",
+            publish,
+        )
+        self.assertIn("repos/$GITHUB_REPOSITORY/releases", publish)
+        for job in ("publish-pypi", "publish-nuget"):
+            block = workflow[workflow.index(f"\n  {job}:\n") :]
+            self.assertIn(
+                "if: needs.validate.outputs.dry_run == 'false' && "
+                "vars.AOAHID_PUBLISH_BINDINGS == 'true'",
+                block[: block.index("steps:")],
+            )
+        assemble = workflow[workflow.index("\n  assemble:\n") : workflow.index("\n  publish:\n")]
+        self.assertIn("contents: read", assemble)
+        self.assertNotIn("contents: write", assemble)
+        self.assertNotIn("gh api", assemble)
+        self.assertIn("name: release-dist", assemble)
+        self.assertIn("collect_release.py", assemble)
+        self.assertIn("glibc_versions.py", assemble)
+        self.assertIn('-eq 10', assemble)
+
+
+def _elf(machine: int) -> bytes:
+    header = bytearray(64)
+    header[0:4] = b"\x7fELF"
+    header[4] = 2
+    header[5] = 1
+    struct.pack_into("<HH", header, 16, 3, machine)
+    return bytes(header)
+
+
+def _mach_o(cpu_type: int) -> bytes:
+    header = bytearray(32)
+    header[0:4] = b"\xcf\xfa\xed\xfe"
+    struct.pack_into("<iiI", header, 4, cpu_type, 0, 6)
+    return bytes(header)
+
+
+def _pe_dll(machine: int) -> bytes:
+    data = bytearray(0x200)
+    data[0:2] = b"MZ"
+    struct.pack_into("<I", data, 0x3C, 0x80)
+    data[0x80:0x84] = b"PE\0\0"
+    struct.pack_into("<H", data, 0x84, machine)
+    struct.pack_into("<H", data, 0x80 + 22, 0x2002)
+    struct.pack_into("<H", data, 0x80 + 24, 0x20B)
+    return bytes(data)
+
+
+FAKE_LIBUSB_SOURCE = b"fixture libusb source archive"
+FAKE_LIBUSB_LICENSE = b"fixture libusb LGPL-2.1 text"
+FAKE_VCPKG = {
+    generate_spdx.VCPKG_LICENSE_NAME: b"fixture vcpkg MIT license",
+    generate_spdx.VCPKG_PORT_FILES[0]: b"fixture portfile",
+    generate_spdx.VCPKG_PORT_FILES[1]: b"fixture vcpkg.json",
+}
+SOURCE_SHA = "a" * 40
+EPOCH = 1_762_473_600
+
+
+def _sha256(data: bytes) -> str:
+    import hashlib
+
+    return hashlib.sha256(data).hexdigest()
+
+
+def _pc(name: str, library: str, version: str, extra: str = "") -> str:
+    return (
+        "prefix=${pcfiledir}/../..\n"
+        "exec_prefix=${prefix}\n"
+        "libdir=${exec_prefix}/lib\n"
+        "includedir=${prefix}/include\n\n"
+        f"Name: {name}\nDescription: fixture\nVersion: {version}\n"
+        + (f"URL: {package_source.REPOSITORY_URL}\n" if name.startswith("libaoahid") else "")
+        + extra
+        + f"Libs: -L${{libdir}} -l{library}\nCflags: -I${{includedir}}\n"
+    )
+
+
+def write_fixture_stage(root: Path, platform: str, arch: str, *, omit: str = "") -> None:
+    """Write an install tree shaped like one combined release build."""
+    files: dict[str, bytes] = {
+        "include/aoahid.h": b"/* fixture */\n",
+        "include/aoahid.hpp": b"/* fixture */\n",
+        "include/libusb-1.0/libusb.h": b"/* fixture */\n",
+        "lib/cmake/aoahid/aoahid-config.cmake": b"# fixture\n",
+        "lib/cmake/aoahid/aoahid-config-version.cmake": b"# fixture\n",
+        "lib/cmake/aoahid/aoahid-check-libusb.cmake": b"# fixture\n",
+        generate_spdx.LIBUSB_LICENSE_NAME: FAKE_LIBUSB_LICENSE,
+        generate_spdx.LIBUSB_SOURCE_NAME: FAKE_LIBUSB_SOURCE,
+    }
+    for component in ("shared", "static"):
+        files[f"lib/cmake/aoahid/aoahid-{component}-targets.cmake"] = b"# fixture\n"
+        files[f"lib/cmake/aoahid/aoahid-{component}-targets-release.cmake"] = b"# fixture\n"
+    cxx = "Libs.private: -lstdc++\n" if platform != "windows" else ""
+    files["lib/pkgconfig/aoahid.pc"] = _pc("libaoahid", "aoahid", "0.1.0").encode()
+    files["lib/pkgconfig/aoahid-static.pc"] = _pc(
+        "libaoahid static",
+        "aoahid_static",
+        "0.1.0",
+        "Requires.private: libusb-1.0 >= 1.0.30\n" + cxx,
+    ).encode()
+    files["lib/pkgconfig/libusb-1.0.pc"] = _pc(
+        "libusb-1.0", "libusb-1.0" if platform == "windows" else "usb-1.0", "1.0.30"
+    ).encode()
+    links: dict[str, str] = {}
+    if platform == "linux":
+        machine = {"x86_64": 62, "aarch64": 183}[arch]
+        files["lib/libaoahid.so.0.1.0"] = _elf(machine)
+        files["lib/libaoahid_static.a"] = b"!<arch>\n"
+        files["lib/libusb-1.0.so.0.6.0"] = _elf(machine)
+        links = {
+            "lib/libaoahid.so.0": "libaoahid.so.0.1.0",
+            "lib/libaoahid.so": "libaoahid.so.0",
+            "lib/libusb-1.0.so.0": "libusb-1.0.so.0.6.0",
+            "lib/libusb-1.0.so": "libusb-1.0.so.0",
+        }
+        glibc = [
+            {"path": path, "required_versions": ["GLIBC_2.17"], "maximum_required": "GLIBC_2.17"}
+            for path in ("lib/libaoahid.so.0.1.0", "lib/libusb-1.0.so.0.6.0")
+        ]
+        files["share/doc/libaoahid/glibc-requirements.json"] = json.dumps(
+            {
+                "schema": 1,
+                "baseline": glibc_versions.BASELINE,
+                "maximum_allowed": glibc_versions.MAXIMUM_ALLOWED,
+                "required_versions": ["GLIBC_2.17"],
+                "maximum_required": "GLIBC_2.17",
+                "files": glibc,
+            }
+        ).encode()
+    elif platform == "macos":
+        cpu = {"x86_64": 0x01000007, "arm64": 0x0100000C}[arch]
+        files["lib/libaoahid.0.1.0.dylib"] = _mach_o(cpu)
+        files["lib/libaoahid_static.a"] = b"!<arch>\n"
+        files["lib/libusb-1.0.0.dylib"] = _mach_o(cpu)
+        links = {
+            "lib/libaoahid.0.dylib": "libaoahid.0.1.0.dylib",
+            "lib/libaoahid.dylib": "libaoahid.0.dylib",
+            "lib/libusb-1.0.dylib": "libusb-1.0.0.dylib",
+        }
+    else:
+        machine = {"x86_64": 0x8664, "arm64": 0xAA64}[arch]
+        files["bin/aoahid.dll"] = _pe_dll(machine)
+        files["bin/libusb-1.0.dll"] = _pe_dll(machine)
+        files["lib/aoahid.lib"] = b"!<arch>\n"
+        files["lib/aoahid_static.lib"] = b"!<arch>\n"
+        files["lib/libusb-1.0.lib"] = b"!<arch>\n"
+        files["lib/dependencies/libusb-1.0.lib"] = b"!<arch>\n"
+        files.update(FAKE_VCPKG)
+    for relative, contents in files.items():
+        if relative == omit:
+            continue
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(contents)
+    for relative, target in links.items():
+        (root / relative).symlink_to(target)
+
+
+def fixture_hashes() -> mock._patch:
+    """Accept the fixture's stand-ins for the pinned third-party files."""
+    vcpkg = {name: _sha256(data) for name, data in FAKE_VCPKG.items()}
+    patches = [
+        mock.patch.multiple(
+            generate_spdx,
+            LIBUSB_SOURCE_SHA256=_sha256(FAKE_LIBUSB_SOURCE),
+            LIBUSB_LICENSE_SHA256=_sha256(FAKE_LIBUSB_LICENSE),
+            VCPKG_LICENSE_SHA256=vcpkg[generate_spdx.VCPKG_LICENSE_NAME],
+        ),
+        mock.patch.multiple(
+            collect_release,
+            LIBUSB_SOURCE_SHA256=_sha256(FAKE_LIBUSB_SOURCE),
+            LIBUSB_LICENSE_SHA256=_sha256(FAKE_LIBUSB_LICENSE),
+            VCPKG_LICENSE_SHA256=vcpkg[generate_spdx.VCPKG_LICENSE_NAME],
+        ),
+        mock.patch.dict(generate_spdx.VCPKG_FILE_SHA256, vcpkg),
+        # The source archive's own tests are in SourcePackageTests; here it is
+        # a placeholder whose git-tree validation would need a real tag.
+        mock.patch.object(package_source, "validate_source_archive"),
+    ]
+    stack = contextlib.ExitStack()
+    for patch in patches:
+        stack.enter_context(patch)
+    return stack
+
+
+def run_main(module: object, arguments: list[str]) -> tuple[int, str]:
+    error = io.StringIO()
+    with mock.patch("sys.argv", ["tool", *arguments]), contextlib.redirect_stderr(
+        error
+    ), contextlib.redirect_stdout(io.StringIO()):
+        code = module.main()
+    return code, error.getvalue()
+
+
+def package_fixture(directory: Path, platform: str, arch: str, *, omit: str = "") -> tuple[int, str]:
+    stage = directory / f"stage-{platform}-{arch}"
+    write_fixture_stage(stage, platform, arch, omit=omit)
+    arguments = [
+        "--source-root", str(REPOSITORY),
+        "--stage", str(stage),
+        "--out-dir", str(directory / "dist"),
+        "--base-name", generate_spdx.release_archive_root("0.1.0", platform, arch),
+        "--version", "0.1.0",
+        "--platform", platform,
+        "--arch", arch,
+        "--source-sha", SOURCE_SHA,
+        "--created-epoch", str(EPOCH),
+        "--libusb-version", "1.0.30",
+    ]
+    if platform == "linux":
+        arguments += [
+            "--build-metadata", f"glibc_baseline={glibc_versions.BASELINE}",
+            "--build-metadata", "glibc_maximum_required=GLIBC_2.17",
+        ]
+    return run_main(package_release, arguments)
+
+
+def collect(directory: Path) -> tuple[int, str]:
+    return run_main(
+        collect_release,
+        [
+            "--directory", str(directory),
+            "--source-root", str(REPOSITORY),
+            "--version", "0.1.0",
+            "--source-sha", SOURCE_SHA,
+            "--created-epoch", str(EPOCH),
+        ],
+    )
+
+
+class SingleArchiveReleaseTests(unittest.TestCase):
+    """End to end: six combined archives become the ten release assets."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.temporary.name)
+        cls.hashes = fixture_hashes()
+        cls.hashes.__enter__()
+        for platform, arch, _, _ in collect_release.TARGETS:
+            code, error = package_fixture(cls.root, platform, arch)
+            if code != 0:
+                raise AssertionError(f"{platform}/{arch}: {error}")
+        dist = cls.root / "dist"
+        (dist / package_source.source_archive_name("0.1.0")).write_bytes(b"fixture source")
+        cls.pristine = cls.root / "pristine"
+        shutil.copytree(dist, cls.pristine)
+        code, error = collect(dist)
+        if code != 0:
+            raise AssertionError(error)
+        cls.dist = dist
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.hashes.__exit__(None, None, None)
+        cls.temporary.cleanup()
+
+    def fresh(self) -> Path:
+        directory = Path(tempfile.mkdtemp(dir=self.root))
+        for path in self.pristine.iterdir():
+            shutil.copy2(path, directory / path.name)
+        return directory
+
+    def test_release_has_exactly_the_ten_assets(self) -> None:
+        names = {path.name for path in self.dist.iterdir()}
+        self.assertEqual(names, collect_release.expected_release_asset_names("0.1.0"))
+        self.assertEqual(len(names), 10)
+        sums = (self.dist / "SHA256SUMS").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(sums), 9)
+        for line in sums:
+            digest, name = line.split("  ")
+            self.assertEqual(digest, collect_release.sha256(self.dist / name))
+
+    def test_each_archive_carries_both_components_and_lgpl_material(self) -> None:
+        manifest = json.loads((self.dist / "release-manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(manifest["targets"]), 6)
+        for target in manifest["targets"]:
+            with self.subTest(archive=target["archive"]):
+                self.assertEqual(target["components"], ["shared", "static"])
+                self.assertNotIn("variant", target)
+                members = collect_release.archive_members(self.dist / target["archive"])
+                for required in (
+                    "lib/cmake/aoahid/aoahid-shared-targets.cmake",
+                    "lib/cmake/aoahid/aoahid-static-targets.cmake",
+                    "lib/pkgconfig/aoahid.pc",
+                    "lib/pkgconfig/aoahid-static.pc",
+                    "share/doc/libaoahid/LICENSE",
+                    "share/doc/libaoahid/NOTICE",
+                    "share/doc/libaoahid/THIRD_PARTY_NOTICES.md",
+                    collect_release.LIBUSB_LICENSE_NAME,
+                    collect_release.LIBUSB_SOURCE_NAME,
+                    collect_release.EMBEDDED_SPDX_NAME,
+                ):
+                    self.assertIn(required, members)
+                shared = {
+                    "linux": "lib/libaoahid.so.0.1.0",
+                    "macos": "lib/libaoahid.0.1.0.dylib",
+                    "windows": "bin/aoahid.dll",
+                }[target["platform"]]
+                static = (
+                    "lib/aoahid_static.lib"
+                    if target["platform"] == "windows"
+                    else "lib/libaoahid_static.a"
+                )
+                self.assertIn(shared, members)
+                self.assertIn(static, members)
+                if target["platform"] == "windows":
+                    self.assertIn(collect_release.VCPKG_LICENSE_NAME, members)
+
+    def test_one_aggregated_sbom_describes_every_archive(self) -> None:
+        sbom_path = self.dist / "libaoahid-0.1.0.spdx.json"
+        document = json.loads(sbom_path.read_text(encoding="utf-8"))
+        manifest = json.loads((self.dist / "release-manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["sbom"]["file"], sbom_path.name)
+        self.assertEqual(manifest["sbom"]["namespace"], document["documentNamespace"])
+        self.assertEqual(document["spdxVersion"], "SPDX-2.3")
+        packages = {package["SPDXID"]: package for package in document["packages"]}
+        archive_ids = {
+            generate_spdx.release_package_id(platform, arch)
+            for platform, arch, _, _ in collect_release.TARGETS
+        }
+        self.assertEqual(
+            set(packages),
+            archive_ids
+            | {
+                generate_spdx.RELEASE_SOURCE_PACKAGE_ID,
+                "SPDXRef-Package-libusb",
+                "SPDXRef-Package-vcpkg",
+            },
+        )
+        self.assertEqual(
+            set(document["documentDescribes"]),
+            archive_ids | {generate_spdx.RELEASE_SOURCE_PACKAGE_ID},
+        )
+        relationships = {
+            (item["spdxElementId"], item["relationshipType"], item["relatedSpdxElement"])
+            for item in document["relationships"]
+        }
+        for target in manifest["targets"]:
+            package_id = generate_spdx.release_package_id(
+                target["platform"], target["architecture"]
+            )
+            package = packages[package_id]
+            self.assertEqual(package["packageFileName"], target["archive"])
+            self.assertEqual(
+                package["checksums"],
+                [{"algorithm": "SHA256", "checksumValue": target["archive_sha256"]}],
+            )
+            self.assertIn(generate_spdx.LIBUSB_LICENSE, package["licenseInfoFromFiles"])
+            self.assertIn(
+                (package_id, "GENERATED_FROM", generate_spdx.RELEASE_SOURCE_PACKAGE_ID),
+                relationships,
+            )
+            self.assertIn((package_id, "DEPENDS_ON", "SPDXRef-Package-libusb"), relationships)
+            embedded = json.loads(
+                collect_release.archive_bytes(
+                    self.dist / target["archive"], collect_release.EMBEDDED_SPDX_NAME
+                )
+            )
+            own = next(p for p in embedded["packages"] if p["SPDXID"] == "SPDXRef-Package-libaoahid")
+            self.assertEqual(
+                own["packageVerificationCode"]["packageVerificationCodeValue"],
+                package["packageVerificationCode"]["packageVerificationCodeValue"],
+            )
+        source = packages[generate_spdx.RELEASE_SOURCE_PACKAGE_ID]
+        self.assertEqual(source["checksums"][0]["checksumValue"], manifest["source"]["archive_sha256"])
+
+    def test_collect_is_deterministic(self) -> None:
+        directory = self.fresh()
+        self.assertEqual(collect(directory)[0], 0)
+        for name in ("SHA256SUMS", "release-manifest.json", "libaoahid-0.1.0.spdx.json"):
+            self.assertEqual((directory / name).read_bytes(), (self.dist / name).read_bytes(), name)
+
+    def repack_without(self, archive: Path, relative: str) -> None:
+        root = archive.name.removesuffix(".tar.gz").removesuffix(".zip")
+        if archive.name.endswith(".zip"):
+            import zipfile
+
+            with zipfile.ZipFile(archive) as source:
+                entries = [(info, source.read(info)) for info in source.infolist()]
+            with zipfile.ZipFile(archive, "w") as output:
+                for info, data in entries:
+                    if info.filename != f"{root}/{relative}":
+                        output.writestr(info, data)
+            return
+        with tarfile.open(archive, "r:gz") as source:
+            entries = [
+                (member, source.extractfile(member).read() if member.isfile() else None)
+                for member in source.getmembers()
+            ]
+        with tarfile.open(archive, "w:gz") as output:
+            for member, data in entries:
+                if member.name != f"{root}/{relative}":
+                    output.addfile(member, io.BytesIO(data) if data is not None else None)
+
+    def test_every_archive_must_still_carry_the_lgpl_material(self) -> None:
+        for platform, arch in (("linux", "aarch64"), ("macos", "x86_64"), ("windows", "arm64")):
+            for relative in (
+                collect_release.LIBUSB_LICENSE_NAME,
+                collect_release.LIBUSB_SOURCE_NAME,
+                "share/doc/libaoahid/NOTICE",
+                "share/doc/libaoahid/THIRD_PARTY_NOTICES.md",
+            ):
+                with self.subTest(platform=platform, arch=arch, missing=relative):
+                    directory = self.fresh()
+                    archive = directory / generate_spdx.release_archive_name("0.1.0", platform, arch)
+                    self.repack_without(archive, relative)
+                    code, error = collect(directory)
+                    self.assertEqual(code, 1)
+                    self.assertIn(f"missing {relative}", error)
+                    self.assertFalse((directory / "SHA256SUMS").exists())
+
+    def test_an_archive_without_one_component_is_refused(self) -> None:
+        for relative in (
+            "lib/libaoahid_static.a",
+            "lib/cmake/aoahid/aoahid-shared-targets.cmake",
+            "lib/pkgconfig/aoahid-static.pc",
+        ):
+            with self.subTest(missing=relative), tempfile.TemporaryDirectory() as temporary:
+                code, error = package_fixture(Path(temporary), "linux", "x86_64", omit=relative)
+                self.assertEqual(code, 1)
+                self.assertIn("package-release: error", error)
+            with self.subTest(collect_missing=relative):
+                directory = self.fresh()
+                archive = directory / generate_spdx.release_archive_name("0.1.0", "linux", "x86_64")
+                self.repack_without(archive, relative)
+                self.assertEqual(collect(directory)[0], 1)
+
+    def test_stale_per_flavour_assets_are_rejected(self) -> None:
+        directory = self.fresh()
+        (directory / "libaoahid-0.1.0-linux-x86_64-ubuntu22.04-shared.tar.gz").write_bytes(b"old")
+        code, error = collect(directory)
+        self.assertEqual(code, 1)
+        self.assertIn("unexpected release artifacts", error)
+
+    def records(self) -> tuple[list[generate_spdx.ArchiveRecord], generate_spdx.SourceRecord]:
+        archives = [
+            collect_release.archive_record(
+                self.dist / generate_spdx.release_archive_name("0.1.0", platform, arch),
+                platform,
+                arch,
+            )
+            for platform, arch, _, _ in collect_release.TARGETS
+        ]
+        source_path = self.dist / package_source.source_archive_name("0.1.0")
+        return archives, generate_spdx.SourceRecord(
+            name=source_path.name, sha256=collect_release.sha256(source_path)
+        )
+
+    def validate(self, document: object) -> str:
+        archives, source = self.records()
+        return generate_spdx.validate_release_document(
+            document,
+            archives,
+            source,
+            version="0.1.0",
+            source_sha=SOURCE_SHA,
+            created_epoch=EPOCH,
+            libusb_version="1.0.30",
+        )
+
+    def test_tampered_release_sbom_is_rejected(self) -> None:
+        original = json.loads((self.dist / "libaoahid-0.1.0.spdx.json").read_text(encoding="utf-8"))
+        self.validate(original)
+        linux = generate_spdx.release_package_id("linux", "x86_64")
+
+        def package(document: dict, identifier: str) -> dict:
+            return next(p for p in document["packages"] if p["SPDXID"] == identifier)
+
+        document = json.loads(json.dumps(original))
+        package(document, linux)["checksums"][0]["checksumValue"] = "0" * 64
+        with self.assertRaisesRegex(generate_spdx.SpdxError, "wrong checksum"):
+            self.validate(document)
+
+        document = json.loads(json.dumps(original))
+        package(document, linux)["licenseInfoFromFiles"] = ["MIT"]
+        with self.assertRaisesRegex(
+            generate_spdx.SpdxError,
+            "no packaged file is attributed to the bundled libusb runtime",
+        ):
+            self.validate(document)
+
+        document = json.loads(json.dumps(original))
+        document["packages"] = [
+            p for p in document["packages"] if p["SPDXID"] != generate_spdx.release_package_id("windows", "arm64")
+        ]
+        with self.assertRaisesRegex(generate_spdx.SpdxError, "no package for"):
+            self.validate(document)
+
+        document = json.loads(json.dumps(original))
+        document["files"] = document["files"][1:]
+        with self.assertRaisesRegex(generate_spdx.SpdxError, "does not exactly describe"):
+            self.validate(document)
+
+        document = json.loads(json.dumps(original))
+        for item in document["files"]:
+            if item["fileName"].endswith("/" + collect_release.LIBUSB_LICENSE_NAME):
+                item["licenseConcluded"] = "MIT"
+                item["licenseInfoInFiles"] = ["MIT"]
+        with self.assertRaisesRegex(generate_spdx.SpdxError, "does not exactly describe"):
+            self.validate(document)
+
+    def test_release_sbom_requires_libusb_attribution_per_archive(self) -> None:
+        archives, source = self.records()
+        unattributed = generate_spdx.ArchiveRecord(
+            platform=archives[0].platform,
+            arch=archives[0].arch,
+            name=archives[0].name,
+            sha256=archives[0].sha256,
+            files={
+                relative: digests
+                for relative, digests in archives[0].files.items()
+                if generate_spdx.file_license(relative)[0] != generate_spdx.LIBUSB_LICENSE
+            },
+        )
+        with self.assertRaisesRegex(generate_spdx.SpdxError, "is missing or has the wrong SHA-256"):
+            generate_spdx.create_release_document(
+                [unattributed, *archives[1:]],
+                source,
+                version="0.1.0",
+                source_sha=SOURCE_SHA,
+                created_epoch=EPOCH,
+                libusb_version="1.0.30",
+            )
+        with mock.patch.object(
+            generate_spdx, "file_license", return_value=("MIT", generate_spdx.FIRST_PARTY_COPYRIGHT)
+        ):
+            with self.assertRaisesRegex(
+                generate_spdx.SpdxError,
+                "no packaged file is attributed to the bundled libusb runtime",
+            ):
+                generate_spdx.create_release_document(
+                    archives,
+                    source,
+                    version="0.1.0",
+                    source_sha=SOURCE_SHA,
+                    created_epoch=EPOCH,
+                    libusb_version="1.0.30",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

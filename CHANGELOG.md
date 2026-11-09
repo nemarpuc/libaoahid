@@ -14,6 +14,24 @@ All notable changes to libaoahid are recorded here. This project follows
   `runtime_bundle`, `runtime_bundle_sha256`, and
   `runtime_glibc_maximum_required` keys. A release now has 27 assets instead
   of 33; the `*-shared` and `*-static` asset names are unchanged.
+- **One archive per platform, one SBOM per release: 10 assets instead of 27.**
+  Each target is built once with both `AOAHID_BUILD_SHARED` and
+  `AOAHID_BUILD_STATIC` and ships as `libaoahid-X.Y.Z-<platform>-<arch>[-ubuntu22.04]`
+  (`.tar.gz`, `.zip` on Windows) with no `-shared`/`-static` suffix. The archive
+  holds both libraries, the CMake package with both `shared` and `static`
+  components, `aoahid.pc` and `aoahid-static.pc`, the libusb runtime, header,
+  and link library, the examples, and the same LGPL material as before. The
+  static library is now `libaoahid_static.a` on Linux and macOS (it was
+  `libaoahid.a` in the static-only archive). The twelve per-archive SPDX
+  sidecars are replaced by `libaoahid-X.Y.Z.spdx.json`, one SPDX 2.3 document
+  with a checksummed package per archive, generated from the source archive;
+  each archive still embeds its own SPDX document. In `release-manifest.json`
+  each target drops `variant`, `spdx`, and `spdx_sha256`, and gains
+  `components`, `embedded_spdx_sha256`, and `embedded_spdx_namespace`; a
+  top-level `sbom` record is added. `release.yml` also accepts a
+  `workflow_dispatch` dry run that builds and checks everything without a tag,
+  keeps the assembled release as the `release-dist` artifact, and publishes
+  nothing.
 
 ## [0.1.0] - 2026-11-07
 

@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 libaoahid contributors
-"""Generate and validate a deterministic SPDX 2.3 JSON document.
+"""Generate and validate deterministic SPDX 2.3 JSON documents.
+
+Two kinds are produced. Each binary archive embeds a document describing that
+archive's own files (share/doc/libaoahid/libaoahid.spdx.json). The release
+itself publishes one document, libaoahid-X.Y.Z.spdx.json, with one package per
+binary archive (with the archive checksum and every file it contains) and a
+package for the source archive they are generated from.
 
 Normative model used here (retrieved 2026-08-27):
   * SPDX 2.3, Document Creation Information
@@ -11,13 +17,14 @@ Normative model used here (retrieved 2026-08-27):
   * SPDX 2.3, File Information
     https://spdx.github.io/spdx-spec/v2.3/file-information/
   * SPDX 2.3, Relationships: DESCRIBES, CONTAINS, DEPENDS_ON,
-    BUILD_DEPENDENCY_OF
+    BUILD_DEPENDENCY_OF, GENERATED_FROM
     https://spdx.github.io/spdx-spec/v2.3/relationships-between-SPDX-elements/
 """
 
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -88,34 +95,40 @@ def file_license(relative: str) -> tuple[str, str]:
     return MIT_LICENSE, FIRST_PARTY_COPYRIGHT
 
 
-def release_archive_name(
-    version: str, platform: str, arch: str, variant: str
-) -> str:
-    allowed = {
-        "linux": {"x86_64", "aarch64"},
-        "macos": {"x86_64", "arm64"},
-        "windows": {"x86_64", "arm64"},
-    }
-    if platform not in allowed or arch not in allowed[platform]:
+RELEASE_TARGETS = {
+    "linux": ("x86_64", "aarch64"),
+    "macos": ("x86_64", "arm64"),
+    "windows": ("x86_64", "arm64"),
+}
+# Every binary archive carries both libaoahid flavours (shared and static);
+# the CMake package exposes them as these find_package() components.
+COMPONENTS = ("shared", "static")
+
+
+def release_archive_root(version: str, platform: str, arch: str) -> str:
+    """Return the archive's top-level directory, which is also its base name."""
+    if platform not in RELEASE_TARGETS or arch not in RELEASE_TARGETS[platform]:
         raise SpdxError(f"unsupported release target: {platform}/{arch}")
-    if variant not in {"shared", "static"}:
-        raise SpdxError(f"unsupported release variant: {variant!r}")
     if platform == "linux":
-        return (
-            f"libaoahid-{version}-linux-{arch}-ubuntu22.04-{variant}.tar.gz"
-        )
-    if platform == "macos":
-        return f"libaoahid-{version}-macos-{arch}-{variant}.tar.gz"
-    return f"libaoahid-{version}-windows-{arch}-{variant}.zip"
+        return f"libaoahid-{version}-linux-{arch}-ubuntu22.04"
+    return f"libaoahid-{version}-{platform}-{arch}"
 
 
-def release_download_url(
-    version: str, platform: str, arch: str, variant: str
-) -> str:
-    archive = release_archive_name(version, platform, arch, variant)
+def release_archive_name(version: str, platform: str, arch: str) -> str:
+    extension = ".zip" if platform == "windows" else ".tar.gz"
+    return release_archive_root(version, platform, arch) + extension
+
+
+def release_download_url(version: str, platform: str, arch: str) -> str:
+    archive = release_archive_name(version, platform, arch)
     return (
         f"{package_source.REPOSITORY_URL}/releases/download/v{version}/{archive}"
     )
+
+
+def release_sbom_name(version: str) -> str:
+    """Return the name of the one SPDX document that describes a release."""
+    return f"libaoahid-{version}.spdx.json"
 
 
 def digest(path: Path, algorithm: str) -> str:
@@ -160,7 +173,7 @@ def create_document(args: argparse.Namespace) -> dict[str, object]:
     if not files:
         raise SpdxError(f"package root is empty: {root}")
     created = datetime.fromtimestamp(args.created_epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    identity = f"{args.version}:{args.platform}:{args.arch}:{args.variant}:{args.source_sha}:{verification_code(files)}"
+    identity = f"{args.version}:{args.platform}:{args.arch}:{args.source_sha}:{verification_code(files)}"
     namespace_id = uuid.uuid5(uuid.NAMESPACE_URL, identity)
     package_id = "SPDXRef-Package-libaoahid"
     libusb_id = "SPDXRef-Package-libusb"
@@ -244,10 +257,10 @@ def create_document(args: argparse.Namespace) -> dict[str, object]:
             "SPDXID": package_id,
             "versionInfo": args.version,
             "downloadLocation": release_download_url(
-                args.version, args.platform, args.arch, args.variant
+                args.version, args.platform, args.arch
             ),
             "packageFileName": release_archive_name(
-                args.version, args.platform, args.arch, args.variant
+                args.version, args.platform, args.arch
             ),
             "homepage": package_source.REPOSITORY_URL,
             "filesAnalyzed": True,
@@ -308,7 +321,7 @@ def create_document(args: argparse.Namespace) -> dict[str, object]:
         "spdxVersion": "SPDX-2.3",
         "dataLicense": "CC0-1.0",
         "SPDXID": "SPDXRef-DOCUMENT",
-        "name": f"libaoahid-{args.version}-{args.platform}-{args.arch}-{args.variant}",
+        "name": f"libaoahid-{args.version}-{args.platform}-{args.arch}",
         "documentNamespace": f"https://spdx.org/spdxdocs/libaoahid-{namespace_id}",
         "creationInfo": {"created": created, "creators": ["Tool: libaoahid-generate-spdx"]},
         "documentDescribes": [package_id],
@@ -332,22 +345,24 @@ def validate_document(root: Path, document: dict[str, object]) -> None:
         raise SpdxError("document name is missing")
     match = re.fullmatch(
         r"libaoahid-([0-9]+\.[0-9]+\.[0-9]+)-(linux|macos|windows)-"
-        r"(x86_64|aarch64|arm64)-(shared|static)",
+        r"(x86_64|aarch64|arm64)",
         name,
     )
     if match is None:
         raise SpdxError("document name does not identify a supported release target")
-    version, platform, arch, variant = match.groups()
+    version, platform, arch = match.groups()
     if own.get("versionInfo") != version:
         raise SpdxError("libaoahid package version disagrees with the SPDX document name")
     if own.get("homepage") != package_source.REPOSITORY_URL:
         raise SpdxError("libaoahid SPDX homepage is not the canonical repository")
-    expected_download = release_download_url(version, platform, arch, variant)
+    try:
+        expected_download = release_download_url(version, platform, arch)
+        expected_file_name = release_archive_name(version, platform, arch)
+    except SpdxError as error:
+        raise SpdxError(f"document name does not identify a supported release target: {error}") from error
     if own.get("downloadLocation") != expected_download:
         raise SpdxError("libaoahid SPDX download location is not the exact release asset")
-    if own.get("packageFileName") != release_archive_name(
-        version, platform, arch, variant
-    ):
+    if own.get("packageFileName") != expected_file_name:
         raise SpdxError("libaoahid SPDX package file name is not the release archive")
     dependency = next(
         (p for p in packages if isinstance(p, dict) and p.get("SPDXID") == "SPDXRef-Package-libusb"),
@@ -524,6 +539,335 @@ def validate_document(root: Path, document: dict[str, object]) -> None:
             raise SpdxError("the vcpkg SPDX file relationships are incomplete")
 
 
+@dataclass(frozen=True)
+class ArchiveRecord:
+    """The digests of one release archive and of every file it contains.
+
+    ``files`` maps each path relative to the archive's top-level directory to
+    its (SHA-1, SHA-256) pair. The embedded per-archive SPDX document is not
+    in it, exactly as it is excluded from that document's own verification
+    code.
+    """
+
+    platform: str
+    arch: str
+    name: str
+    sha256: str
+    files: dict[str, tuple[str, str]]
+
+
+@dataclass(frozen=True)
+class SourceRecord:
+    name: str
+    sha256: str
+
+
+RELEASE_SOURCE_PACKAGE_ID = "SPDXRef-Package-libaoahid-source"
+
+
+def release_package_id(platform: str, arch: str) -> str:
+    return f"SPDXRef-Package-libaoahid-{platform}-{arch}"
+
+
+def release_file_id(archive_root: str, relative: str) -> str:
+    """Return a file identifier that is unique across every release archive."""
+    return file_id(f"{archive_root}/{relative}")
+
+
+def _code_from_sha1(values: list[str]) -> str:
+    return hashlib.sha1("".join(sorted(values)).encode("ascii")).hexdigest()
+
+
+def create_release_document(
+    archives: list[ArchiveRecord],
+    source: SourceRecord,
+    *,
+    version: str,
+    source_sha: str,
+    created_epoch: int,
+    libusb_version: str,
+) -> dict[str, object]:
+    """Describe every binary archive and the source archive in one document.
+
+    Each archive is one package with its own checksum, file list, and license
+    summary; the libusb and pinned vcpkg packages are shared. Every archive is
+    GENERATED_FROM the source package and DEPENDS_ON libusb, so the per-file
+    licensing that each archive's embedded document states is kept here too.
+    """
+    if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) is None:
+        raise SpdxError(f"unsupported release version syntax: {version!r}")
+    if libusb_version != "1.0.30":
+        raise SpdxError("the bundled libusb source archive does not match the dependency version")
+    if source.name != package_source.source_archive_name(version):
+        raise SpdxError(f"source archive is {source.name!r}, not the release source archive")
+    if not archives:
+        raise SpdxError("a release SBOM needs at least one binary archive")
+    seen_targets: set[tuple[str, str]] = set()
+    for archive in archives:
+        target = (archive.platform, archive.arch)
+        if target in seen_targets:
+            raise SpdxError(f"duplicate release archive for {archive.platform}/{archive.arch}")
+        seen_targets.add(target)
+        if archive.name != release_archive_name(version, archive.platform, archive.arch):
+            raise SpdxError(f"{archive.name}: not the exact release archive name")
+
+    created = datetime.fromtimestamp(created_epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    libusb_id = "SPDXRef-Package-libusb"
+    vcpkg_id = "SPDXRef-Package-vcpkg"
+    describes = [RELEASE_SOURCE_PACKAGE_ID]
+    packages: list[dict[str, object]] = [
+        {
+            "name": "libaoahid-source",
+            "SPDXID": RELEASE_SOURCE_PACKAGE_ID,
+            "versionInfo": version,
+            "downloadLocation": package_source.source_download_url(version),
+            "packageFileName": source.name,
+            "checksums": [{"algorithm": "SHA256", "checksumValue": source.sha256}],
+            "homepage": package_source.REPOSITORY_URL,
+            "filesAnalyzed": False,
+            "licenseConcluded": MIT_LICENSE,
+            "licenseDeclared": MIT_LICENSE,
+            "copyrightText": FIRST_PARTY_COPYRIGHT,
+            "supplier": "NOASSERTION",
+            "primaryPackagePurpose": "SOURCE",
+            "sourceInfo": f"Git commit {source_sha}",
+        }
+    ]
+    spdx_files: list[dict[str, object]] = []
+    relationships: list[dict[str, str]] = []
+    vcpkg_sha1: list[str] = []
+    vcpkg_file_ids: list[str] = []
+    windows_package_ids: list[str] = []
+
+    def relate(element: str, relation: str, related: str) -> None:
+        relationships.append(
+            {
+                "spdxElementId": element,
+                "relationshipType": relation,
+                "relatedSpdxElement": related,
+            }
+        )
+
+    for archive in sorted(archives, key=lambda item: item.name):
+        package_id = release_package_id(archive.platform, archive.arch)
+        archive_root = release_archive_root(version, archive.platform, archive.arch)
+        if SPDX_NAME in archive.files:
+            raise SpdxError(f"{archive.name}: the embedded SPDX document must not be listed")
+        if not archive.files:
+            raise SpdxError(f"{archive.name}: archive is empty")
+        observed_licenses: set[str] = set()
+        sha1_values: list[str] = []
+        archive_vcpkg = [relative for relative in VCPKG_FILE_SHA256 if relative in archive.files]
+        if archive.platform == "windows":
+            if len(archive_vcpkg) != len(VCPKG_FILE_SHA256):
+                raise SpdxError(f"{archive.name}: pinned vcpkg build material is incomplete")
+            windows_package_ids.append(package_id)
+        elif archive_vcpkg:
+            raise SpdxError(f"{archive.name}: vcpkg build material outside a Windows archive")
+        for relative in archive_vcpkg:
+            if archive.files[relative][1] != VCPKG_FILE_SHA256[relative]:
+                raise SpdxError(f"{archive.name}: pinned vcpkg build material changed: {relative}")
+        for required, expected_sha256 in (
+            (LIBUSB_SOURCE_NAME, LIBUSB_SOURCE_SHA256),
+            (LIBUSB_LICENSE_NAME, LIBUSB_LICENSE_SHA256),
+        ):
+            if archive.files.get(required, ("", ""))[1] != expected_sha256:
+                raise SpdxError(f"{archive.name}: {required} is missing or has the wrong SHA-256")
+        for relative in sorted(archive.files):
+            sha1_value, sha256_value = archive.files[relative]
+            identifier = release_file_id(archive_root, relative)
+            license_expression, copyright_text = file_license(relative)
+            observed_licenses.add(license_expression)
+            sha1_values.append(sha1_value)
+            spdx_files.append(
+                {
+                    "fileName": f"./{archive_root}/{relative}",
+                    "SPDXID": identifier,
+                    "checksums": [
+                        {"algorithm": "SHA1", "checksumValue": sha1_value},
+                        {"algorithm": "SHA256", "checksumValue": sha256_value},
+                    ],
+                    "licenseConcluded": license_expression,
+                    "licenseInfoInFiles": [license_expression],
+                    "copyrightText": copyright_text,
+                }
+            )
+            relate(package_id, "CONTAINS", identifier)
+            if relative in VCPKG_FILE_SHA256:
+                vcpkg_sha1.append(sha1_value)
+                vcpkg_file_ids.append(identifier)
+        if LIBUSB_LICENSE not in observed_licenses:
+            raise SpdxError(
+                f"{archive.name}: no packaged file is attributed to the bundled libusb runtime"
+            )
+        describes.append(package_id)
+        packages.append(
+            {
+                "name": f"libaoahid-{archive.platform}-{archive.arch}",
+                "SPDXID": package_id,
+                "versionInfo": version,
+                "downloadLocation": release_download_url(version, archive.platform, archive.arch),
+                "packageFileName": archive.name,
+                "checksums": [{"algorithm": "SHA256", "checksumValue": archive.sha256}],
+                "homepage": package_source.REPOSITORY_URL,
+                "filesAnalyzed": True,
+                "packageVerificationCode": {
+                    "packageVerificationCodeValue": _code_from_sha1(sha1_values),
+                    "packageVerificationCodeExcludedFiles": [f"./{archive_root}/{SPDX_NAME}"],
+                },
+                "licenseConcluded": " AND ".join(sorted(observed_licenses)),
+                "licenseDeclared": MIT_LICENSE,
+                "licenseInfoFromFiles": sorted(observed_licenses),
+                "copyrightText": FIRST_PARTY_COPYRIGHT,
+                "supplier": "NOASSERTION",
+                "primaryPackagePurpose": "LIBRARY",
+                "sourceInfo": f"Git commit {source_sha}",
+            }
+        )
+        relate(package_id, "GENERATED_FROM", RELEASE_SOURCE_PACKAGE_ID)
+        relate(package_id, "DEPENDS_ON", libusb_id)
+
+    packages.append(
+        {
+            "name": "libusb",
+            "SPDXID": libusb_id,
+            "versionInfo": libusb_version,
+            "downloadLocation": (
+                "https://github.com/libusb/libusb/releases/download/v1.0.30/"
+                "libusb-1.0.30.tar.bz2"
+            ),
+            "packageFileName": "libusb-1.0.30.tar.bz2",
+            "checksums": [{"algorithm": "SHA256", "checksumValue": LIBUSB_SOURCE_SHA256}],
+            "filesAnalyzed": False,
+            "licenseConcluded": LIBUSB_LICENSE,
+            "licenseDeclared": LIBUSB_LICENSE,
+            "copyrightText": "NOASSERTION",
+            "supplier": "NOASSERTION",
+            "primaryPackagePurpose": "LIBRARY",
+        }
+    )
+    if windows_package_ids:
+        packages.append(
+            {
+                "name": "vcpkg",
+                "SPDXID": vcpkg_id,
+                "versionInfo": VCPKG_COMMIT,
+                "downloadLocation": f"https://github.com/microsoft/vcpkg/tree/{VCPKG_COMMIT}",
+                "filesAnalyzed": True,
+                "packageVerificationCode": {
+                    "packageVerificationCodeValue": _code_from_sha1(vcpkg_sha1)
+                },
+                "licenseConcluded": MIT_LICENSE,
+                "licenseDeclared": MIT_LICENSE,
+                "licenseInfoFromFiles": [MIT_LICENSE],
+                "copyrightText": MICROSOFT_COPYRIGHT,
+                "supplier": "Organization: Microsoft Corporation",
+                "primaryPackagePurpose": "SOURCE",
+                "sourceInfo": "Pinned vcpkg libusb port build material",
+            }
+        )
+        for package_id in windows_package_ids:
+            relate(vcpkg_id, "BUILD_DEPENDENCY_OF", package_id)
+        for identifier in vcpkg_file_ids:
+            relate(vcpkg_id, "CONTAINS", identifier)
+    for package_id in describes:
+        relate("SPDXRef-DOCUMENT", "DESCRIBES", package_id)
+
+    identity = ":".join(
+        [version, source_sha, source.sha256]
+        + [f"{archive.name}={archive.sha256}" for archive in sorted(archives, key=lambda a: a.name)]
+    )
+    namespace_id = uuid.uuid5(uuid.NAMESPACE_URL, identity)
+    return {
+        "spdxVersion": "SPDX-2.3",
+        "dataLicense": "CC0-1.0",
+        "SPDXID": "SPDXRef-DOCUMENT",
+        "name": f"libaoahid-{version}",
+        "documentNamespace": f"https://spdx.org/spdxdocs/libaoahid-{namespace_id}",
+        "creationInfo": {"created": created, "creators": ["Tool: libaoahid-generate-spdx"]},
+        "documentDescribes": describes,
+        "packages": packages,
+        "files": spdx_files,
+        "relationships": relationships,
+    }
+
+
+def validate_release_document(
+    document: object,
+    archives: list[ArchiveRecord],
+    source: SourceRecord,
+    *,
+    version: str,
+    source_sha: str,
+    created_epoch: int,
+    libusb_version: str,
+) -> str:
+    """Require the release SBOM to describe exactly these archives.
+
+    The named checks give a precise error for the properties that matter most
+    (one checksummed package per archive, libusb attribution in each); the
+    final comparison with a regenerated document rejects anything else that
+    differs. Returns the document namespace.
+    """
+    if not isinstance(document, dict):
+        raise SpdxError("release SBOM is not a JSON object")
+    if document.get("spdxVersion") != "SPDX-2.3" or document.get("dataLicense") != "CC0-1.0":
+        raise SpdxError("release SBOM is not SPDX-2.3 JSON")
+    if document.get("name") != f"libaoahid-{version}":
+        raise SpdxError(f"release SBOM name is not libaoahid-{version}")
+    packages = document.get("packages")
+    if not isinstance(packages, list) or not all(isinstance(item, dict) for item in packages):
+        raise SpdxError("release SBOM packages must be a list of objects")
+    by_id = {str(item.get("SPDXID")): item for item in packages}
+    if len(by_id) != len(packages):
+        raise SpdxError("release SBOM contains duplicate package identifiers")
+    source_package = by_id.get(RELEASE_SOURCE_PACKAGE_ID)
+    if (
+        source_package is None
+        or source_package.get("packageFileName") != source.name
+        or source_package.get("checksums")
+        != [{"algorithm": "SHA256", "checksumValue": source.sha256}]
+    ):
+        raise SpdxError("release SBOM source package is missing or has the wrong checksum")
+    for archive in archives:
+        own = by_id.get(release_package_id(archive.platform, archive.arch))
+        if own is None:
+            raise SpdxError(f"release SBOM has no package for {archive.name}")
+        if own.get("packageFileName") != archive.name or own.get("checksums") != [
+            {"algorithm": "SHA256", "checksumValue": archive.sha256}
+        ]:
+            raise SpdxError(f"release SBOM package for {archive.name} has the wrong checksum")
+        licenses = own.get("licenseInfoFromFiles")
+        if not isinstance(licenses, list) or LIBUSB_LICENSE not in licenses:
+            raise SpdxError(
+                f"{archive.name}: no packaged file is attributed to the bundled libusb runtime"
+            )
+    expected_ids = {RELEASE_SOURCE_PACKAGE_ID, "SPDXRef-Package-libusb"} | {
+        release_package_id(archive.platform, archive.arch) for archive in archives
+    }
+    if any(archive.platform == "windows" for archive in archives):
+        expected_ids.add("SPDXRef-Package-vcpkg")
+    if set(by_id) != expected_ids:
+        raise SpdxError("release SBOM packages do not exactly match the release archives")
+    expected = create_release_document(
+        archives,
+        source,
+        version=version,
+        source_sha=source_sha,
+        created_epoch=created_epoch,
+        libusb_version=libusb_version,
+    )
+    if document != expected:
+        differing = sorted(
+            key for key in set(document) | set(expected) if document.get(key) != expected.get(key)
+        )
+        raise SpdxError(
+            "release SBOM does not exactly describe the release archives: "
+            + ", ".join(differing)
+        )
+    return str(expected["documentNamespace"])
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser()
     subparsers = result.add_subparsers(dest="command", required=True)
@@ -533,7 +877,6 @@ def parser() -> argparse.ArgumentParser:
     generate.add_argument("--version", required=True)
     generate.add_argument("--platform", required=True)
     generate.add_argument("--arch", required=True)
-    generate.add_argument("--variant", choices=("shared", "static"), required=True)
     generate.add_argument("--source-sha", required=True)
     generate.add_argument("--created-epoch", type=int, required=True)
     generate.add_argument("--libusb-version", required=True)

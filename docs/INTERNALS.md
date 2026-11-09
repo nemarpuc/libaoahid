@@ -281,13 +281,18 @@ differ only in the copyright line).
   whose `CHANGELOG.md` has no dated section.
 - Each CHANGELOG section states whether the release was verified on hardware.
 - A pushed `v*` tag runs `.github/workflows/release.yml`, which builds and
-  publishes the GitHub Release. The PyPI and NuGet jobs run only when the
+  publishes the GitHub Release: one archive per platform with both libaoahid
+  flavours, one release SBOM, the source archive, `release-manifest.json`, and
+  `SHA256SUMS` (10 assets). Started by hand (`workflow_dispatch`, `dry_run`
+  true) the same workflow runs every build and check without a tag, takes the
+  version from the newest dated CHANGELOG section, uploads the assembled set as
+  the `release-dist` artifact, and publishes nothing. The PyPI and NuGet jobs run only when the
   repository variable `AOAHID_PUBLISH_BINDINGS` is `true`.
 - Registry publication also needs setup by the repository owner: PyPI Trusted
   Publishing for the `aoahid` project and workflow, and a scoped `NUGET_API_KEY`
   secret with authority for the `AoaHid` package ID. This source tree does not
   establish registry ownership. Neither package contains native libraries, so
-  users still install a version-matched shared archive from the GitHub Release.
+  users still install the version-matched archive from the GitHub Release.
 - The same workflow always builds, byte-rebuilds, installs, and validates the
   wheel and the NuGet package before the native GitHub Release job can publish.
   A workflow failure cannot undo an already-pushed tag; it prevents creation of

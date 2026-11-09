@@ -5,12 +5,13 @@ LGPL-2.1-or-later. Windows release archives that contain `libusb-1.0.dll`, and
 macOS archives that contain `libusb-1.0.0.dylib`, also contain the corresponding
 libusb license and notices. Static libusb linkage, if
 selected by a distributor, carries the LGPL relinking/source obligations; the
-project release pipeline keeps libusb dynamically linked in both its shared and
-static-libaoahid distributions (the `static` label describes libaoahid itself).
+project release pipeline keeps libusb dynamically linked for both the shared and
+the static libaoahid in every archive (`static` describes libaoahid itself).
 
 Every release asset that ships a libusb runtime binary carries libusb's license
-and corresponding source in the same distribution unit. That rule covers the
-`*-shared` and `*-static` archives, each of which contains `LICENSE`, `NOTICE`,
+and corresponding source in the same distribution unit. That rule covers each
+per-platform archive (one per target, holding both the shared and the static
+libaoahid), each of which contains `LICENSE`, `NOTICE`,
 this file, `third-party/libusb-copyright`, and
 `third-party/source/libusb-1.0.30.tar.bz2` next to the libraries.
 The release pipeline publishes no standalone `.so`, `.dylib`, or `.dll` asset, because a

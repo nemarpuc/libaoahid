@@ -147,11 +147,14 @@ the explicit static target is always `aoahid::aoahid_static`. A static-only
 installation also provides `aoahid::aoahid` as a compatibility/default alias.
 Both components can be requested together.
 
-Release archives also install `lib/pkgconfig/aoahid.pc`. Shared metadata has no
-private libusb dependency. Static metadata declares libusb and, on toolchains
-that expose it as an implicit link library, the compiler-reported C++ runtime
-needed when a C compiler links `libaoahid.a`; the static archive includes a
-relocatable `libusb-1.0.pc` for that dependency.
+A release archive holds both components, so either can be requested from the
+same unpacked directory. It also installs `lib/pkgconfig/aoahid.pc` (shared)
+and `lib/pkgconfig/aoahid-static.pc` (static, with `pkg-config --static`).
+Shared metadata has no private libusb dependency. Static metadata declares
+libusb and, on toolchains that expose it as an implicit link library, the
+compiler-reported C++ runtime needed when a C compiler links
+`libaoahid_static.a`; the archive includes a relocatable `libusb-1.0.pc` for
+that dependency.
 
 ## Creating an option structure
 
