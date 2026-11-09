@@ -491,9 +491,29 @@ if(AOAHID_BUILD_TESTS)
       tests/unit/test_main.cpp
       tests/unit/test_item_writer.cpp
       tests/unit/test_profiles.cpp
+      tests/unit/test_profiles_keyboard.cpp
+      tests/unit/test_profiles_mouse.cpp
+      tests/unit/test_profiles_toggle.cpp
+      tests/unit/test_profiles_gamepad.cpp
+      tests/unit/test_profiles_touch.cpp
+      tests/unit/test_profiles_pen.cpp
+      tests/unit/test_profiles_raw.cpp
+      tests/unit/test_profiles_battery.cpp
       tests/unit/test_spec_options.cpp
-      tests/unit/test_raw_descriptor.cpp
+      tests/unit/test_raw_validator.cpp
+      tests/sim/allocation_probe.cpp
       tests/sim/test_transport.cpp
+      tests/sim/test_transport_runtime.cpp
+      tests/sim/test_accessory_start.cpp
+      tests/sim/test_channel.cpp
+      tests/sim/test_device_open.cpp
+      tests/sim/test_session_setup.cpp
+      tests/sim/test_neutral_close.cpp
+      tests/sim/test_touch_battery.cpp
+      tests/sim/test_submit.cpp
+      tests/sim/test_node_close.cpp
+      tests/sim/test_hot_path.cpp
+      tests/sim/test_context_destroy.cpp
       tests/sim/test_identity.cpp
       tests/sim/test_api_arguments.cpp
       tests/sim/test_report_state.cpp
