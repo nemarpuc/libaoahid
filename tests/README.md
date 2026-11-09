@@ -98,9 +98,8 @@ harness, not the library:
   catch blocks in `src/api/error_detail.cpp` and `c_api_context.cpp`). They
   turn an exception into `AOAHID_ERR_INTERNAL` so none crosses the C ABI.
   `aoahid.sim-allocation-failure` reaches the ones an allocation can reach;
-  the rest guard calls that cannot throw today. That test is not run with MSVC: with the
-  global `operator new` replaced it ends in a fast-fail (0xc0000409) on Windows that has not
-  been traced yet, so the failure paths it covers are checked on Linux and macOS only.
+  the rest guard calls that cannot throw today. That test is not run with MSVC or with the sanitizers on macOS
+  (see "Known platform differences" below).
 - **Null results of `new (std::nothrow)`** in the transport and Channel
   (`port.cpp`, `channel.cpp`, `transport.cpp`). The allocation-failure test
   fails them, but some sit behind a branch only one platform takes.
@@ -141,3 +140,15 @@ harness, not the library:
    ctest next to `aoahid.sim-internal-thread` in `CMakeLists.txt`.
 6. Run the dev, ASan and TSan builds, and `clang-format-14` on the files you
    touched.
+
+## Known platform differences
+
+Found by the first CI run of the `sim` suites on every platform. Each one is a check or a test that
+is switched off on that platform only, because the cause has not been traced; they are open items,
+not accepted behaviour. Reproduce on the named platform before changing them.
+
+| Where | What | Switched off |
+|---|---|---|
+| Windows (MSVC) | `aoahid.sim-allocation-failure` ends in a fast-fail (exit code 0xc0000409) with the global `operator new` replaced to fail. | The test is built but not registered (`CMakeLists.txt`). |
+| macOS with `AOAHID_SANITIZE=ON` | With a failed allocation in the mouse submit path the call returns `AOAHID_ERR_TIMEOUT`, not `AOAHID_ERR_INTERNAL`; Linux with the sanitizers returns `AOAHID_ERR_INTERNAL`. | The test is built but not registered. |
+| Windows (MSVC) | A report that completes with a failure status returns the right result on the next call, but `aoahid_last_error()` has `aoa_request == 0` and `node_id == 0` (Linux and macOS: 57 and the Node's ID). `test_report_completion_statuses` in `tests/sim/test_transport_failures.cpp`. | The two detail checks (`#ifndef _MSC_VER`). |
