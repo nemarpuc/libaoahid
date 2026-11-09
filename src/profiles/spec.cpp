@@ -709,7 +709,8 @@ static aoahid_result aoahid_spec_create_mouse_impl(const aoahid_mouse_options* o
     }
     if ((options->enable_wheel == 1U && !validate_field(options->wheel, "mouse.wheel")) ||
         (options->enable_pan == 1U && !validate_field(options->pan, "mouse.pan"))) {
-        return AOAHID_ERR_PARAM;
+        // validate_field recorded the result (UNSET_FIELD for a zero width); return that one.
+        return aoahid_last_error()->code;
     }
     if ((options->enable_wheel == 0U && !field_is_zero(options->wheel)) ||
         (options->enable_pan == 0U && !field_is_zero(options->pan))) {
@@ -1157,10 +1158,10 @@ create_touch_spec_from_fields(const aoa::detail::TouchFields& fields, const Touc
         return AOAHID_ERR_PARAM;
     }
     if (fields.enable_width == 1U && !validate_field(fields.width, names.width)) {
-        return AOAHID_ERR_PARAM;
+        return aoahid_last_error()->code;
     }
     if (fields.enable_height == 1U && !validate_field(fields.height, names.height)) {
-        return AOAHID_ERR_PARAM;
+        return aoahid_last_error()->code;
     }
     if ((fields.enable_width == 1U &&
          (fields.width.logical_minimum > 0 || fields.width.logical_maximum < 0)) ||
