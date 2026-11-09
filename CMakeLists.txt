@@ -104,7 +104,7 @@ if(NOT AOAHID_BUILD_SHARED AND NOT AOAHID_BUILD_STATIC)
   message(FATAL_ERROR "At least one of AOAHID_BUILD_SHARED or AOAHID_BUILD_STATIC must be enabled.")
 endif()
 if(AOAHID_BUILD_TESTS AND NOT AOAHID_USE_FAKE_LIBUSB)
-  message(FATAL_ERROR "AOAHID_BUILD_TESTS requires AOAHID_USE_FAKE_LIBUSB because the integration suite uses the deterministic fake backend.")
+  message(FATAL_ERROR "AOAHID_BUILD_TESTS requires AOAHID_USE_FAKE_LIBUSB because the sim suites run against the deterministic fake backend.")
 endif()
 
 set(AOAHID_SOURCES
@@ -466,8 +466,8 @@ if(AOAHID_BUILD_TESTS)
       tests/unit/test_main.cpp
       tests/unit/test_item_writer.cpp
       tests/unit/test_profiles.cpp
-      tests/integration/test_transport.cpp
-      tests/integration/test_identity.cpp
+      tests/sim/test_transport.cpp
+      tests/sim/test_identity.cpp
       $<TARGET_OBJECTS:aoahid_test_objects>)
   target_include_directories(aoahid_tests PRIVATE include src tests tests/fake_libusb)
   set_target_properties(aoahid_tests PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED YES)
@@ -477,53 +477,56 @@ if(AOAHID_BUILD_TESTS)
     target_compile_options(aoahid_tests PRIVATE -Wall -Wextra -Wpedantic $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fno-rtti)
   endif()
   aoahid_instrument_executable(aoahid_tests)
-  add_test(NAME aoahid.unit-and-integration COMMAND aoahid_tests)
+  # One executable, two layers: the unit suites need no USB backend, the sim
+  # suites drive the transport against the fake libusb.
+  add_test(NAME aoahid.unit COMMAND aoahid_tests item_writer profiles)
+  add_test(NAME aoahid.sim COMMAND aoahid_tests transport identity)
 
-  add_executable(aoahid_internal_thread_test
-      tests/integration/test_internal_thread.cpp
+  add_executable(aoahid_sim_internal_thread
+      tests/sim/test_internal_thread.cpp
       $<TARGET_OBJECTS:aoahid_test_objects>)
-  target_include_directories(aoahid_internal_thread_test
+  target_include_directories(aoahid_sim_internal_thread
       PRIVATE include src tests tests/fake_libusb)
-  set_target_properties(aoahid_internal_thread_test PROPERTIES
+  set_target_properties(aoahid_sim_internal_thread PROPERTIES
       CXX_STANDARD 20
       CXX_STANDARD_REQUIRED YES
       CXX_EXTENSIONS NO)
   if(MSVC)
-    target_compile_options(aoahid_internal_thread_test PRIVATE
+    target_compile_options(aoahid_sim_internal_thread PRIVATE
         /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /permissive- /EHsc /GR- /utf-8)
   else()
-    target_compile_options(aoahid_internal_thread_test PRIVATE
+    target_compile_options(aoahid_sim_internal_thread PRIVATE
         -Wall -Wextra -Wpedantic $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fno-rtti)
   endif()
-  aoahid_instrument_executable(aoahid_internal_thread_test)
-  add_test(NAME aoahid.internal-thread COMMAND aoahid_internal_thread_test)
+  aoahid_instrument_executable(aoahid_sim_internal_thread)
+  add_test(NAME aoahid.sim-internal-thread COMMAND aoahid_sim_internal_thread)
 
   if(AOAHID_CHECK_SERIALIZATION)
-    add_executable(aoahid_serialization_check_test
-        tests/integration/test_serialization_check.cpp
+    add_executable(aoahid_sim_serialization_check
+        tests/sim/test_serialization_check.cpp
         $<TARGET_OBJECTS:aoahid_test_objects>)
-    target_include_directories(aoahid_serialization_check_test
+    target_include_directories(aoahid_sim_serialization_check
         PRIVATE include src tests tests/fake_libusb)
-    set_target_properties(aoahid_serialization_check_test PROPERTIES
+    set_target_properties(aoahid_sim_serialization_check PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED YES
         CXX_EXTENSIONS NO)
     if(MSVC)
-      target_compile_options(aoahid_serialization_check_test PRIVATE
+      target_compile_options(aoahid_sim_serialization_check PRIVATE
           /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /permissive- /EHsc /GR- /utf-8)
     else()
-      target_compile_options(aoahid_serialization_check_test PRIVATE
+      target_compile_options(aoahid_sim_serialization_check PRIVATE
           -Wall -Wextra -Wpedantic $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fno-rtti)
     endif()
-    aoahid_instrument_executable(aoahid_serialization_check_test)
-    add_test(NAME aoahid.serialization-check-ok
-        COMMAND aoahid_serialization_check_test ok)
+    aoahid_instrument_executable(aoahid_sim_serialization_check)
+    add_test(NAME aoahid.sim-serialization-check-ok
+        COMMAND aoahid_sim_serialization_check ok)
     # A debug C runtime on Windows answers abort() with a dialog and waits.
     if(NOT WIN32)
       add_test(
-          NAME aoahid.serialization-check-violation
+          NAME aoahid.sim-serialization-check-violation
           COMMAND ${CMAKE_COMMAND}
-              -DAOAHID_SERIALIZATION_TEST=$<TARGET_FILE:aoahid_serialization_check_test>
+              -DAOAHID_SERIALIZATION_TEST=$<TARGET_FILE:aoahid_sim_serialization_check>
               -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/expect_serialization_abort.cmake)
     endif()
   endif()

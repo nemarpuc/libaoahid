@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 libaoahid contributors
 /* Proves the public header and exported entry points are usable from C; USB
- * transport behavior is covered by the integration suite. */
+ * transport behavior is covered by the sim suite (fake libusb). */
 #include "aoahid.h"
 
 #include <stdint.h>

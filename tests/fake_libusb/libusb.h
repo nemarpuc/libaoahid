@@ -7,7 +7,7 @@
 
 /*
  * A deterministic libusb 1.0 subset used only by transport tests. The fake's
- * control API is C-compatible so integration tests need not depend on C++
+ * control API is C-compatible so sim tests need not depend on C++
  * implementation details.
  */
 

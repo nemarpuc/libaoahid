@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 libaoahid contributors
-/* Runs the allocation-free HID/profile unit suite; integration executables
- * own transport and threading coverage. */
+/* Runs the named suites: the HID/profile unit suites and the sim suites that
+ * drive the transport against the fake libusb backend. The internal-thread and
+ * serialization-check sim tests are executables of their own. */
 #include "test.hpp"
 
 #include <cstring>
