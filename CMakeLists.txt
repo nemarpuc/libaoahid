@@ -231,6 +231,12 @@ function(aoahid_add_objects target export_api)
 endfunction()
 
 function(aoahid_instrument_executable target)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12)
+    # GCC 12+ reports these two from inlined std::vector::insert/uninitialized_copy of small
+    # initializer lists in -O2/-O3 builds (GCC bug 105329 and related). They are false positives in
+    # libstdc++ and only fire in test code; the library keeps the full warning set.
+    target_compile_options(${target} PRIVATE -Wno-array-bounds -Wno-stringop-overflow)
+  endif()
   if(AOAHID_INSTRUMENT_COMPILE_OPTIONS)
     target_compile_options(${target} PRIVATE
         ${AOAHID_INSTRUMENT_COMPILE_OPTIONS})
