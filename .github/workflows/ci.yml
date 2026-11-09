@@ -489,7 +489,7 @@ jobs:
             --markdown build/cov/coverage/coverage.md \
             --cobertura build/cov/coverage/coverage.xml \
             --html-details build/cov/coverage/index.html \
-            --print-summary --fail-under-line 78 || status=$?
+            --print-summary --fail-under-line 87 --fail-under-branch 75 || status=$?
           cat build/cov/coverage/coverage.md >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
 

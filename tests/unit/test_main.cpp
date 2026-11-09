@@ -8,6 +8,7 @@
 #include <cstring>
 
 int g_failures = 0;
+std::size_t g_checks = 0U;
 
 namespace {
 struct Suite {
@@ -15,10 +16,12 @@ struct Suite {
     void (*run)();
 };
 
-constexpr Suite kSuites[] = {{"item_writer", test_item_writer},
-                             {"profiles", test_profiles},
-                             {"transport", test_transport},
-                             {"identity", test_identity}};
+constexpr Suite kSuites[] = {
+    {"item_writer", test_item_writer},      {"profiles", test_profiles},
+    {"transport", test_transport},          {"identity", test_identity},
+    {"api_arguments", test_api_arguments},  {"spec_options", test_spec_options},
+    {"report_state", test_report_state},    {"transport_failures", test_transport_failures},
+    {"raw_descriptor", test_raw_descriptor}};
 } // namespace
 
 // With no arguments every suite runs; otherwise only the named ones.
@@ -42,5 +45,6 @@ int main(const int argc, char** argv) {
             suite.run();
         }
     }
+    std::printf("%zu checks, %d failed\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;
 }

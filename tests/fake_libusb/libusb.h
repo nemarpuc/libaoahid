@@ -420,6 +420,9 @@ void aoahid_fake_libusb_unplug(size_t device_index);
 /* Active configuration value (1 by default; 0 is unconfigured). */
 void aoahid_fake_libusb_set_active_configuration(size_t device_index, int value);
 size_t aoahid_fake_libusb_set_configuration_count(void);
+/* Nonzero while this thread is inside a fake libusb function (a test's
+ * allocation hook uses it to fail only the library's own allocations). */
+size_t aoahid_fake_libusb_backend_depth(void);
 
 #ifdef __cplusplus
 }

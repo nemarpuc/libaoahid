@@ -11,6 +11,11 @@ All notable changes to libaoahid are recorded here. This project follows
 - Build: `AOAHID_COVERAGE` (GCC or Clang, off by default, not combinable with
   the sanitizers or fuzzing), a `coverage` preset and a CI job "Coverage" that
   writes the gcovr table for `src/` into the job summary and keeps the report.
+- Tests: new suites for every option field of each profile's Spec, every
+  public argument check, the input calls' state rules, transport and Channel
+  failures and raw-descriptor faults, and a sim run that fails each
+  allocation in turn. The Coverage job fails below 87% of lines or 75% of
+  branches.
 - **The release no longer publishes `*-runtime` bundles.** The `*-shared`
   archive already carries the shared library, the libusb runtime, and the same
   license material (`LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, libusb's

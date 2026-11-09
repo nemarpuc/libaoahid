@@ -491,8 +491,13 @@ if(AOAHID_BUILD_TESTS)
       tests/unit/test_main.cpp
       tests/unit/test_item_writer.cpp
       tests/unit/test_profiles.cpp
+      tests/unit/test_spec_options.cpp
+      tests/unit/test_raw_descriptor.cpp
       tests/sim/test_transport.cpp
       tests/sim/test_identity.cpp
+      tests/sim/test_api_arguments.cpp
+      tests/sim/test_report_state.cpp
+      tests/sim/test_transport_failures.cpp
       $<TARGET_OBJECTS:aoahid_test_objects>)
   target_include_directories(aoahid_tests PRIVATE include src tests tests/fake_libusb)
   set_target_properties(aoahid_tests PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED YES)
@@ -504,8 +509,8 @@ if(AOAHID_BUILD_TESTS)
   aoahid_instrument_executable(aoahid_tests)
   # One executable, two layers: the unit suites need no USB backend, the sim
   # suites drive the transport against the fake libusb.
-  add_test(NAME aoahid.unit COMMAND aoahid_tests item_writer profiles)
-  add_test(NAME aoahid.sim COMMAND aoahid_tests transport identity)
+  add_test(NAME aoahid.unit COMMAND aoahid_tests item_writer profiles spec_options raw_descriptor)
+  add_test(NAME aoahid.sim COMMAND aoahid_tests transport identity api_arguments report_state transport_failures)
 
   add_executable(aoahid_sim_internal_thread
       tests/sim/test_internal_thread.cpp
@@ -525,6 +530,26 @@ if(AOAHID_BUILD_TESTS)
   endif()
   aoahid_instrument_executable(aoahid_sim_internal_thread)
   add_test(NAME aoahid.sim-internal-thread COMMAND aoahid_sim_internal_thread)
+
+  # Replaces the global operator new, so it is an executable of its own.
+  add_executable(aoahid_sim_allocation_failure
+      tests/sim/test_allocation_failure.cpp
+      $<TARGET_OBJECTS:aoahid_test_objects>)
+  target_include_directories(aoahid_sim_allocation_failure
+      PRIVATE include src tests tests/fake_libusb)
+  set_target_properties(aoahid_sim_allocation_failure PROPERTIES
+      CXX_STANDARD 20
+      CXX_STANDARD_REQUIRED YES
+      CXX_EXTENSIONS NO)
+  if(MSVC)
+    target_compile_options(aoahid_sim_allocation_failure PRIVATE
+        /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /permissive- /EHsc /GR- /utf-8)
+  else()
+    target_compile_options(aoahid_sim_allocation_failure PRIVATE
+        -Wall -Wextra -Wpedantic $<$<BOOL:${AOAHID_WERROR}>:-Werror> -fno-rtti)
+  endif()
+  aoahid_instrument_executable(aoahid_sim_allocation_failure)
+  add_test(NAME aoahid.sim-allocation-failure COMMAND aoahid_sim_allocation_failure)
 
   if(AOAHID_CHECK_SERIALIZATION)
     add_executable(aoahid_sim_serialization_check

@@ -106,6 +106,38 @@ std::size_t init_context_count{};
 std::uint64_t context_token{};
 bool control_recording_enabled{true};
 
+// Depth of fake-backend frames on this thread. The allocation-failure test
+// fails only allocations made outside them: real libusb allocates with
+// malloc and reports LIBUSB_ERROR_NO_MEM, never std::bad_alloc, so a
+// bad_alloc thrown from this fake's bookkeeping would test nothing.
+thread_local std::size_t backend_depth{};
+
+class BackendScope final {
+  public:
+    BackendScope() noexcept { ++backend_depth; }
+    ~BackendScope() { leave(); }
+    BackendScope(const BackendScope&) = delete;
+    BackendScope& operator=(const BackendScope&) = delete;
+    void leave() noexcept {
+        if (active_) {
+            --backend_depth;
+            active_ = false;
+        }
+    }
+
+  private:
+    bool active_{true};
+};
+
+class BackendLock final {
+  public:
+    BackendLock() = default;
+
+  private:
+    BackendScope scope_{};
+    std::lock_guard<std::mutex> guard_{global_mutex};
+};
+
 libusb_device* find_device(const std::size_t index) noexcept {
     return index < devices.size() ? devices[index].get() : nullptr;
 }
@@ -240,7 +272,7 @@ int libusb_get_configuration(libusb_device_handle* handle, int* config) {
     if (handle == nullptr || handle->device == nullptr || config == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (!handle->device->present) {
         return LIBUSB_ERROR_NO_DEVICE;
     }
@@ -252,7 +284,7 @@ int libusb_set_configuration(libusb_device_handle* handle, const int configurati
     if (handle == nullptr || handle->device == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (!handle->device->present) {
         return LIBUSB_ERROR_NO_DEVICE;
     }
@@ -265,7 +297,7 @@ int libusb_get_active_config_descriptor(libusb_device* device, libusb_config_des
     if (device == nullptr || config == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (!device->present) {
         return LIBUSB_ERROR_NO_DEVICE;
     }
@@ -309,7 +341,7 @@ int libusb_get_active_config_descriptor(libusb_device* device, libusb_config_des
 }
 
 void libusb_free_config_descriptor(libusb_config_descriptor* config) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     configs.erase(std::remove_if(configs.begin(), configs.end(),
                                  [config](const std::unique_ptr<FakeConfig>& value) {
                                      return &value->config == config;
@@ -327,7 +359,7 @@ int libusb_init_context(libusb_context** context, const libusb_init_option optio
         return LIBUSB_ERROR_NO_MEM;
     }
     {
-        const std::lock_guard<std::mutex> guard(global_mutex);
+        const BackendLock guard;
         value->token = ++context_token;
         ++init_context_count;
         for (int index = 0; index < num_options; ++index) {
@@ -359,7 +391,7 @@ ssize_t libusb_get_device_list(libusb_context* context, libusb_device*** list) {
     if (list == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     std::size_t count = 0U;
     for (const auto& device : devices) {
         if (device->present) {
@@ -389,7 +421,7 @@ int libusb_get_device_descriptor(libusb_device* device, libusb_device_descriptor
     if (device == nullptr || descriptor == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (!device->present) {
         return LIBUSB_ERROR_NO_DEVICE;
     }
@@ -416,7 +448,7 @@ int libusb_get_port_numbers(libusb_device* device, uint8_t* ports, int port_coun
     if (device == nullptr || ports == nullptr || port_count < 0) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (device->ports.size() > static_cast<std::size_t>(port_count)) {
         return LIBUSB_ERROR_OVERFLOW;
     }
@@ -429,7 +461,7 @@ int libusb_open(libusb_device* device, libusb_device_handle** handle) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
     *handle = nullptr;
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (!device->present) {
         return LIBUSB_ERROR_NO_DEVICE;
     }
@@ -449,7 +481,7 @@ int libusb_open(libusb_device* device, libusb_device_handle** handle) {
 
 void libusb_close(libusb_device_handle* handle) {
     if (handle != nullptr) {
-        const std::lock_guard<std::mutex> guard(global_mutex);
+        const BackendLock guard;
         if (open_handle_count > 0U) {
             --open_handle_count;
         }
@@ -462,7 +494,7 @@ int libusb_get_string_descriptor_ascii(libusb_device_handle* handle, const uint8
     if (handle == nullptr || handle->device == nullptr || data == nullptr || length < 0) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (!handle->device->present) {
         return LIBUSB_ERROR_NO_DEVICE;
     }
@@ -486,7 +518,7 @@ int libusb_control_transfer(libusb_device_handle* handle, const uint8_t request_
     if (handle == nullptr || handle->device == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     libusb_device* device = handle->device;
     if (!device->present) {
         return LIBUSB_ERROR_NO_DEVICE;
@@ -517,7 +549,7 @@ int libusb_claim_interface(libusb_device_handle* handle, const int interface_num
     if (handle == nullptr || handle->device == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     const int result =
         handle->device->present ? handle->device->claim_status : LIBUSB_ERROR_NO_DEVICE;
     claims.push_back(
@@ -529,7 +561,7 @@ int libusb_release_interface(libusb_device_handle* handle, const int interface_n
     if (handle == nullptr || handle->device == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     const int result = handle->device->present ? LIBUSB_SUCCESS : LIBUSB_ERROR_NO_DEVICE;
     claims.push_back(
         aoahid_fake_libusb_claim_record{handle->device->index, interface_number, 1, result});
@@ -542,7 +574,7 @@ libusb_transfer* libusb_alloc_transfer(const int iso_packets) {
     if (transfer == nullptr) {
         return nullptr;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     allocated_transfers.push_back(transfer);
     return transfer;
 }
@@ -552,7 +584,7 @@ void libusb_free_transfer(libusb_transfer* transfer) {
         return;
     }
     {
-        const std::lock_guard<std::mutex> guard(global_mutex);
+        const BackendLock guard;
         const auto found =
             std::find(allocated_transfers.begin(), allocated_transfers.end(), transfer);
         if (found != allocated_transfers.end()) {
@@ -570,7 +602,7 @@ int libusb_submit_transfer(libusb_transfer* transfer) {
         transfer->length < (bulk ? 0 : static_cast<int>(LIBUSB_CONTROL_SETUP_SIZE))) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (!transfer->dev_handle->device->present) {
         return LIBUSB_ERROR_NO_DEVICE;
     }
@@ -616,7 +648,7 @@ int libusb_cancel_transfer(libusb_transfer* transfer) {
     if (transfer == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (transfer->fake_submitted == 0 || transfer->fake_cancel_requested != 0) {
         return LIBUSB_ERROR_NOT_FOUND;
     }
@@ -636,7 +668,7 @@ int libusb_cancel_transfer(libusb_transfer* transfer) {
 }
 
 void libusb_interrupt_event_handler(libusb_context* context) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     ++event_stats.interrupt_calls;
     if (context != nullptr) {
         context->user_interrupt_pending = true;
@@ -646,6 +678,7 @@ void libusb_interrupt_event_handler(libusb_context* context) {
 
 int libusb_handle_events_timeout_completed(libusb_context* context, const timeval* timeout,
                                            int* completed) {
+    BackendScope scope{};
     std::unique_lock<std::mutex> lock(global_mutex);
     ++event_handle_count;
     ++event_stats.handle_calls;
@@ -714,6 +747,7 @@ int libusb_handle_events_timeout_completed(libusb_context* context, const timeva
     }
     event_stats.callbacks_dispatched += callbacks.size();
     lock.unlock();
+    scope.leave();
     if (completed != nullptr) {
         *completed = callbacks.empty() ? 0 : 1;
     }
@@ -726,7 +760,7 @@ int libusb_handle_events_timeout_completed(libusb_context* context, const timeva
 }
 
 void aoahid_fake_libusb_reset(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     devices.clear();
     control_results.clear();
     submit_results.clear();
@@ -769,7 +803,7 @@ int aoahid_fake_libusb_add_device(const aoahid_fake_libusb_device_config* config
     device->serial = config->serial == nullptr ? "" : config->serial;
     device->product = config->product == nullptr ? "" : config->product;
     device->open_status = config->open_status;
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     device->index = devices.size();
     const int result = static_cast<int>(device->index);
     devices.push_back(std::move(device));
@@ -777,43 +811,43 @@ int aoahid_fake_libusb_add_device(const aoahid_fake_libusb_device_config* config
 }
 
 void aoahid_fake_libusb_set_present(const size_t device_index, const int present) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (libusb_device* device = find_device(device_index); device != nullptr) {
         device->present = present != 0;
     }
 }
 
 void aoahid_fake_libusb_set_protocol(const size_t device_index, const uint16_t protocol_version) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (libusb_device* device = find_device(device_index); device != nullptr) {
         device->protocol_version = protocol_version;
     }
 }
 
 void aoahid_fake_libusb_set_claim_result(const size_t device_index, const int result) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (libusb_device* device = find_device(device_index); device != nullptr) {
         device->claim_status = result;
     }
 }
 
 void aoahid_fake_libusb_queue_control_result(const int result) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     control_results.push_back(result);
 }
 
 void aoahid_fake_libusb_queue_submit_result(const int result) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     submit_results.push_back(result);
 }
 
 void aoahid_fake_libusb_queue_cancel_result(const int result) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     cancel_results.push_back(result);
 }
 
 void aoahid_fake_libusb_queue_event_result(const int result) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     event_results.push_back(result);
     notify_event_locked(EventNotification::backend_result);
 }
@@ -821,12 +855,12 @@ void aoahid_fake_libusb_queue_event_result(const int result) {
 void aoahid_fake_libusb_queue_async_completion(const libusb_transfer_status status,
                                                const int actual_length,
                                                const uint32_t delay_polls) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     async_outcomes.push_back(AsyncOutcome{status, actual_length, delay_polls});
 }
 
 void aoahid_fake_libusb_make_pending_transfers_ready(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     for (libusb_transfer* transfer : allocated_transfers) {
         if (transfer != nullptr && transfer->fake_submitted != 0) {
             transfer->fake_ready_poll = poll_number + 1U;
@@ -836,12 +870,12 @@ void aoahid_fake_libusb_make_pending_transfers_ready(void) {
 }
 
 void aoahid_fake_libusb_set_control_recording(const int enabled) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     control_recording_enabled = enabled != 0;
 }
 
 size_t aoahid_fake_libusb_control_count(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return controls.size();
 }
 
@@ -849,7 +883,7 @@ int aoahid_fake_libusb_get_control(const size_t index, aoahid_fake_libusb_contro
     if (record == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (index >= controls.size()) {
         return LIBUSB_ERROR_NOT_FOUND;
     }
@@ -859,7 +893,7 @@ int aoahid_fake_libusb_get_control(const size_t index, aoahid_fake_libusb_contro
 
 size_t aoahid_fake_libusb_copy_control_data(const size_t index, uint8_t* output,
                                             const size_t capacity) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (index >= controls.size()) {
         return 0U;
     }
@@ -873,7 +907,7 @@ size_t aoahid_fake_libusb_copy_control_data(const size_t index, uint8_t* output,
 }
 
 size_t aoahid_fake_libusb_claim_count(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return claims.size();
 }
 
@@ -881,7 +915,7 @@ int aoahid_fake_libusb_get_claim(const size_t index, aoahid_fake_libusb_claim_re
     if (record == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (index >= claims.size()) {
         return LIBUSB_ERROR_NOT_FOUND;
     }
@@ -890,7 +924,7 @@ int aoahid_fake_libusb_get_claim(const size_t index, aoahid_fake_libusb_claim_re
 }
 
 size_t aoahid_fake_libusb_pending_transfer_count(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return static_cast<size_t>(std::count_if(allocated_transfers.begin(), allocated_transfers.end(),
                                              [](const libusb_transfer* transfer) {
                                                  return transfer != nullptr &&
@@ -900,7 +934,7 @@ size_t aoahid_fake_libusb_pending_transfer_count(void) {
 
 void aoahid_fake_libusb_add_bulk_interface(const size_t device_index,
                                            const aoahid_fake_libusb_bulk_interface* value) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (libusb_device* device = find_device(device_index); device != nullptr && value != nullptr) {
         device->bulk_interfaces.push_back(*value);
     }
@@ -908,7 +942,7 @@ void aoahid_fake_libusb_add_bulk_interface(const size_t device_index,
 
 void aoahid_fake_libusb_push_bulk_in(const size_t device_index, const uint8_t endpoint,
                                      const uint8_t* data, const size_t length) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     libusb_device* device = find_device(device_index);
     if (device == nullptr) {
         return;
@@ -931,23 +965,23 @@ void aoahid_fake_libusb_push_bulk_in(const size_t device_index, const uint8_t en
 }
 
 size_t aoahid_fake_libusb_bulk_in_submit_count(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return bulk_in_submits.size();
 }
 
 int aoahid_fake_libusb_bulk_in_submit_length(const size_t index) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return index < bulk_in_submits.size() ? bulk_in_submits[index] : -1;
 }
 
 size_t aoahid_fake_libusb_bulk_out_count(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return bulk_out.size();
 }
 
 size_t aoahid_fake_libusb_copy_bulk_out(const size_t index, uint8_t* output,
                                         const size_t capacity) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (index >= bulk_out.size()) {
         return 0U;
     }
@@ -959,7 +993,7 @@ size_t aoahid_fake_libusb_copy_bulk_out(const size_t index, uint8_t* output,
 }
 
 void aoahid_fake_libusb_unplug(const size_t device_index) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     libusb_device* device = find_device(device_index);
     if (device == nullptr) {
         return;
@@ -978,34 +1012,34 @@ void aoahid_fake_libusb_unplug(const size_t device_index) {
 }
 
 void aoahid_fake_libusb_set_active_configuration(const size_t device_index, const int value) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (libusb_device* device = find_device(device_index); device != nullptr) {
         device->configuration = value;
     }
 }
 
 size_t aoahid_fake_libusb_set_configuration_count(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return set_configuration_count;
 }
 
 size_t aoahid_fake_libusb_open_call_count(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return open_call_count;
 }
 
 size_t aoahid_fake_libusb_open_handle_count(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return open_handle_count;
 }
 
 size_t aoahid_fake_libusb_cancel_count(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return cancel_count;
 }
 
 size_t aoahid_fake_libusb_event_handle_count(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return event_handle_count;
 }
 
@@ -1013,7 +1047,7 @@ int aoahid_fake_libusb_get_event_stats(aoahid_fake_libusb_event_stats* stats) {
     if (stats == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     *stats = event_stats;
     return LIBUSB_SUCCESS;
 }
@@ -1035,12 +1069,12 @@ int aoahid_fake_libusb_wait_for_event_waiters(const size_t minimum, const unsign
 }
 
 size_t aoahid_fake_libusb_init_context_count(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return init_context_count;
 }
 
 size_t aoahid_fake_libusb_init_option_count(void) {
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     return init_options.size();
 }
 
@@ -1049,12 +1083,14 @@ int aoahid_fake_libusb_get_init_option(const size_t index,
     if (record == nullptr) {
         return LIBUSB_ERROR_INVALID_PARAM;
     }
-    const std::lock_guard<std::mutex> guard(global_mutex);
+    const BackendLock guard;
     if (index >= init_options.size()) {
         return LIBUSB_ERROR_NOT_FOUND;
     }
     *record = init_options[index];
     return LIBUSB_SUCCESS;
 }
+
+size_t aoahid_fake_libusb_backend_depth(void) { return backend_depth; }
 
 } // extern "C"
