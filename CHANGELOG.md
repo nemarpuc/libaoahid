@@ -3,6 +3,18 @@
 All notable changes to libaoahid are recorded here. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- **The release no longer publishes `*-runtime` bundles.** The `*-shared`
+  archive already carries the shared library, the libusb runtime, and the same
+  license material (`LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, libusb's
+  LGPL-2.1 text and corresponding source), and nothing consumed the smaller
+  bundle. The architecture and glibc checks that ran on the bundle now run on
+  the `*-shared` archive itself, and `release-manifest.json` drops the
+  `runtime_bundle`, `runtime_bundle_sha256`, and
+  `runtime_glibc_maximum_required` keys. A release now has 27 assets instead
+  of 33; the `*-shared` and `*-static` asset names are unchanged.
+
 ## [0.1.0] - 2026-11-07
 
 Not hardware-verified on a phone in this form: the transport and the device

@@ -29,11 +29,10 @@ revisions.
 
 Every asset that ships the libusb runtime carries this NOTICE, LICENSE,
 THIRD_PARTY_NOTICES.md, libusb's LGPL-2.1 text, and libusb's corresponding
-source archive in the same distribution unit. That includes the smaller
-`*-runtime` bundles as well as the complete `*-shared` and `*-static`
-archives. No bare shared object or DLL is published as a standalone release
-asset, so no distributed unit containing the libusb runtime can become
-separated from libusb's license and corresponding source.
+source archive in the same distribution unit: both the `*-shared` and the
+`*-static` archives. No bare shared object or DLL is published as a
+standalone release asset, so no distributed unit containing the libusb runtime
+can become separated from libusb's license and corresponding source.
 
 Every first-party source file in this repository carries an
 SPDX-License-Identifier: MIT tag and copyright line of its own, so a file

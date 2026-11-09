@@ -63,11 +63,6 @@ command above, and make sure the shared library is on your loader's search
 path at run time (`LD_LIBRARY_PATH=./lib` on Linux, `DYLD_LIBRARY_PATH=./lib`
 on macOS, or just keep the `.dll` next to the `.exe` on Windows).
 
-The `*-runtime` release bundle is not enough to compile any of this: it carries
-the shared libraries and their license material for deploying a finished
-application, but no headers, import library, or package metadata. Build against
-a `*-shared` or `*-static` archive of the same version.
-
 `libusb-1.0` above assumes it is installed system-wide (`pkg-config
 --libs libusb-1.0` will confirm the exact flags your system needs if this
 does not link). See `docs/PORTING.md` for platform-specific notes.

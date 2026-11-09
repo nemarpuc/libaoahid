@@ -10,12 +10,12 @@ static-libaoahid distributions (the `static` label describes libaoahid itself).
 
 Every release asset that ships a libusb runtime binary carries libusb's license
 and corresponding source in the same distribution unit. That rule covers the
-complete `*-shared` and `*-static` archives and the smaller `*-runtime`
-bundles, which contain the shared libraries, `LICENSE`, `NOTICE`, this file,
-`third-party/libusb-copyright`, and `third-party/source/libusb-1.0.30.tar.bz2`.
+`*-shared` and `*-static` archives, each of which contains `LICENSE`, `NOTICE`,
+this file, `third-party/libusb-copyright`, and
+`third-party/source/libusb-1.0.30.tar.bz2` next to the libraries.
 The release pipeline publishes no standalone `.so`, `.dylib`, or `.dll` asset, because a
 single loose binary cannot carry those obligations; `collect_release.py`
-refuses to assemble a release whose runtime bundle is missing any of them.
+refuses to assemble a release whose archive is missing any of them.
 
 Each binary archive contains the official `libusb-1.0.30.tar.bz2` source
 archive (SHA-256

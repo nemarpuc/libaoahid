@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import argparse
 import gzip
-import hashlib
 import io
 from io import BytesIO
 from pathlib import Path
@@ -338,112 +337,59 @@ class ReleaseIdentityTests(unittest.TestCase):
             "libaoahid-0.1.0-source.tar.gz",
         )
 
-    def test_exact_33_asset_contract(self) -> None:
+    def test_exact_27_asset_contract(self) -> None:
         assets = collect_release.expected_release_asset_names("0.1.0")
-        self.assertEqual(len(assets), 33)
+        self.assertEqual(len(assets), 27)
         self.assertEqual(
             sum(name.endswith((".tar.gz", ".zip")) for name in assets),
-            19,
+            13,
         )
         self.assertEqual(sum(name.endswith(".spdx.json") for name in assets), 12)
-        self.assertEqual(
-            sum(name.endswith(("-runtime.tar.gz", "-runtime.zip")) for name in assets),
-            6,
-        )
+        self.assertFalse(any("-runtime" in name for name in assets))
         # A bare shared library cannot carry libusb's license or corresponding
         # source, so no asset may be one.
         self.assertEqual(sum(name.endswith((".so", ".dylib", ".dll")) for name in assets), 0)
         self.assertIn("release-manifest.json", assets)
         self.assertIn("SHA256SUMS", assets)
         readme = (REPOSITORY / "README.md").read_text(encoding="utf-8")
-        self.assertIn("exactly 33 uploaded assets", readme)
+        self.assertIn("exactly 27 uploaded assets", readme)
 
-    def test_runtime_bundle_carries_every_license_obligation(self) -> None:
-        elf = bytearray(64)
-        elf[0:4] = b"\x7fELF"
-        elf[4] = 2
-        elf[5] = 1
-        struct.pack_into("<HH", elf, 16, 3, 62)
+    def test_shared_archive_runtime_architecture_is_checked(self) -> None:
+        def elf(machine: int) -> bytes:
+            header = bytearray(64)
+            header[0:4] = b"\x7fELF"
+            header[4] = 2
+            header[5] = 1
+            struct.pack_into("<HH", header, 16, 3, machine)
+            return bytes(header)
+
         root = "libaoahid-0.1.0-linux-x86_64-ubuntu22.04-shared"
-        libusb_source = b"official libusb 1.0.30 source archive"
-        libusb_license = b"GNU LESSER GENERAL PUBLIC LICENSE Version 2.1"
-        files = {
-            "lib/libaoahid.so.0.1.0": bytes(elf),
-            "lib/libusb-1.0.so.0.6.0": b"libusb runtime",
-            "include/aoahid.h": b"header that must not be bundled",
-            "share/doc/libaoahid/LICENSE": b"MIT",
-            "share/doc/libaoahid/NOTICE": b"NOTICE",
-            "share/doc/libaoahid/THIRD_PARTY_NOTICES.md": b"third party",
-            "share/doc/libaoahid/build-metadata.json": b"{}",
-            collect_release.LIBUSB_LICENSE_NAME: libusb_license,
-            collect_release.LIBUSB_SOURCE_NAME: libusb_source,
-        }
-        links = {
-            "lib/libaoahid.so.0": "libaoahid.so.0.1.0",
-            "lib/libusb-1.0.so.0": "libusb-1.0.so.0.6.0",
-        }
         with tempfile.TemporaryDirectory() as directory:
-            root_path = Path(directory)
-            archive = root_path / (root + ".tar.gz")
-            with archive.open("wb") as raw:
-                with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as gz:
-                    with tarfile.open(
-                        mode="w", fileobj=gz, format=tarfile.PAX_FORMAT
-                    ) as output:
-                        for name, payload in files.items():
-                            info = tarfile.TarInfo(f"{root}/{name}")
-                            info.size = len(payload)
-                            info.mode = 0o644
-                            output.addfile(info, io.BytesIO(payload))
-                        for name, target in links.items():
-                            info = tarfile.TarInfo(f"{root}/{name}")
-                            info.type = tarfile.SYMTYPE
-                            info.linkname = target
-                            output.addfile(info)
-            with mock.patch.object(
-                collect_release,
-                "LIBUSB_SOURCE_SHA256",
-                hashlib.sha256(libusb_source).hexdigest(),
-            ), mock.patch.object(
-                collect_release,
-                "LIBUSB_LICENSE_SHA256",
-                hashlib.sha256(libusb_license).hexdigest(),
-            ):
-                bundle = collect_release.build_runtime_bundle(
-                    root_path, archive, "0.1.0", "linux", "x86_64", "ubuntu22.04", 1700000000
-                )
-                collect_release.validate_runtime_bundle(
-                    bundle, archive, "linux", "x86_64"
-                )
-                self.assertEqual(
-                    bundle.name, "libaoahid-0.1.0-linux-x86_64-ubuntu22.04-runtime.tar.gz"
-                )
-                members = collect_release.archive_members(bundle)
-                for obligation in (
-                    collect_release.LIBUSB_LICENSE_NAME,
-                    collect_release.LIBUSB_SOURCE_NAME,
-                    "share/doc/libaoahid/LICENSE",
-                    "share/doc/libaoahid/NOTICE",
-                    "share/doc/libaoahid/THIRD_PARTY_NOTICES.md",
-                ):
-                    self.assertIn(obligation, members)
-                # The runtime bundle is not a development package.
-                self.assertNotIn("include/aoahid.h", members)
-                self.assertEqual(
-                    collect_release.archive_symlinks(bundle),
-                    {
-                        "lib/libaoahid.so.0": "libaoahid.so.0.1.0",
-                        "lib/libusb-1.0.so.0": "libusb-1.0.so.0.6.0",
-                    },
-                )
-                first = hashlib.sha256(bundle.read_bytes()).hexdigest()
-                bundle.unlink()
-                again = collect_release.build_runtime_bundle(
-                    root_path, archive, "0.1.0", "linux", "x86_64", "ubuntu22.04", 1700000000
-                )
-                self.assertEqual(
-                    first, hashlib.sha256(again.read_bytes()).hexdigest()
-                )
+            for machine, accepted in ((62, True), (183, False)):
+                with self.subTest(machine=machine):
+                    archive = Path(directory) / f"{machine}" / (root + ".tar.gz")
+                    archive.parent.mkdir()
+                    with archive.open("wb") as raw:
+                        with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as gz:
+                            with tarfile.open(
+                                mode="w", fileobj=gz, format=tarfile.PAX_FORMAT
+                            ) as output:
+                                payload = elf(machine)
+                                info = tarfile.TarInfo(f"{root}/lib/libaoahid.so.0.1.0")
+                                info.size = len(payload)
+                                info.mode = 0o644
+                                output.addfile(info, io.BytesIO(payload))
+                                link = tarfile.TarInfo(f"{root}/lib/libaoahid.so.0")
+                                link.type = tarfile.SYMTYPE
+                                link.linkname = "libaoahid.so.0.1.0"
+                                output.addfile(link)
+                    if accepted:
+                        collect_release.validate_shared_runtime(archive, "linux", "x86_64")
+                    else:
+                        with self.assertRaises(collect_release.CollectionError):
+                            collect_release.validate_shared_runtime(
+                                archive, "linux", "x86_64"
+                            )
 
     def test_macos_runtime_is_checked_as_a_thin_mach_o_dylib(self) -> None:
         def dylib(cpu_type: int, file_type: int = 6) -> bytes:
@@ -469,12 +415,6 @@ class ReleaseIdentityTests(unittest.TestCase):
                     collect_release.validate_runtime_architecture(
                         data, "macos", arch
                     )
-        self.assertTrue(collect_release.is_runtime_binary("lib/libusb-1.0.0.dylib", "macos"))
-        self.assertFalse(collect_release.is_runtime_binary("lib/libaoahid.a", "macos"))
-        self.assertEqual(
-            collect_release.runtime_bundle_name("0.1.0", "macos", "arm64", ""),
-            "libaoahid-0.1.0-macos-arm64-runtime.tar.gz",
-        )
 
     def test_spdx_files_are_licensed_individually(self) -> None:
         self.assertEqual(
@@ -644,7 +584,7 @@ Cflags: -I${includedir}
         self.assertIn("generator: Visual Studio 18 2026", workflow)
         self.assertIn("tools/release/package_source.py", workflow)
         self.assertIn("--source-root .", workflow)
-        self.assertIn('test "${#assets[@]}" -eq 33', workflow)
+        self.assertIn('test "${#assets[@]}" -eq 27', workflow)
         self.assertIn(
             "AOAHID_RELEASE_VERSION: ${{ needs.validate.outputs.version }}", workflow
         )
@@ -665,7 +605,7 @@ Cflags: -I${includedir}
         for workflow_path in workflows:
             workflow = workflow_path.read_text(encoding="utf-8")
             action_references = re.findall(
-                r"^\s*uses:\s*([^\s#]+)", workflow, re.MULTILINE
+                r"^\s*(?:-\s+)?uses:\s*([^\s#]+)", workflow, re.MULTILINE
             )
             self.assertTrue(action_references, workflow_path.name)
             for reference in action_references:

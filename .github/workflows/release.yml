@@ -1104,43 +1104,45 @@ jobs:
           # No bare shared object is ever uploaded: a redistributable asset that
           # carries the libusb runtime must carry libusb's license and
           # corresponding source in the same distribution unit. Re-inspect the
-          # runtime bundles that replace it, from the uploaded bytes.
-          mapfile -t linux_runtime_bundles < <(
-            find dist -maxdepth 1 -type f -name 'libaoahid-*-linux-*-runtime.tar.gz' -print | sort
+          # Linux shared libraries and every archive's license material from
+          # the uploaded bytes.
+          mapfile -t linux_shared_archives < <(
+            find dist -maxdepth 1 -type f -name 'libaoahid-*-linux-*-shared.tar.gz' -print | sort
           )
-          test "${#linux_runtime_bundles[@]}" -eq 2
-          rm -rf build/runtime-bundle-check
-          mkdir -p build/runtime-bundle-check
-          for bundle in "${linux_runtime_bundles[@]}"; do
-            tar -xzf "$bundle" -C build/runtime-bundle-check
+          test "${#linux_shared_archives[@]}" -eq 2
+          rm -rf build/shared-archive-check
+          mkdir -p build/shared-archive-check
+          for archive in "${linux_shared_archives[@]}"; do
+            tar -xzf "$archive" -C build/shared-archive-check
           done
-          mapfile -t bundled_runtimes < <(
-            find build/runtime-bundle-check -type f -name 'libaoahid.so.*' -print | sort
+          mapfile -t shipped_runtimes < <(
+            find build/shared-archive-check -type f -name 'libaoahid.so.*' -print | sort
           )
-          test "${#bundled_runtimes[@]}" -eq 2
+          test "${#shipped_runtimes[@]}" -eq 2
           python tools/release/glibc_versions.py \
-            --root build/runtime-bundle-check \
-            --output build/runtime-bundle-glibc-requirements.json \
+            --root build/shared-archive-check \
+            --output build/shared-archive-glibc-requirements.json \
             --maximum GLIBC_2.35 \
-            "${bundled_runtimes[@]}"
+            "${shipped_runtimes[@]}"
           python - <<'PY'
           import json
           import tarfile
+          import zipfile
           from pathlib import Path
 
           inspected_document = json.loads(
-              Path("build/runtime-bundle-glibc-requirements.json").read_text(encoding="utf-8")
+              Path("build/shared-archive-glibc-requirements.json").read_text(encoding="utf-8")
           )
           manifest = json.loads(Path("dist/release-manifest.json").read_text(encoding="utf-8"))
           recorded = {
-              target["runtime_glibc_maximum_required"]
+              target["glibc_maximum_required"]
               for target in manifest["targets"]
               if target["platform"] == "linux" and target["variant"] == "shared"
           }
           inspected = {item["maximum_required"] for item in inspected_document["files"]}
           if inspected != recorded:
               raise SystemExit(
-                  f"runtime bundle GLIBC requirements {sorted(inspected)!r} "
+                  f"shared archive GLIBC requirements {sorted(inspected)!r} "
                   f"disagree with manifest {sorted(recorded)!r}"
               )
           required = (
@@ -1151,12 +1153,16 @@ jobs:
               "share/doc/libaoahid/third-party/source/libusb-1.0.30.tar.bz2",
           )
           for target in manifest["targets"]:
-              name = target.get("runtime_bundle")
-              if name is None or not name.endswith(".tar.gz"):
-                  continue
-              root = name.removesuffix(".tar.gz")
-              with tarfile.open(Path("dist") / name, "r:gz") as bundle:
-                  members = set(bundle.getnames())
+              name = target["archive"]
+              path = Path("dist") / name
+              if name.endswith(".tar.gz"):
+                  root = name.removesuffix(".tar.gz")
+                  with tarfile.open(path, "r:gz") as archive:
+                      members = set(archive.getnames())
+              else:
+                  root = name.removesuffix(".zip")
+                  with zipfile.ZipFile(path) as archive:
+                      members = set(archive.namelist())
               missing = [item for item in required if f"{root}/{item}" not in members]
               if missing:
                   raise SystemExit(f"{name} is missing license material: {missing}")
@@ -1324,7 +1330,7 @@ jobs:
             dist/SHA256SUMS
           )
           shopt -u nullglob
-          test "${#assets[@]}" -eq 33
+          test "${#assets[@]}" -eq 27
           declare -A expected_asset_names=()
           declare -A expected_asset_sizes=()
           declare -A expected_asset_digests=()

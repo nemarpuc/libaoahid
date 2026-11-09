@@ -7,13 +7,10 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
-import gzip
 import hashlib
-import io
 import json
 from pathlib import Path, PurePosixPath
 import re
-import stat
 import struct
 import sys
 import tarfile
@@ -43,59 +40,10 @@ LIBUSB_LICENSE_SHA256 = "5df07007198989c622f5d41de8d703e7bef3d0e79d62e24332ee739
 VCPKG_LICENSE_NAME = "share/doc/libaoahid/third-party/vcpkg-LICENSE.txt"
 VCPKG_LICENSE_SHA256 = "1ee376fc340e0aa6ad6a3581c94126e741468705096ac92263048a21daa86460"
 
-# A runtime bundle is the smallest asset that may be redistributed on its own.
 # libaoahid links libusb dynamically, so any asset carrying the libusb runtime
 # must carry libusb's license and its corresponding source in the same
-# distribution unit. A bare shared object cannot, which is why one is never
-# uploaded.
-RUNTIME_BUNDLE_DOCUMENTS = (
-    "share/doc/libaoahid/LICENSE",
-    "share/doc/libaoahid/NOTICE",
-    "share/doc/libaoahid/THIRD_PARTY_NOTICES.md",
-    "share/doc/libaoahid/build-metadata.json",
-    LIBUSB_LICENSE_NAME,
-    LIBUSB_SOURCE_NAME,
-)
-WINDOWS_RUNTIME_BUNDLE_DOCUMENTS = (
-    VCPKG_LICENSE_NAME,
-    "share/doc/libaoahid/third-party/vcpkg-libusb-port/portfile.cmake",
-    "share/doc/libaoahid/third-party/vcpkg-libusb-port/vcpkg.json",
-)
-RUNTIME_BUNDLE_README_NAME = "README.txt"
-RUNTIME_BUNDLE_README = """\
-libaoahid runtime bundle
-========================
-
-This archive carries only the shared libraries needed to run an application
-that is already built against libaoahid, together with the license material
-that must travel with them. It has no headers, no import library, and no
-CMake or pkg-config metadata; build against the matching -shared or -static
-archive from the same release instead.
-
-Contents
---------
-
-  lib/ or bin/   the libaoahid shared library and the libusb-1.0 runtime it
-                 loads at run time
-  share/doc/libaoahid/LICENSE
-                 the MIT license covering libaoahid itself
-  share/doc/libaoahid/NOTICE
-  share/doc/libaoahid/THIRD_PARTY_NOTICES.md
-                 the exact third-party versions, licenses, and checksums
-  share/doc/libaoahid/third-party/libusb-copyright
-                 the full LGPL-2.1 text covering the bundled libusb runtime
-  share/doc/libaoahid/third-party/source/libusb-1.0.30.tar.bz2
-                 the official corresponding source for that libusb runtime
-  share/doc/libaoahid/build-metadata.json
-                 the version, commit, platform, and libusb version recorded at
-                 build time
-
-libaoahid is MIT licensed. libusb is a separate work under LGPL-2.1-or-later
-and is linked dynamically; it is never absorbed into libaoahid. Redistribute
-this archive unchanged and both licenses remain satisfied as shipped. If you
-replace the bundled libusb with a modified copy, the LGPL obligations apply to
-that copy.
-"""
+# distribution unit; require_layout enforces that for every archive. A bare
+# shared object cannot, which is why one is never uploaded.
 
 
 class CollectionError(RuntimeError):
@@ -104,17 +52,6 @@ class CollectionError(RuntimeError):
 
 def platform_part(platform: str, arch: str, qualifier: str) -> str:
     return f"{platform}-{arch}" + (f"-{qualifier}" if qualifier else "")
-
-
-def runtime_bundle_name(
-    version: str, platform: str, arch: str, qualifier: str
-) -> str:
-    """Return the license-complete runtime asset name for one target."""
-    extension = ".tar.gz" if platform in TAR_PLATFORMS else ".zip"
-    return (
-        f"libaoahid-{version}-{platform_part(platform, arch, qualifier)}"
-        f"-runtime{extension}"
-    )
 
 
 def expected_release_asset_names(version: str) -> frozenset[str]:
@@ -129,7 +66,6 @@ def expected_release_asset_names(version: str) -> frozenset[str]:
         for variant in VARIANTS:
             base = f"libaoahid-{version}-{part}-{variant}"
             names.update((base + extension, base + ".spdx.json"))
-        names.add(runtime_bundle_name(version, platform, arch, qualifier))
     return frozenset(names)
 
 
@@ -166,19 +102,6 @@ def archive_members(path: Path) -> set[str]:
     if len(normalized) != len(raw):
         raise CollectionError(f"{path.name}: duplicate archive member")
     return normalized
-
-
-def archive_symlinks(path: Path) -> dict[str, str]:
-    """Return the symbolic-link members of one archive and their targets."""
-    if not path.name.endswith(".tar.gz"):
-        return {}
-    root = path.name.removesuffix(".tar.gz")
-    with tarfile.open(path, "r:gz") as archive:
-        return {
-            PurePosixPath(member.name).relative_to(root).as_posix(): member.linkname
-            for member in archive.getmembers()
-            if member.issym()
-        }
 
 
 def archive_bytes(path: Path, relative: str) -> bytes:
@@ -232,6 +155,15 @@ def shared_runtime(path: Path, platform: str) -> tuple[str, bytes]:
         return "aoahid.dll", archive.read(member)
 
 
+def validate_shared_runtime(path: Path, platform: str, arch: str) -> None:
+    """Require the archive's libaoahid shared library to match its target."""
+    name, data = shared_runtime(path, platform)
+    try:
+        validate_runtime_architecture(data, platform, arch)
+    except CollectionError as error:
+        raise CollectionError(f"{path.name}: {name}: {error}") from error
+
+
 def validate_runtime_architecture(data: bytes, platform: str, arch: str) -> None:
     if platform == "linux":
         if len(data) < 20 or data[:4] != b"\x7fELF":
@@ -273,190 +205,6 @@ def validate_runtime_architecture(data: bytes, platform: str, arch: str) -> None
         raise CollectionError(
             "direct Windows runtime is not the expected PE32+ DLL architecture"
         )
-
-
-def runtime_bundle_documents(platform: str) -> tuple[str, ...]:
-    if platform == "windows":
-        return RUNTIME_BUNDLE_DOCUMENTS + WINDOWS_RUNTIME_BUNDLE_DOCUMENTS
-    return RUNTIME_BUNDLE_DOCUMENTS
-
-
-def is_runtime_binary(relative: str, platform: str) -> bool:
-    """Report whether one shared-archive member is a runtime binary."""
-    parts = PurePosixPath(relative).parts
-    if len(parts) != 2:
-        return False
-    if platform == "linux":
-        return parts[0] == "lib" and ".so" in parts[1]
-    if platform == "macos":
-        return parts[0] == "lib" and parts[1].endswith(".dylib")
-    return parts[0] == "bin" and parts[1].lower().endswith(".dll")
-
-
-def build_runtime_bundle(
-    directory: Path,
-    archive: Path,
-    version: str,
-    platform: str,
-    arch: str,
-    qualifier: str,
-    created_epoch: int,
-) -> Path:
-    """Repackage one shared archive as a redistributable runtime-only asset.
-
-    Every member is copied byte-for-byte out of the already validated shared
-    archive, so the bundled runtime is the same binary the complete archive
-    ships and inherits its architecture and glibc validation.
-    """
-    _, runtime_contents = shared_runtime(archive, platform)
-    validate_runtime_architecture(runtime_contents, platform, arch)
-    root = archive.name.removesuffix(".tar.gz").removesuffix(".zip")
-    bundle_root = (
-        f"libaoahid-{version}-{platform_part(platform, arch, qualifier)}-runtime"
-    )
-    bundle = directory / runtime_bundle_name(version, platform, arch, qualifier)
-    if bundle.exists():
-        raise CollectionError(f"refusing to overwrite existing runtime bundle {bundle.name}")
-
-    documents = runtime_bundle_documents(platform)
-    members = archive_members(archive)
-    missing = sorted(set(documents) - members)
-    if missing:
-        raise CollectionError(
-            f"{archive.name}: runtime bundle sources are missing: {', '.join(missing)}"
-        )
-    binaries = sorted(name for name in members if is_runtime_binary(name, platform))
-    if not binaries:
-        raise CollectionError(f"{archive.name}: no runtime binary to bundle")
-
-    if platform in TAR_PLATFORMS:
-        with tarfile.open(archive, "r:gz") as source:
-            with bundle.open("wb") as raw:
-                with gzip.GzipFile(
-                    filename="", mode="wb", fileobj=raw, mtime=created_epoch
-                ) as compressed:
-                    with tarfile.open(
-                        mode="w", fileobj=compressed, format=tarfile.PAX_FORMAT
-                    ) as output:
-                        entries = [
-                            (relative, source.getmember(f"{root}/{relative}"))
-                            for relative in binaries + list(documents)
-                        ]
-                        for relative, member in entries:
-                            copied = tarfile.TarInfo(f"{bundle_root}/{relative}")
-                            copied.mtime = created_epoch
-                            copied.uid = 0
-                            copied.gid = 0
-                            copied.uname = ""
-                            copied.gname = ""
-                            copied.mode = member.mode
-                            copied.type = member.type
-                            if member.issym():
-                                copied.linkname = member.linkname
-                                output.addfile(copied)
-                                continue
-                            payload = source.extractfile(member)
-                            if payload is None:
-                                raise CollectionError(
-                                    f"{archive.name}: {relative} is not extractable"
-                                )
-                            data = payload.read()
-                            copied.size = len(data)
-                            output.addfile(copied, io.BytesIO(data))
-                        readme = RUNTIME_BUNDLE_README.encode("utf-8")
-                        info = tarfile.TarInfo(
-                            f"{bundle_root}/{RUNTIME_BUNDLE_README_NAME}"
-                        )
-                        info.mtime = created_epoch
-                        info.mode = 0o644
-                        info.size = len(readme)
-                        output.addfile(info, io.BytesIO(readme))
-        return bundle
-
-    stamp = datetime.fromtimestamp(max(created_epoch, 315532800), timezone.utc)
-    date_time = (
-        stamp.year,
-        stamp.month,
-        stamp.day,
-        stamp.hour,
-        stamp.minute,
-        stamp.second,
-    )
-    with zipfile.ZipFile(archive) as source:
-        with zipfile.ZipFile(
-            bundle, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
-        ) as output:
-            payloads = [
-                (relative, source.read(f"{root}/{relative}"))
-                for relative in binaries + list(documents)
-            ]
-            payloads.append(
-                (RUNTIME_BUNDLE_README_NAME, RUNTIME_BUNDLE_README.encode("utf-8"))
-            )
-            for relative, data in payloads:
-                info = zipfile.ZipInfo(f"{bundle_root}/{relative}", date_time)
-                info.create_system = 3
-                info.external_attr = (stat.S_IFREG | 0o644) << 16
-                info.compress_type = zipfile.ZIP_DEFLATED
-                output.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
-    return bundle
-
-
-def validate_runtime_bundle(
-    bundle: Path,
-    archive: Path,
-    platform: str,
-    arch: str,
-) -> None:
-    """Require the bundle to carry every license obligation of its binaries."""
-    members = archive_members(bundle)
-    documents = runtime_bundle_documents(platform)
-    required = set(documents) | {RUNTIME_BUNDLE_README_NAME}
-    missing = sorted(required - members)
-    if missing:
-        raise CollectionError(f"{bundle.name}: missing {', '.join(missing)}")
-    binaries = sorted(name for name in members if is_runtime_binary(name, platform))
-    if not binaries:
-        raise CollectionError(f"{bundle.name}: contains no runtime binary")
-    unexpected = sorted(members - required - set(binaries))
-    if unexpected:
-        raise CollectionError(f"{bundle.name}: unexpected member {', '.join(unexpected)}")
-    if not any("usb" in PurePosixPath(name).name.lower() for name in binaries):
-        raise CollectionError(
-            f"{bundle.name}: the libusb runtime is missing from the bundle"
-        )
-    if (
-        hashlib.sha256(archive_bytes(bundle, LIBUSB_SOURCE_NAME)).hexdigest()
-        != LIBUSB_SOURCE_SHA256
-    ):
-        raise CollectionError(f"{bundle.name}: bundled libusb source has the wrong SHA-256")
-    if (
-        hashlib.sha256(archive_bytes(bundle, LIBUSB_LICENSE_NAME)).hexdigest()
-        != LIBUSB_LICENSE_SHA256
-    ):
-        raise CollectionError(f"{bundle.name}: bundled libusb license has the wrong SHA-256")
-    if platform == "windows" and (
-        hashlib.sha256(archive_bytes(bundle, VCPKG_LICENSE_NAME)).hexdigest()
-        != VCPKG_LICENSE_SHA256
-    ):
-        raise CollectionError(f"{bundle.name}: bundled vcpkg license has the wrong SHA-256")
-    # Every bundled member must be the exact byte sequence already validated in
-    # the complete archive; the bundle adds only its own README.
-    bundle_links = archive_symlinks(bundle)
-    archive_links = archive_symlinks(archive)
-    for relative in sorted(members - {RUNTIME_BUNDLE_README_NAME}):
-        if relative in bundle_links or relative in archive_links:
-            if bundle_links.get(relative) != archive_links.get(relative):
-                raise CollectionError(
-                    f"{bundle.name}: {relative} is not the archive's symbolic link"
-                )
-            continue
-        if archive_bytes(bundle, relative) != archive_bytes(archive, relative):
-            raise CollectionError(
-                f"{bundle.name}: {relative} differs from the complete archive"
-            )
-    _, runtime_contents = shared_runtime(archive, platform)
-    validate_runtime_architecture(runtime_contents, platform, arch)
 
 
 def require_layout(
@@ -660,6 +408,8 @@ def require_layout(
         validate_runtime_architecture(
             archive_bytes(path, "lib/libusb-1.0.0.dylib"), platform, arch
         )
+    if variant == "shared":
+        validate_shared_runtime(path, platform, arch)
 
     try:
         metadata = json.loads(archive_bytes(path, "share/doc/libaoahid/build-metadata.json"))
@@ -1037,22 +787,6 @@ def main() -> int:
                 if platform == "linux":
                     record["glibc_baseline"] = glibc_versions.BASELINE
                     record["glibc_maximum_required"] = glibc_maximum_required
-                if variant == "shared":
-                    runtime = build_runtime_bundle(
-                        args.directory,
-                        archive,
-                        args.version,
-                        platform,
-                        arch,
-                        qualifier,
-                        args.created_epoch,
-                    )
-                    validate_runtime_bundle(runtime, archive, platform, arch)
-                    expected.add(runtime.name)
-                    record["runtime_bundle"] = runtime.name
-                    record["runtime_bundle_sha256"] = sha256(runtime)
-                    if platform == "linux":
-                        record["runtime_glibc_maximum_required"] = glibc_maximum_required
         expected_uploads = expected_release_asset_names(args.version)
         if expected != expected_uploads - {"release-manifest.json", "SHA256SUMS"}:
             raise CollectionError("internal release asset-name policy is inconsistent")
@@ -1090,8 +824,7 @@ def main() -> int:
         print(f"collect-release: error: {error}", file=sys.stderr)
         return 1
     print(
-        f"collect-release: validated {len(TARGETS) * len(VARIANTS)} packages, 1 source archive, "
-        f"and {len(TARGETS)} runtime bundles; "
+        f"collect-release: validated {len(TARGETS) * len(VARIANTS)} packages and 1 source archive; "
         "wrote release-manifest.json and SHA256SUMS"
     )
     return 0

@@ -257,14 +257,12 @@ matrix produces and architecture-checks:
 - headers, relocatable CMake/pkg-config metadata, notices, checksums, and an
   SPDX SBOM.
 
-For version `X.Y.Z`, the GitHub Release contains exactly 33 uploaded assets:
+For version `X.Y.Z`, the GitHub Release contains exactly 27 uploaded assets:
 
 - twelve archives: `libaoahid-X.Y.Z-linux-{x86_64,aarch64}-ubuntu22.04-{shared,static}.tar.gz`,
   `libaoahid-X.Y.Z-macos-{arm64,x86_64}-{shared,static}.tar.gz`, and
   `libaoahid-X.Y.Z-windows-{x86_64,arm64}-{shared,static}.zip`;
 - twelve matching `.spdx.json` sidecars;
-- six runtime bundles: the same six target names with `-runtime.tar.gz` on
-  Linux and macOS and `-runtime.zip` on Windows;
 - the deterministic tagged-tree archive `libaoahid-X.Y.Z-source.tar.gz`;
 - `release-manifest.json` and `SHA256SUMS`.
 
@@ -274,11 +272,11 @@ and is covered by `release-manifest.json` and `SHA256SUMS`.
 
 The complete `*-shared` or `*-static` archive is what you build against: it is
 the only asset carrying headers, the import library, and CMake/pkg-config
-metadata. The `*-runtime` bundle is for deploying next to an application that is
-already built. It carries the libaoahid shared library, the libusb runtime it
-loads, and the full license set for both - `LICENSE`, `NOTICE`,
-`THIRD_PARTY_NOTICES.md`, libusb's LGPL-2.1 text, and libusb's official
-corresponding source archive. No bare `.so` or `.dll` is published on its own,
+metadata. To deploy next to an application that is already built, take the
+libraries from the `*-shared` archive: it carries the libaoahid shared library,
+the libusb runtime it loads, and the full license set for both - `LICENSE`,
+`NOTICE`, `THIRD_PARTY_NOTICES.md`, libusb's LGPL-2.1 text, and libusb's
+official corresponding source archive. No bare `.so` or `.dll` is published on its own,
 because an asset that ships the libusb runtime has to carry libusb's license and
 corresponding source in the same distribution unit.
 
@@ -324,7 +322,7 @@ its official source tarball under
 | What you receive | License | Where the text is |
 |---|---|---|
 | `libaoahid` library, headers, bindings, examples | MIT | `LICENSE` |
-| `libusb-1.0` runtime shipped in release archives and runtime bundles | LGPL-2.1-or-later | `share/doc/libaoahid/third-party/libusb-copyright` |
+| `libusb-1.0` runtime shipped in release archives | LGPL-2.1-or-later | `share/doc/libaoahid/third-party/libusb-copyright` |
 | vcpkg port files bundled in Windows archives | MIT (Microsoft) | `share/doc/libaoahid/third-party/vcpkg-LICENSE.txt` |
 
 Every first-party source file carries its own
