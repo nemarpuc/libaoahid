@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>AoaHid</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>libaoahid contributors</Authors>
     <Copyright>Copyright (c) 2026 libaoahid contributors</Copyright>
     <Description>Literal P/Invoke declarations for libaoahid; requires a separately installed, version-matched native libaoahid shared library and libusb runtime.</Description>

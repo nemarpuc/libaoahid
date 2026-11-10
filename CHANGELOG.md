@@ -5,6 +5,13 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-10
+
+**Not hardware-verified.** This release changes the release packaging, the tests, the documentation and one
+argument check; none of it was run on a phone. The only hardware record is the `[0.1.0]` entry below. Asset
+names changed: a script that downloads the old `-shared` / `-static` names must be changed.
+
+
 - Fix: `aoahid_spec_create_mouse`, `aoahid_spec_create_touchscreen`, and
   `aoahid_spec_create_touchpad` now return the result code recorded in
   `aoahid_last_error()` when an enabled wheel, AC Pan, Contact Width, or
