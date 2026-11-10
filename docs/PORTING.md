@@ -109,7 +109,7 @@ The transport uses only public libusb 1.0.30 APIs, and CI builds and tests on
 Linux musl. Release archives cover only the targets in
 [TARGET_MATRIX.md](TARGET_MATRIX.md#build-targets). A new backend needs a check
 of its control-transfer length, claim, cancel, event, and device-matching
-behavior against the libusb documentation and source, plus integration tests.
+behavior against the libusb documentation and source, plus `sim` tests.
 Do not assume Windows or Linux behavior carries over.
 
 ## New Android targets

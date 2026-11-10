@@ -59,19 +59,22 @@ budgets also are not hard end-to-end operating-system latency bounds: backend,
 scheduler, driver, controller, and device behavior must be measured on the
 deployment host.
 
-The default pool allocates eight payload buffers of `1024 + 8` bytes, where the
-eight bytes are the libusb control setup area: 8,256 bytes of slot-buffer
-storage. This is a lower-level payload-buffer calculation, not total heap use;
-libusb transfer objects, vectors, handles, and allocator metadata are additional.
-Using an explicit smaller maximum report or smaller pool reduces this reserved
-storage when the application's reports and concurrency permit it. Increasing
-the pool does not parallelize EP0.
+The `aoahid_device_options_init` pool allocates four payload buffers of
+`1024 + 8` bytes, where the eight bytes are the libusb control setup area:
+4,128 bytes of slot-buffer storage (or 8,256 bytes when `transfer_pool_slots`
+is raised to `8` as in `examples/c/multi_profile.c`). This is a lower-level
+payload-buffer calculation, not total heap use; libusb transfer objects,
+vectors, handles, and allocator metadata are additional. Using an explicit
+smaller maximum report or smaller pool reduces this reserved storage when the
+application's reports and concurrency permit it. Increasing the pool does not
+parallelize EP0.
 
-The 64-byte descriptor fragment setting affects registration request 56 only;
-Input reports remain one request 57 each and are never fragmented. A Node with
-no reservation consumes no dedicated slot; this saves no Device-pool allocation because the pool is
-already allocated, but it leaves all slots shared and changes fairness under
-contention.
+The `descriptor_fragment_bytes` setting (`4096` in
+`aoahid_device_options_init`, or `64` in `examples/c/multi_profile.c`) affects
+registration request 56 only; Input reports remain one request 57 each and are
+never fragmented. A Node with no reservation consumes no dedicated slot; this
+saves no Device-pool allocation because the pool is already allocated, but it
+leaves all slots shared and changes fairness under contention.
 
 There is no basis for fixed latency predictions that differ between Linux and
 Windows, x86-64 and ARM64, or one libusb backend and another. OS-specific
@@ -148,7 +151,7 @@ are failure budgets rather than success-latency estimates.
 | Caller-poll hot-path probe | After prewarming fake event dispatch, one keyboard down/submit/completion and one up/submit/completion make zero calls to the test-instrumented C++ allocation operators. | It does not intercept every possible allocator in a real libusb backend, measure elapsed time, or cover every profile/state transition. |
 | Caller-poll synchronization selectors | The tested caller-poll Context and Node have null active mutex selectors, so their update/submit/completion path does not take the library's Context or Node mutex. | It does not make multiple callers safe; the application must still serialize a caller-poll Context. |
 | Caller-poll work counters | That same two-report cycle records exactly two successful submissions, two zero-timeout event-handler calls, two callbacks, and no blocking wait in the fake backend. Each completion is observed before the next mutation. | These are operation counts for one deterministic path, not wall-clock latency, CPU load, or a real libusb-backend trace. |
-| Internal-thread integration loop | Completion races with Node close for 128 iterations, error publication is transferred to the caller, and failed-thread teardown drains pending work. | A finite schedule cannot prove the absence of every possible race. |
+| Internal-thread sim loop | Completion races with Node close for 128 iterations, error publication is transferred to the caller, and failed-thread teardown drains pending work. | A finite schedule cannot prove the absence of every possible race. |
 | Linux ThreadSanitizer suite | The full deterministic suite executes with ThreadSanitizer instrumentation and fails if TSan reports an observed data race. | TSan is schedule-dependent and does not prove race freedom; it also does not validate Android hardware or Windows synchronization. |
 | Internal-thread idle wait | After one injected immediate backend error, the fake backend observes only nonzero 60-second requested waits, no submissions or callbacks, and no zero-timeout calls while the Context is idle. The error path itself uses an interruptible 10 ms condition-variable backoff. | Counters prove the selected blocking path, not a CPU percentage or scheduler behavior on a physical host. |
 | Cancellation and teardown wake | A deliberately delayed transfer blocks a fake five-second event wait; cancellation causes exactly one cancellation wake and terminal callback. Separately, idle Context teardown interrupts a fake 60-second wait exactly once, with no timeout wake and no remaining waiter. | The five-second value is a deadlock escape, not a latency threshold; the test does not benchmark a real libusb backend. |
@@ -203,7 +206,7 @@ Channel read/write allocate nothing. Whether heavy Bulk traffic, such as a large
 `adb push`, raises HID latency on real hardware has not been measured yet
 ([TARGET_MATRIX.md](TARGET_MATRIX.md)).
 
-## Measuring on the target
+## How to measure
 
 No nanosecond cost, jitter bound, or throughput number is stated without a
 reproducible benchmark, compiler, CPU, libusb backend, and percentile report.
@@ -211,7 +214,70 @@ The library makes no promise that increasing pool size creates parallel EP0 wire
 transfers. Pool size controls ready-work capacity, fairness, and callback
 lifetime.
 
-For caller-controlled scheduling, select caller-poll mode, keep all calls for
-that context on one scheduling domain, prebuild/retain specs, and submit only
-state already validated by its profile. Measure latency and jitter on the actual
-host, USB controller, cable, phone, kernel, and Android build.
+Three distinct measurements answer three different questions; each has strict
+limits on what it can and cannot show:
+
+### 1. Library CPU cost per submit (nanoseconds, fake libusb, no hardware)
+
+- **What it measures:** Host CPU time spent inside `libaoahid` on the hot send
+  path (`t4 - t0` against `tests/fake_libusb`): dirty-state checks, transfer-pool
+  slot acquisition and release, byte-wise report serialization
+  (`serialize_node`), optional `validate_reports` checks, and completion
+  bookkeeping—with no kernel USB driver, bus scheduling, or phone in the loop.
+- **How to measure:** Configure a `Release` build with
+  `-DAOAHID_USE_FAKE_LIBUSB=ON`, open a `Context` in `AOAHID_EVENT_CALLER_POLL`
+  mode, register the target `Spec`, warm up the loop, and time a batch of
+  $10^5$–$10^6$ state-mutation + `aoahid_node_submit` + completion cycles with
+  `std::chrono::steady_clock`, dividing total elapsed nanoseconds by the
+  iteration count.
+- **What it can and cannot show:** Shows host CPU regressions or improvements in
+  library serialization and pool management at nanosecond resolution (for
+  example, the ~2.9× speedup for 16-contact touchscreen serialization recorded
+  in commit `15a6491`). It cannot show real `libusb` backend locking or URB
+  allocation, `usbfs` / `WinUSB` kernel transitions, USB bus scheduling, or
+  Android input processing.
+
+### 2. Host-side submit-to-completion time on a real phone (microseconds, p50/p90/p99 and sample count)
+
+- **What it measures:** Round-trip time on the host clock from calling
+  `aoahid_node_submit` (`t0`) for AOA request 57 (`ACCESSORY_SEND_HID_EVENT`) on
+  endpoint 0 until `libusb` invokes the completion callback (`t4`) after the
+  phone's USB controller acknowledges the control transfer's status stage.
+- **How to measure:** Build in `Release` mode against the real system `libusb`
+  (`-DAOAHID_USE_FAKE_LIBUSB=OFF`), connect a physical Android phone, and record
+  `std::chrono::steady_clock::now` around each report submission and its
+  completion (for example around `aoahid_node_submit_blocking` in caller-poll
+  mode). Report **microseconds** with **p50, p90, and p99 percentiles** and the
+  **exact sample count**, together with the host OS, USB controller/hub path,
+  and phone model. Nanoseconds are meaningless at this boundary because USB 2.0
+  High-Speed schedules bus traffic in 125 µs microframes (and Full-Speed in
+  1 ms frames) ([USB 2.0 specification §5.6–5.8](https://www.usb.org/document-library/usb-20-specification)).
+- **What it can and cannot show:** Captures host `libusb` + OS USB driver +
+  wire control transfer + `f_accessory` EP0 completion (`acc_complete_set_hid_event`
+  in `f_accessory.c`). It cannot show the time spent after EP0 completion inside
+  Android's `uhid` driver, `hid-input`, `EventHub`, `InputReader`, or the
+  foreground application (`t7 - t4`).
+
+### 3. Comparing with `libmimhid` on the same phone via wireless `adb getevent -t`
+
+- **What it measures:** Relative delivery-time difference on the **same Android
+  phone** between `libaoahid` (USB cable directly to the phone, AOA 2.0 request
+  57 on EP0 -> `f_accessory` -> `uhid` -> `/dev/input/eventN`) and
+  [`libmimhid`](https://github.com/nemarpuc/libmimhid) (PC -> UART ->
+  microcontroller USB HID interrupt IN endpoint -> `usbhid` ->
+  `/dev/input/eventN`).
+- **How to measure:** Because `libaoahid` and `libmimhid` each occupy the
+  phone's USB port, run `adb` over Wi-Fi (`adb tcpip` / wireless debugging) and
+  record kernel input timestamps on the phone with
+  `adb shell getevent -lt /dev/input/eventN` while sending a paced sequence of
+  reports from the PC and logging the PC's monotonic send timestamps using the
+  same method for both libraries on the same phone.
+- **What it can and cannot show:** The PC clock and the phone's kernel clock do
+  not share an epoch, so subtracting a PC send timestamp from a phone
+  `getevent -t` timestamp does **not** measure absolute one-way latency. The
+  PC-to-phone clock offset cancels **only in a difference** between two
+  measurements taken with the same method on the same setup, and clock drift
+  plus Wi-Fi jitter limit wireless `adb` comparisons to **about a millisecond**.
+  Absolute one-way wire-to-device figures require a hardware USB protocol
+  analyzer (or a physical hardware trigger tying the host and phone to a common
+  capture clock).

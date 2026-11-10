@@ -5,6 +5,17 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+- Fix: `aoahid_spec_create_mouse`, `aoahid_spec_create_touchscreen`, and
+  `aoahid_spec_create_touchpad` now return the result code recorded in
+  `aoahid_last_error()` when an enabled wheel, AC Pan, Contact Width, or
+  Contact Height field is invalid—in particular returning
+  `AOAHID_ERR_UNSET_FIELD` (instead of `AOAHID_ERR_PARAM`) when `bit_width` is
+  zero (`src/profiles/spec.cpp`).
+- Docs: added `docs/BUILDING.md`, `docs/RELEASES.md`, and
+  `docs/VERIFICATION.md`, expanded the design rationales in
+  `docs/ARCHITECTURE.md` and `docs/INTERNALS.md`, added measurement methods to
+  `docs/LATENCY.md`, and recorded three platform-specific open test items in
+  `tests/README.md`, `docs/LIMITS.md`, and `docs/VERIFICATION.md`.
 - Tests: the fake-libusb tests are called what they are, `sim` (`tests/sim`,
   ctest `aoahid.unit`, `aoahid.sim`, `aoahid.sim-*`); `hw` is kept for runs on
   a real phone.

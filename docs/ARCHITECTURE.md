@@ -151,25 +151,125 @@ a report is still in flight at the deadline, the Node close returns
 moves the consumed graph to the Context graveyard, which reaps it once the
 callbacks have run.
 
-## Design rules
+## Design decisions
 
-- **No inferred product or target values.** Usages, logical ranges, bit
-  widths, Report IDs, and target HID-parser limits are caller inputs. The
-  library does not guess them. An unset required value is an error
-  (`AOAHID_ERR_UNSET_FIELD` or `AOAHID_ERR_PARAM`), never a silent fallback.
-- **Initial values in the header, none in the library.** The `*_init`
-  functions in `aoahid.h` fill options in; the library itself never puts a
-  value in place of a zero. Timeouts, fragment size, pool size, maximum report
-  size, drain budget, and Channel transfer counts and size are required; zero
-  is `AOAHID_ERR_UNSET_FIELD`. Every enumeration starts at 1, so a zeroed
-  enumeration field is refused too. Options are copied; caller storage is never
-  modified. Reserved fields must be zero.
-- **No convenience names.** `tools/symbol-lint/symbol_lint.py` fails if an
-  exported function name contains `default`, `preset`, `standard`, or
-  `typical` as an underscore-separated word. It also checks that the header
-  does not include libusb, that every `*_options` struct (and
-  `aoahid_capability_manifest`) begins with `uint32_t struct_size`, and that
-  the built library's exports match the header.
+Every non-obvious API and object-model choice below states the decision, its
+reason from the codebase or commit history, and the alternative that was
+rejected or left out:
+
+- **Zero inference; unset fields return `AOAHID_ERR_UNSET_FIELD` (`include/aoahid.h`, `src/profiles/spec.cpp`, `src/api/context_ops.cpp`, commits `7c2ffdc`, `c82dc1c`, `0e48856`).**
+  Usages, logical ranges, bit widths, Report IDs, target HID-parser limits,
+  timeouts, fragment sizes, pool sizes, and Channel transfer counts are caller
+  inputs. If a required field or timeout argument is zero, the call returns
+  `AOAHID_ERR_UNSET_FIELD` (or `AOAHID_ERR_PARAM`) before any USB I/O. Every
+  enumeration starts at `1`, so a zeroed enum field is refused too. The
+  `aoahid_*_options_init` functions and `AOAHID_*_TIMEOUT_MS` header constants
+  supply one working set of values that callers can inspect and modify; the
+  library itself never substitutes a fallback for `0`.
+  *Rejected alternative:* Letting `0` silently select a library-chosen fallback
+  inside `aoahid_device_open`, `aoahid_channel_open`, or profile factories, or
+  storing timeouts inside `aoahid_device_options` (removed in commits
+  `7c2ffdc`, `c82dc1c`, and `0e48856`, and guarded by `tools/symbol-lint/symbol_lint.py`).
+- **No `default`, `preset`, `standard`, or `typical` symbol names (`tools/symbol-lint/symbol_lint.py`, `include/aoahid.h`, commit `0e48856`).**
+  `tools/symbol-lint/symbol_lint.py` fails if any exported function name
+  contains `default`, `preset`, `standard`, or `typical` as an
+  underscore-separated word (`BANNED_CONVENIENCE_RE`), and dynamically invokes
+  `aoahid_context_create` and every `aoahid_spec_create_*` with an all-zero
+  options buffer to verify that each rejects it. Option initializers are
+  `static inline` header functions named `aoahid_*_options_init`.
+  *Rejected alternative:* Convenience factory functions in the C ABI that hide
+  product or target policy behind a "default" or "preset" name
+  (`tools/symbol-lint/symbol_lint.py`).
+- **Immutable `aoahid_spec` shared across Nodes (`src/api/internal.hpp`, `src/hid/descriptor_builder.cpp`, `src/hid/validator.cpp`, `src/api/c_api_node.cpp`).**
+  `aoahid_spec_create_*` emits the HID report descriptor and its immutable
+  `ReportLayout` together in `DescriptorBuilder`, validates them before any USB
+  I/O occurs, and returns an immutable `aoahid_spec` retained by atomic
+  `ref_count` when `aoahid_node_open` attaches it to a Node. Several Nodes—even
+  on different `aoahid_device` handles—can share one `Spec`.
+  *Rejected alternative:* Generating descriptor bytes separately from serializer
+  field offsets, rejected in `src/hid/descriptor_builder.cpp` so a serializer
+  can never silently drift away from the descriptor registered with Android.
+  (At the wire level, AOA 2.0 `f_accessory` accepts `ACCESSORY_SET_HID_REPORT_DESC`
+  only before registration completes; changing a descriptor requires
+  `ACCESSORY_UNREGISTER_HID` and a new registration, as documented in
+  [PROTOCOL.md](PROTOCOL.md). No separate rejected alternative for separating
+  `aoahid_spec` creation from `aoahid_node_open` is recorded in commit history.)
+- **Caller-poll vs internal-thread event modes (`src/api/c_api_context.cpp`, `src/api/internal.hpp`, commit `1c6b080`).**
+  Each `aoahid_context` chooses at creation between `AOAHID_EVENT_CALLER_POLL`
+  (no background thread; the caller drives `aoahid_context_poll`, and
+  `active_state_mutex` / `active_completion_mutex` are `nullptr` so
+  `ModeMutexGuard` takes no lock) and `AOAHID_EVENT_INTERNAL_THREAD` (one
+  event thread runs `Runtime::poll` with a 60-second bound and synchronizes
+  shared state with `context->mutex` and `node->completion_mutex`).
+  *Rejected alternatives:* (1) A 100 Hz (10 ms) idle poll timeout on the
+  internal event thread, replaced by a 60,000 ms bounded wait woken via
+  `libusb_interrupt_event_handler` (`src/api/c_api_context.cpp`); (2) an atomic
+  flag to skip `context->mutex` in `aoahid_node_submit`, reverted in commit
+  `1c6b080` because saving one uncontended lock was unmeasured and had to be
+  kept in step with the error latch by hand. (Why both event modes are offered
+  rather than only one is not separately recorded beyond supporting both
+  single-threaded caller-driven polling and background event pumping.)
+- **Pre-allocated transfer pool, per-Node reservations, and LIFO free list (`src/transport/transport.cpp`, commits `97bbd17`, `aa3dbf9`).**
+  `aoahid_device_open` pre-allocates `transfer_pool_slots` `libusb_transfer`
+  handles and payload buffers of `8 + maximum_report_bytes` bytes, and each
+  Node may reserve `reserved_slots` at `aoahid_node_open`. The hot send path
+  never allocates heap memory or libusb transfers, and per-Node reservations
+  prevent a burst of keyboard or toggle events from starving a high-rate
+  touchscreen or mouse Node. Free slots are kept on a singly-linked LIFO list
+  (`free_head_`; see [INTERNALS.md](INTERNALS.md#design-decisions)).
+  *Rejected alternatives:* Per-report allocation of `libusb_transfer` or
+  payload buffers ([LATENCY.md](LATENCY.md)), and spinning or sleeping 1 ms in
+  `aoahid_node_submit_blocking` when all pool slots are held by other Nodes
+  (replaced in commits `97bbd17` and `aa3dbf9` with a Device-level condition
+  variable signaled by transfer completion).
+- **No retry or re-enumeration wait in the library (`src/api/c_api_send.cpp`, `src/api/node_ops.cpp`, commits `0f7739e`, `b12b7d4`, `e1ba9ba`, `ef7b3d1`).**
+  Every AOA request is sent once. When request 57 (`ACCESSORY_SEND_HID_EVENT`)
+  completes with `AOAHID_ERR_STALL`—the normal kernel response while
+  `f_accessory`'s workqueue is still creating the `uhid` device right after
+  `aoahid_node_open`—the library leaves `node->dirty`, `TouchState::packet_cursor`,
+  and `scan_time` pending so the caller's next submit resends the refused
+  state. `aoahid_accessory_start` sends requests 51–53 and returns immediately
+  without waiting for USB re-enumeration, and `aoahid_device_open` sends no
+  probe request (`commit ef7b3d1`).
+  *Rejected alternatives:* Automatic first-report retry loops (`first_report_attempts`
+  and `first_report_backoff_us`, removed in commits `b12b7d4` and `ef7b3d1`),
+  retrying `LIBUSB_TRANSFER_ERROR` on first report (reverted in commit `0f7739e`
+  as unconfirmed on hardware), and an automatic re-enumeration `Link` layer
+  (removed in commit `e1ba9ba`).
+- **Per-device `aoahid_context` serialization domain and shared `transport::Port` (`src/api/internal.hpp`, `src/transport/port.cpp`, commits `b12b7d4`, `553e774`, `fa98a65`, `15efaea`).**
+  An `aoahid_context` is the unit of serialization (checked at runtime with
+  `-DAOAHID_CHECK_SERIALIZATION=ON`): callers serialize calls on a `Context`
+  and its child handles, and drive multiple devices in parallel by creating one
+  `aoahid_context` per device. Within a `Context`, `transport::Port` owns the
+  single `libusb_device_handle` for each physical port and shares it across
+  `Device`, `Channel`s, discovery, and accessory start.
+  *Rejected alternatives:* Opening the same physical USB device twice (which
+  fails under Windows WinUSB; `src/transport/port.cpp`, commit `b12b7d4`), and
+  claiming or releasing a Bulk Channel interface while a HID report control
+  transfer is in flight (which WinUSB routes through the first claimed
+  interface and auto-releases on completion, undoing a concurrent claim; commit
+  `553e774`).
+- **Stable C99 ABI with header-only C++20 forwarders and generated bindings (`include/aoahid.h`, `include/aoahid.hpp`, `src/api/support.hpp`, `tools/bindings/generate.py`, commits `0581391`, `9d91bca`, `0e48856`, `24c2092`).**
+  The binary boundary is a 53-function C ABI with `struct_size`-prefixed option
+  structs, opaque handles, `AOAHID_C_*_CATCH` exception firewalls, and static
+  C++ runtime linking (`commit 9d91bca`). `include/aoahid.hpp` is a header-only
+  forwarding layer under `namespace aoahid` with `default_*_options()` helpers
+  and `SpecPtr` / `DiscoveryPtr`, and `tools/bindings/generate.py` generates
+  the Python, C#, and Rust bindings directly from `include/aoahid.h`.
+  *Rejected alternatives:* Hand-maintained per-language bindings (replaced in
+  commit `24c2092`) and stateful C++ node-reference classes (`keyboard_node_ref`,
+  `raw_node_ref`, `aoa::bind`, removed in commit `0581391` so `aoahid.hpp`
+  forwards `aoahid.h` 1:1).
+- **Full-NKRO bitmap Keyboard and Gamepad-only controller collection (`src/profiles/spec.cpp`, commits `25789c0`, `c05aec4`).**
+  The Keyboard profile emits a 1-bit-per-Usage Variable bitmap only, and the
+  Gamepad profile always emits the Generic Desktop `Game Pad` Application
+  Collection.
+  *Rejected alternatives:* The legacy 6KRO Array keyboard mode and
+  `ErrorRollOver` state machine (removed in commit `25789c0` because Linux and
+  Android `hid-input` map 1-bit Variable key bits directly to `EV_KEY` events
+  without a 6-key limit), and `AOAHID_CONTROLLER_JOYSTICK` (removed in commit
+  `c05aec4` because AOSP `Generic.kl` and `EventHub.cpp` map only the Gamepad
+  button range to `BUTTON_A`/`B`/`X`/`Y` and `SOURCE_GAMEPAD`).
 
 ## Error model
 
@@ -216,7 +316,7 @@ callbacks have run.
 | `src/profiles/` | `spec.cpp` (Spec factories and descriptor generation), `state.cpp` (per-Node report state machines and serialization). |
 | `src/transport/` | `discovery.cpp` (runtime, event pumping, request-51 probing), `port.cpp` (shared USB handle, accessory start), `transport.cpp` (requests 54–57, transfer pool), `channel.cpp` (bulk Channels). |
 | `bindings/` | Python, C#, and Rust bindings over the C ABI. |
-| `tests/` | `unit/`, `integration/` (against the fake libusb in `fake_libusb/`), `abi/`, `golden/` (expected descriptors as hex), `fuzz/`, `cmake/` (package tests), `hidtools/`, `release/`. |
+| `tests/` | `unit/`, `sim/` (against the fake libusb in `fake_libusb/`), `hw/`, `abi/`, `golden/` (expected descriptors as hex), `fuzz/`, `cmake/` (package tests), `hidtools/`, `release/`. |
 | `tools/` | `symbol-lint/`, `check_*.py` contract and license checks, `generate-support-table/`, `device-check/`, `release/`, `docs/`. |
 
 ## Building and checking
@@ -224,7 +324,7 @@ callbacks have run.
 ```sh
 cmake --preset dev && cmake --build --preset dev && ctest --preset dev
 cmake --preset tsan && cmake --build --preset tsan && ctest --preset tsan
-./build/dev/aoahid_tests profiles   # only the named suites: item_writer, profiles, transport, identity
+./build/dev/aoahid_tests profiles   # only the named suites: item_writer, profiles, spec_options, raw_descriptor, transport, identity, api_arguments, report_state, transport_failures
 ```
 
 Tests require `AOAHID_USE_FAKE_LIBUSB=ON`; the fake backend is never used in

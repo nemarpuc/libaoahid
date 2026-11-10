@@ -83,9 +83,20 @@ button counts, and optional-field presence are what the options say. The
 ([API.md](API.md#initial-values)); a factory reads only what the structure
 holds.
 
+| Profile | You describe | The library derives and keeps consistent |
+| --- | --- | --- |
+| Keyboard | Report ID, key Usage range, optional battery report | 8 modifier bits (`0xE0`–`0xE7`), 1-bit-per-Usage NKRO Variable bitmap, byte-alignment padding, press/release edge guard, release-all neutral report on close |
+| Mouse | Report ID, button count, X/Y ranges and bit widths, optional Wheel and AC Pan ranges and widths | Pointer Physical Collection, signed 64-bit pending delta accumulators, per-report clamping and multi-report flushing, button edge guard, neutral report on close |
+| Toggle (Consumer, System, Camera, Telephony) | Application Collection, field Usage Page, four parallel arrays (`allowed_usages`, `usage_semantics`, `expected_linux_event_types`, `expected_linux_codes`) | One 1-bit Variable field per allow-listed Usage with the HID Input flags matching its declared semantic (HUT Table 3.2), per-Usage edge guard |
+| Gamepad | Report ID, button count and starting Usage, D-pad representation (Hat, D-pad buttons, or none), axes (`role`, `usage_page`, `usage`, field range/width, `neutral_value`, expected Linux/Android names) | Canonical 4-bit Hat Switch (`0..7`, Physical `0..315` degrees, Null `15`) or 4 D-pad button bits (`0x90`–`0x93`), axis range/neutral validation, neutral report on close |
+| Touchscreen & Touchpad | Report ID, `maximum_contacts` (`1..16`), `contacts_per_report`, multi-packet flag, Contact ID/X/Y/Contact Count fields, optional Pressure/Width/Height/Azimuth/Scan Time/Contact Count Maximum Feature (plus `button_count` on Touchpad) | Finger Logical Collections, fixed-slot contact state machine with explicit `Tip = 0` lift records, multi-packet frame splitting (`Contact Count` on first packet, `0` on continuations), 100 µs Scan Time counter, lift-all neutral report on close |
+| Pen & Digitizer | Report ID, hover and eraser flags, barrel switch Usages, X/Y fields, optional Pressure, X/Y Tilt, Twist | Stylus Physical Collection, `Invert` before `Tip Switch` and `In Range`, automatic out-of-range transition report when switching tool (`pen` vs `eraser`) while in range, out-of-range neutral report on close |
+| Battery report | `enable_battery = 1` and `aoahid_battery_report` (`report_id`, `strength` range and width) on any generated profile | Second Input report with Battery Strength (`0x06/0x20`) inside the same Application Collection, sent only when no input report is pending and the strength changed |
+| Raw | Descriptor bytes, accepted Input report table (`report_id` + `wire_length`), `acknowledges_no_android_support = 1` | Full HID 1.11 short-item and Linux `hid-core` parser validation, target `DescriptorRequirements` calculation, trailing-padding zero-bit mask check on every `aoahid_raw_submit` |
+
 ## Keyboard
 
-`aoahid_spec_create_keyboard(&aoahid_keyboard_options)`
+`aoahid_spec_create_keyboard(&options, &spec)`
 
 - Application Collection: Generic Desktop / Keyboard (`0x01/0x06`).
 - Eight modifier bits, Keyboard page `0x07` Usages `0xE0`-`0xE7` (Left
@@ -109,7 +120,7 @@ IME; a barcode-wedge scanner uses the same profile.
 
 ## Mouse
 
-`aoahid_spec_create_mouse(&aoahid_mouse_options)`
+`aoahid_spec_create_mouse(&options, &spec)`
 
 - Application Collection: Generic Desktop / Mouse (`0x01/0x02`), with a
   Pointer (`0x01`) Physical Collection.
@@ -130,7 +141,7 @@ Pointer acceleration is the target's business.
 
 ## Toggle: Consumer, System, Camera, and Telephony controls
 
-`aoahid_spec_create_toggle(&aoahid_toggle_options)`
+`aoahid_spec_create_toggle(&options, &spec)`
 
 One factory covers every page of one-bit controls. You choose:
 
@@ -190,7 +201,7 @@ depends on Android's key layout and policy.
 
 ## Gamepad
 
-`aoahid_spec_create_gamepad(&aoahid_gamepad_options)`
+`aoahid_spec_create_gamepad(&options, &spec)`
 
 - Application Collection: Generic Desktop / Game Pad (`0x01/0x05`).
 - Buttons: `button_count` (at least 1) Button page Usages starting at
@@ -257,7 +268,7 @@ and each axis returns to its neutral.
 
 ## Touchscreen
 
-`aoahid_spec_create_touchscreen(&aoahid_touchscreen_options)`
+`aoahid_spec_create_touchscreen(&options, &spec)`
 
 - Application Collection: Digitizers / Touch Screen (`0x0D/0x04`), fixed-slot
   Multi-Touch.
@@ -322,7 +333,7 @@ unit. The count restarts at 0 once every contact is lifted and sent.
 
 ## Touchpad
 
-`aoahid_spec_create_touchpad(&aoahid_touchpad_options)`
+`aoahid_spec_create_touchpad(&options, &spec)`
 
 The same fixed-slot Multi-Touch descriptor and contact state machine as
 Touchscreen, with every field and constraint identical, except:
@@ -342,8 +353,8 @@ button index is out of range. Close clears buttons and lifts all contacts.
 
 ## Pen and Digitizer
 
-`aoahid_spec_create_pen(&aoahid_pen_options)` and
-`aoahid_spec_create_digitizer(&aoahid_digitizer_options)`
+`aoahid_spec_create_pen(&options, &spec)` and
+`aoahid_spec_create_digitizer(&options, &spec)`
 
 The two profiles share one report shape and one state machine; the options
 structures have the same fields. They differ only in the Application
@@ -438,7 +449,7 @@ the level with `InputDevice.getBatteryState()`.
 
 ## Raw
 
-`aoahid_spec_create_raw(&aoahid_raw_options)` accepts your own descriptor plus a
+`aoahid_spec_create_raw(&options, &spec)` accepts your own descriptor plus a
 table of accepted Input reports (`aoahid_raw_report`: a `report_id`
 (`aoahid_report_id_option`: whether it is present, and the ID) and the exact
 `wire_length`). You must set
@@ -448,7 +459,7 @@ requires_feature_response = 0` (else `AOAHID_ERR_UNSUPPORTED`).
 The descriptor is parsed and checked (short items only, no reserved items,
 required Global/Local state present, field spans per HID 1.11 §8.4, see
 [LIMITS.md](LIMITS.md#library-limits)). `aoahid_raw_submit(node, report,
-length)` checks the report against the accepted ID and length (and that
+length, send_timeout_ms)` checks the report against the accepted ID and length (and that
 trailing padding bits are zero), copies it, and queues it. No state, neutral
 report, or transition is generated; `aoahid_node_submit` does not apply to Raw
 Nodes.

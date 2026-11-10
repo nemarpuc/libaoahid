@@ -36,7 +36,7 @@ structure layout does not change when a compiler uses short enums.
 The initializers are `static inline` functions in `aoahid.h`, so they are not
 in the binary ABI and the language bindings do not have them; a binding sets
 the same fields itself. `aoahid.hpp` adds functions that return an initialized
-structure (`aoahid::device_options`, ...).
+structure (`aoahid::default_device_options`, ...).
 
 | Initializer | What it fills in |
 |---|---|
@@ -47,7 +47,7 @@ structure (`aoahid::device_options`, ...).
 | `aoahid_node_options_init` | No reserved slot. |
 | `aoahid_keyboard_options_init` | Usages `0x04` (Keyboard a) to `0xDD` (Keypad Hexadecimal), plus the modifiers. |
 | `aoahid_mouse_options_init` | 5 buttons; X and Y -32767..32767 in 16 bits; wheel and pan -127..127 in 8 bits. |
-| `aoahid_toggle_options_init` | Consumer Control (`0x0C/0x01`, field page `0x0C`). The Usages and their three parallel arrays are yours to set. |
+| `aoahid_toggle_options_init` | Consumer Control (`0x0C/0x01`, field page `0x0C`). The four parallel arrays (`allowed_usages`, `usage_semantics`, `expected_linux_event_types`, `expected_linux_codes`) and `allowed_usage_count` are yours to set. |
 | `aoahid_gamepad_options_init` | Axes X, Y, Z, Rz (-127..127 in 8 bits, at rest at 0), 12 buttons from Button 1, an eight-way Hat. |
 | `aoahid_touchscreen_options_init` | 10 contacts in one report; Contact ID 0..15 in 4 bits; X and Y 0..32767 in 16 bits; Contact Count 0..10 in 4 bits. |
 | `aoahid_touchpad_options_init` | As the touchscreen with 5 contacts, plus one click button. |
@@ -465,8 +465,10 @@ namespace `aoahid`, without the `aoahid_` prefix (`aoahid_keyboard_key` is
 `aoahid::keyboard_key`). Types, arguments, and results are those of the C API.
 It adds two things:
 
-- one function per initializer that returns the initialized structure
-  (`aoahid::device_options` returns what `aoahid_device_options_init` fills in);
+- one helper function per initializer that returns the initialized structure by
+  value (`aoahid::default_device_options` returns what
+  `aoahid_device_options_init` fills in), alongside unprefixed type aliases
+  (`aoahid::device_options` for `aoahid_device_options`);
 - `aoahid::SpecPtr` and `aoahid::DiscoveryPtr`, `std::unique_ptr` types that
   release a Spec reference or destroy a discovery snapshot. Context, Device,
   Node and Channel stay plain pointers: closing them takes timeouts and may

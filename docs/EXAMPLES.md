@@ -114,9 +114,9 @@ are meant to be watched rather than run unattended.
 
 ## Example values
 
-Every number below is set in each comprehensive example. The C example takes
-the rest from the `*_init` functions, and the other languages set those values
-too. A required value left at zero is refused (`AOAHID_ERR_UNSET_FIELD`).
+Every number below is set in `examples/c/multi_profile.c`, which starts from
+the `*_init` functions and overrides the values for its three-profile session.
+A required value left at zero is refused (`AOAHID_ERR_UNSET_FIELD`).
 
 | Example value | Role |
 |---|---|
@@ -124,7 +124,7 @@ too. A required value left at zero is refused (`AOAHID_ERR_UNSET_FIELD`).
 | 1000 ms | Device close-drain budget. |
 | 64 bytes | Descriptor fragment policy. The official AOA page fixes ordering and offset, not a fragment size. |
 | 8 pool slots; 1 reserved slot per Node | Capacity and reservation choices for this three-profile example; the one-slot Node reservation is explicit because zero/zero means no reservation. |
-| First-report STALL | The library never retries. The multi-profile examples report a STALL once and send again on their next loop iteration, because a refused report stays pending; `examples/c/verify/verify_common.h` resends explicitly up to 20 times, 1 ms apart. |
+| First-report STALL | The library never retries. `examples/c/multi_profile.c` reports a STALL once and sends again on its next loop iteration, because a refused report stays pending; `examples/c/verify/verify_common.h` resends explicitly up to 20 times, 1 ms apart. |
 | 4096 descriptor/target policies | Descriptor-size limits chosen by the example. The Linux HID core rejects descriptors larger than `HID_MAX_DESCRIPTOR_SIZE` (4096, `include/linux/hid.h`). They are not universal AOA limits. |
 | 4088 host/report policy | Deliberately conservative host control-buffer value, used as both `host_control_buffer_policy_bytes` and `maximum_report_bytes`. |
 | 256 fields, stack depth 4, 12288 usages, 65528 report-data bits, 256 report-size bits | Linux HID core parser limits (`include/linux/hid.h`, `drivers/hid/hid-core.c`) for the kernel these examples target; check them against your target kernel. |
@@ -161,6 +161,7 @@ that dependency.
 Start from the initializer and change what differs:
 
 ```c
+/* Fragment: customize an aoahid_mouse_options structure before aoahid_spec_create_mouse. */
 aoahid_mouse_options mouse;
 aoahid_mouse_options_init(&mouse);
 mouse.button_count = 3;
@@ -193,8 +194,11 @@ open a device below version 2 with `AOAHID_ERR_NOT_AOA`.
   at zero.
 - C#: populate the sequential structs, using unmanaged UTF-8 storage whose
   lifetime covers the native call. P/Invoke uses C calling convention.
-- Rust: populate `aoahid_sys` `repr(C)` structures. The safe wrapper owns specs
-  and provides a typed keyboard-node reference, but does not construct options.
+- Rust: populate `aoahid_sys` `repr(C)` structures. The safe `aoahid` wrapper
+  crate owns specs (`KeyboardSpec`, `MouseSpec`, `ToggleSpec`, `GamepadSpec`,
+  `TouchscreenSpec`, `TouchpadSpec`, `PenSpec`, `DigitizerSpec`, `RawSpec`) and
+  provides typed node references for all nine profiles (`KeyboardNodeRef`,
+  `MouseNodeRef`, ...), but does not construct options.
 
 All bindings expose native result codes. On error, inspect the C thread-local
 detail on the same calling thread.

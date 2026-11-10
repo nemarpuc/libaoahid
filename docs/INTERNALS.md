@@ -208,7 +208,7 @@ AOA length (`src/profiles/spec.cpp`).
   result again and checks it against the layout.
 - `DescriptorRequirements` records what the descriptor needs of the target
   parser (usages, fields per report, report bits). `aoahid_node_open` compares
-  it with the Device's `linux_hid_*_policy` values.
+  it with the Device's `linux_hid` (`aoahid_linux_hid_policy`) values.
 
 `src/profiles/state.cpp` writes a value little-endian at
 its layout offset and rejects one outside the logical range, except the null
@@ -229,20 +229,97 @@ value of a Null State field.
 - A pen that changes tool while in range first sends one out-of-range report.
 - The toggle profile keeps one pressed bit and one edge flag per allowed Usage.
 
+## Design decisions
+
+High-level API rationales are in
+[ARCHITECTURE.md](ARCHITECTURE.md#design-decisions). The implementation choices
+below record the internal mechanism, its recorded reason, and the rejected
+alternative:
+
+- **Pre-allocated transfer pool, LIFO free list, and condition-variable wait (`src/transport/transport.cpp`, commits `15a6491`, `97bbd17`, `aa3dbf9`).**
+  `transport::Device::open` allocates a fixed vector of `Slot` structures, each
+  owning one `libusb_transfer` and a buffer of `8 + maximum_report_bytes` bytes
+  with the unchanging setup fields (`bmRequestType`, `bRequest = 57`, `wValue = 0`)
+  written during `acquire()` (`commit 15a6491`). Free slots are chained through
+  `Slot::next_free` on `free_head_`, a singly-linked LIFO list popped by
+  `acquire()` and pushed by `release_slot()`. (The codebase records pre-allocation
+  to keep `aoahid_node_submit` and `aoahid_raw_submit` allocation-free; why
+  `free_head_` uses LIFO order rather than FIFO or a ring index is not recorded
+  in code comments or commit history.)
+  *Rejected alternatives:* Rewriting unchanging setup fields in `submit()`
+  (`commit 15a6491`), and spinning or sleeping 1 ms in
+  `aoahid_node_submit_blocking` when every pool slot is held by other Nodes
+  (replaced in commits `97bbd17` and `aa3dbf9` by a Device-level condition
+  variable woken on transfer completion).
+- **Byte-wise report serialization and plain `StateGuard` spin (`src/profiles/state.cpp`, `src/transport/transport.cpp`, commits `0f7739e`, `15a6491`).**
+  `src/profiles/state.cpp` packs and validates report bits a byte at a time
+  rather than bit by bit, measured at ~2.9× faster for a 16-contact touchscreen
+  report with identical wire bytes (`commit 15a6491`). `transport::Device::StateGuard`
+  is a plain `std::atomic_flag` `test_and_set` spinlock around pool slot and
+  counter updates.
+  *Rejected alternative:* A two-stage CPU-pause/yield backoff in `StateGuard`
+  and an unbenchmarked byte-aligned special case from `0.5.1`, reverted in
+  commit `0f7739e` because they added branch complexity without benchmark or
+  hardware evidence.
+- **Two-pass descriptor emission and automatic 4-byte span padding (`src/profiles/spec.cpp`, `src/hid/descriptor_builder.cpp`, commits `3a7c30d`, `61d7d2c`).**
+  `src/profiles/spec.cpp` runs the profile's emit function twice—first with a
+  `nullptr` buffer to compute exact byte length, then into an exact-sized
+  buffer while `DescriptorBuilder` records `FieldLayout` bit offsets—and
+  `DescriptorBuilder::variable` pads to the next byte boundary whenever a field
+  would touch a fifth byte (HID 1.11 §8.4).
+  *Rejected alternative:* Rejecting field-width combinations whose cumulative
+  bit offset caused an otherwise valid 1–32 bit field to cross a fifth byte
+  (fixed in commits `3a7c30d` and `61d7d2c` by inserting constant byte-alignment
+  padding at chained field boundaries and before any >4-byte span).
+- **Pre-reserved `Context` graveyard and single close rule (`src/api/c_api_device.cpp`, `src/api/context_ops.cpp`, `src/api/node_ops.cpp`, commits `0e48856`, `26bc5c5`).**
+  libusb transfer cancellation (`libusb_cancel_transfer`) is asynchronous: a
+  `Device` or `Node` structure cannot be freed until `Runtime::poll` has
+  returned from every cancelled transfer's callback. `aoahid_device_open`
+  reserves capacity in both `context->devices` and `context->graveyard` up
+  front (`src/api/c_api_device.cpp`), and `aoahid_device_close` waits within its
+  `drain_timeout_ms` budget (`commit 26bc5c5`) before moving an undrained
+  `Device` graph to `context->graveyard` without allocating.
+  *Rejected alternatives:* Freeing `Device` or `Node` memory immediately on a
+  timed-out cancel (which would cause a use-after-free when libusb delivers the
+  cancellation callback), or parking a `Device` in the graveyard in
+  internal-thread mode without first waiting for an in-progress callback return
+  (`commit 26bc5c5`).
+- **Pre-allocating all host state before AOA request 54 (`src/api/c_api_node.cpp`).**
+  In `aoahid_node_open`, `initialize_node_state`, `device->nodes.reserve`,
+  `retain_spec`, and `set_reservation` all run before `register_hid` sends AOA
+  request 54 (`ACCESSORY_REGISTER_HID`). Publishing the registered `Node` into
+  `device->nodes` afterward is a non-allocating pointer push.
+  *Rejected alternative:* Allocating or growing `device->nodes` after request
+  54 succeeds, which could fail under OOM and leave an orphaned HID ID
+  registered inside Android's `f_accessory` driver (`src/api/c_api_node.cpp`).
+- **Separate ` [[gnu::noinline]] ` / `__declspec(noinline)` neutralizers per profile (`src/profiles/state.cpp`, commits `297729f`, `26c7153`, `963548f`).**
+  `make_neutral` dispatches to a separate `AOAHID_NOINLINE` helper for each
+  `NodeState` variant arm (`neutralize_keyboard`, `neutralize_mouse`, etc.).
+  *Rejected alternative:* Inlining all `NodeState` neutralization arms into a
+  single function, which caused GCC 14 `-O3` to unify value-range analysis
+  across sibling `std::variant` arms and emit a false-positive
+  `-Wstringop-overflow` error (`commits 26c7153`, `963548f`).
+
 ## Tests and checks
 
 - `tests/fake_libusb/` implements the libusb calls the transport uses. It is
   linked only with `AOAHID_USE_FAKE_LIBUSB=ON`, which `AOAHID_BUILD_TESTS=ON`
   requires.
 - `aoahid_tests` runs the suites named on its command line (`item_writer`,
-  `profiles`, `transport`, `identity`).
+  `profiles`, `spec_options`, `raw_descriptor`, `transport`, `identity`,
+  `api_arguments`, `report_state`, `transport_failures`); separate `sim`
+  executables cover internal-thread mode (`aoahid_sim_internal_thread`),
+  allocation failures (`aoahid_sim_allocation_failure`), and the serialization
+  check (`aoahid_sim_serialization_check`).
 - `tests/golden/*.hex` are the expected descriptors. A generator change that
   alters one of them changes what existing callers put on the wire.
 - `tests/abi/` and the binding tests compare the C struct layout with the
   layout oracle and with the Python, C#, and Rust bindings.
 - CI formats with clang-format 14 and lints with clang-tidy 14; a newer
   clang-format lays out some lines differently.
-- The `tsan` preset builds the tests and the C examples with ThreadSanitizer.
+- The `tsan` preset (`CMakePresets.json`) builds the tests with
+  ThreadSanitizer, the `coverage` preset builds with `--coverage`, and
+  `-DAOAHID_SANITIZE=ON` enables AddressSanitizer and UndefinedBehaviorSanitizer.
 
 ## Language bindings
 

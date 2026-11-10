@@ -126,7 +126,7 @@ These are choices made by this library, not HID, Linux, or Android limits.
 | Generated field width | 1-32 bits. |
 | Touch contacts | `maximum_contacts` 1-16 (Touchscreen and Touchpad). |
 | Contacts per report | 1..`maximum_contacts`; fewer only with `enable_multi_packet_frames`. |
-| Buttons | Mouse 1-65535, Gamepad at least 1 (Usage range must stay within 16 bits), Touchpad 0-65535. |
+| Buttons | Mouse 1-65535; Gamepad 1-65535 (`1-65532` when `dpad_representation` is `AOAHID_DPAD_BUTTONS`, and `button_usage_minimum + button_count - 1 <= 65535`); Touchpad 0-65535. |
 | Gamepad axes | At least 2 (one X, one Y), each role once, at most 65535. |
 | Toggle allow-list | 1-65535 unique nonzero Usages. |
 | Pen barrel controls | At most 32, each `0x44` or `0x5A`, unique. |
@@ -158,10 +158,31 @@ the Channel's `out_transfers`, `transfer_bytes` and (stream mode)
 `maximum_report_bytes` and `descriptor_fragment_bytes` must fit
 `target_ep0_data_policy_bytes` and `host_control_buffer_policy_bytes`.
 
-The Touchscreen, Keyboard, Mouse, Gamepad, and Consumer
-Control profiles have been used on the devices listed in
-[PROFILES.md](PROFILES.md#hardware-status). For latency figures see
-[LATENCY.md](LATENCY.md).
+The Touchscreen, Touchpad, Keyboard, Mouse, Gamepad, Pen, Digitizer, and
+Consumer Control profiles have been used on the devices listed in
+[PROFILES.md](PROFILES.md#hardware-status) and
+[VERIFICATION.md](VERIFICATION.md#hardware-verification-status). For latency
+figures see [LATENCY.md](LATENCY.md).
+
+## Known platform differences
+
+Three platform-specific `sim` test behaviors are currently open items and
+documented in [tests/README.md](../tests/README.md#known-platform-differences)
+and [VERIFICATION.md](VERIFICATION.md#known-platform-differences):
+
+- **Windows (MSVC) allocation-failure fast-fail (open item):**
+  `aoahid.sim-allocation-failure` terminates with fast-fail `0xc0000409` under
+  MSVC (`tests/sim/test_allocation_failure.cpp`).
+- **Windows (MSVC) report-completion error detail without request or Node ID (open item):**
+  After a failed asynchronous report completion (AOA request 57),
+  `aoahid_last_error()` reports the expected result code, `transport_status`,
+  and `report_id`, while `aoa_request` and `node_id` read `0`
+  (`tests/sim/test_transport_failures.cpp`).
+- **macOS `AOAHID_SANITIZE=ON` mouse submit allocation failure reporting `AOAHID_ERR_TIMEOUT` (open item):**
+  Under AddressSanitizer and UndefinedBehaviorSanitizer on macOS, failing the
+  second allocation in `aoahid_node_submit` on a Mouse Node returns
+  `AOAHID_ERR_TIMEOUT` instead of `AOAHID_ERR_INTERNAL`
+  (`tests/sim/test_hot_path.cpp`).
 
 ## Changing a limit
 
