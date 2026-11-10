@@ -63,6 +63,7 @@ column below is about real devices only.
 | In accessory mode, requests 54-57 register the HID and deliver input as in the current USB mode | Confirmed (both devices, both hosts) |
 | On Windows, `2d00`/`2d01` binds a libusb-usable driver (WinUSB or libusbK) | Confirmed (both devices) |
 | `GET_PROTOCOL` (request 51) sent by discovery to an accessory-mode device does not disturb the accessory session | Not tested |
+| In the current USB mode, an ADB Bulk Channel (`FF/42/01`) and an AOA HID Node work at the same time on one handle (`aoahid_adb_proxy`) | Confirmed on Samsung Galaxy Tab S11 (Windows 10 x64 after whole-device WinUSB driver replacement, 2026-09; Arch Linux `devtest` + `getevent`, 2026-10) |
 | With `2d01`, an ADB Bulk Channel and an AOA HID Node work at the same time on one handle | Not tested |
 | A zero-length Bulk OUT transfer terminates a write the same way on Linux and Windows | Not tested |
 | A first report that races HID registration STALLs rather than being dropped, so the caller's resend delivers it | Confirmed (Galaxy Tab S11, Arch Linux, 2026-09): request 57 STALLed for 6-16 ms after `aoahid_node_open` returned, then a resend was accepted. Reports accepted in the first milliseconds after that, up to about 60 ms in one run, did not reach `getevent`; see [API.md](API.md) step 5. |

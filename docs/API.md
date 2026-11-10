@@ -580,3 +580,23 @@ The sink is called synchronously on the thread that produced the record,
 including the internal event thread. It must return promptly, must not call
 back into or destroy the same Context, and must be thread-safe in
 internal-thread mode. The library holds no internal lock while calling it.
+
+## Differences from `libmimhid`
+
+[`libmimhid`](https://github.com/nemarpuc/libmimhid) is the sister library that
+sends the same nine HID profiles to any USB host through a microcontroller
+board over a serial port. Profile `Spec` factories, report state machines, and
+per-profile mutation calls share the same structure (`s/aoahid/mimhid/`); the
+APIs differ only where AOA 2.0 over `libusb` differs from a physical MCU USB
+device:
+
+| Area | `libaoahid` (Android Open Accessory 2.0) | `libmimhid` (MCU USB-HID bridge) |
+| --- | --- | --- |
+| **Target & transport** | Android phone/tablet directly over USB (`libusb`, AOA 2.0 control requests `51`–`57` on endpoint 0) | Any USB host (PC, console, phone) through an MCU board over a host serial port (`termios` / `Win32`) |
+| **Top-level handles & event loop** | `aoahid_context*` (owns `libusb` runtime in `AOAHID_EVENT_CALLER_POLL` via `aoahid_context_poll` or `AOAHID_EVENT_INTERNAL_THREAD`), `aoahid_discovery*`, `aoahid_device*`, `aoahid_spec*`, `aoahid_node*`, `aoahid_channel*` | No `Context` handle: `mimhid_discovery*`, `mimhid_device*` (owns its serial reader thread), `mimhid_spec*`, `mimhid_node*` |
+| **Initializers (`*_init`)** | `aoahid_*_options_init` fills in one working set of values for a current Android phone | `mimhid_*_init` zeroes the structure and sets `struct_size` only; every required field is set by the caller |
+| **USB descriptors** | Fixed by the Android gadget (`aoahid_accessory_start` sends AOA identification strings `0`–`5` only) | Caller supplies full USB Device, Configuration, Interface, and Endpoint descriptors (`mimhid_device_config`, `mimhid_node_config`) |
+| **Opening & closing a Node** | `aoahid_node_open` immediately registers the HID descriptor on EP0 (requests `54` and `56`) with a single `control_timeout_ms`; `aoahid_node_close` sends request `55` | `mimhid_node_open` / `mimhid_node_close` take `const mimhid_commit_timeouts*` (`control_timeout_ms` + `reconnect_timeout_ms`) and re-enumerate the board immediately, or stage changes inside `mimhid_device_batch_begin` / `mimhid_device_batch_end` |
+| **Submit calls** | `aoahid_node_submit` (asynchronous single-report submit on EP0) and `aoahid_node_submit_blocking` (waits for completion and drains multi-packet frames and relative remainders) | `mimhid_node_submit` (synchronous single-report send) and `mimhid_node_submit_blocking` (drains multi-packet frames and relative remainders) |
+| **Sideband channels vs. two-way HID** | Input-only HID (AOA 2.0 defines no Output or Feature report requests); USB Bulk `aoahid_channel` (`aoahid_channel_open` / `read` / `write` / `close`) for sideband bulk interfaces such as ADB | Full two-way HID via `transport.event_sink` (`OUTPUT_REPORT`, `FEATURE_REPORT`, `SET_PROTOCOL`, `SET_IDLE`, `REPORT_LOST`, bus state), `mimhid_node_set_feature_response`, `mimhid_device_disconnect` / `connect` / `remote_wakeup`, and EP0 control transfer routing (`mimhid_device_set_control_routing`, `mimhid_device_control_reply`) |
+| **Result codes** | Shares the common integer values (`0..3`, `6..8`, `10..14`, `16`) plus `4` (`AOAHID_ERR_NOT_AOA`), `9` (`AOAHID_ERR_STALL`), and `15` (`AOAHID_CLOSE_PENDING`) | Shares the common integer values plus `4` (`MIMHID_ERR_PROTOCOL`), reserving `5`, `9`, and `15` |

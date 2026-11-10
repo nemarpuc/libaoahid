@@ -59,7 +59,7 @@ archive stem (`libaoahid-X.Y.Z-<platform>-<arch>[-ubuntu22.04]/`):
 | `lib/` (and `bin/` on Windows) | Shared library (`libaoahid.so.0.1.0` + symlinks, `libaoahid.0.1.0.dylib` + symlinks, or `bin/aoahid.dll` + `lib/aoahid.lib`), static archive (`libaoahid_static.a` or `aoahid_static.lib`), and the bundled `libusb-1.0` shared runtime and link library (`libusb-1.0.so*`, `libusb-1.0.0.dylib`, or `bin/libusb-1.0.dll` + `lib/usb-1.0.lib`) |
 | `lib/cmake/aoahid/` | `aoahid-config.cmake`, `aoahid-config-version.cmake`, `aoahid-shared-targets.cmake`, `aoahid-static-targets.cmake` |
 | `lib/pkgconfig/` | Relocatable `aoahid.pc`, `aoahid-static.pc`, and `libusb-1.0.pc` |
-| `share/libaoahid/examples/` | C and C++ example source files and standalone `CMakeLists.txt` |
+| `share/doc/libaoahid/examples/` | C and C++ example source files and standalone `CMakeLists.txt` |
 | `share/doc/libaoahid/` | `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, `build-metadata.json`, `sbom.spdx.json` (plus `glibc-requirements.json` on Linux) |
 | `share/doc/libaoahid/third-party/` | `libusb-copyright` (LGPL-2.1-or-later), `source/libusb-1.0.30.tar.bz2`, and `vcpkg-LICENSE.txt` (Windows archives) |
 

@@ -214,5 +214,7 @@ Official documentation for the threading calls `multi_profile.c` uses:
 
 The published Python wheel and NuGet package contain declarations only. The
 Python caller passes the exact shared-library path to `aoahid.load`; the .NET
-native loader must resolve the name `aoahid`. In both cases, install the
-version-matched shared native archive and its libusb runtime separately.
+native loader must resolve the name `aoahid`. In both cases, unpack the
+version-matched platform release archive (which bundles both the shared and
+static libraries together with the `libusb` runtime) and point the loader at its
+`lib/` directory (or `bin/` on Windows).

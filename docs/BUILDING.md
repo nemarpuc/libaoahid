@@ -21,7 +21,7 @@ drivers, and human-observable verification programs), see
   libusb at runtime, it inspects `libusb_get_version()` and refuses any library
   outside the `1.0` line or older than `1.0.30` with `AOAHID_ERR_UNSUPPORTED`
   (`src/transport/transport.cpp`).
-- **Platform USB access.** On Linux, install `udev/70-libaoahid.rules` (see
+- **Platform USB access.** On Linux, install `udev/51-aoahid.rules` (see
   [PORTING.md](PORTING.md#linux)). On Windows, the phone must use a
   WinUSB-compatible driver (see [PORTING.md](PORTING.md#windows)).
 
@@ -49,9 +49,9 @@ Every project-specific CMake option is declared in `CMakeLists.txt`:
 
 | Preset | Build directory | Key flags | Purpose |
 | --- | --- | --- | --- |
-| `dev` | `build/dev` | `Debug`, `-DAOAHID_USE_FAKE_LIBUSB=ON`, `-DAOAHID_CHECK_SERIALIZATION=ON` | Fast local development and full unit + `sim` test suite with no USB hardware. |
+| `dev` | `build/dev` | `Debug`, `-DAOAHID_BUILD_TESTS=ON`, `-DAOAHID_BUILD_EXAMPLES=ON`, `-DAOAHID_USE_FAKE_LIBUSB=ON`, `-DAOAHID_CHECK_SERIALIZATION=ON` | Fast local development and full unit + `sim` test suite with no USB hardware. |
 | `release` | `build/release` | `Release`, `-DAOAHID_USE_FAKE_LIBUSB=OFF`, `-DAOAHID_BUILD_TESTS=OFF` | Production shared and static libraries plus examples against the system `libusb-1.0`. |
-| `tsan` | `build/tsan` | `RelWithDebInfo`, `-DAOAHID_USE_FAKE_LIBUSB=ON`, `-DAOAHID_TSAN=ON`, `-DAOAHID_BUILD_EXAMPLES=OFF` | ThreadSanitizer verification of internal-thread mode, Channels, and teardown. |
+| `tsan` | `build/tsan` | `RelWithDebInfo`, `-DAOAHID_BUILD_TESTS=ON`, `-DAOAHID_BUILD_EXAMPLES=ON`, `-DAOAHID_USE_FAKE_LIBUSB=ON`, `-DAOAHID_TSAN=ON` | ThreadSanitizer verification of internal-thread mode, Channels, and teardown. |
 | `coverage` | `build/coverage` | `Debug`, `-DAOAHID_USE_FAKE_LIBUSB=ON`, `-DAOAHID_CHECK_SERIALIZATION=ON`, `-DAOAHID_COVERAGE=ON`, `-DAOAHID_BUILD_EXAMPLES=OFF` | Line and branch coverage measurement over `src/` with `gcovr`. |
 
 ### Standard build against system libusb
@@ -221,4 +221,27 @@ cmake -S . -B build/release -G "Visual Studio 18 2026" -A x64 `
   -DVCPKG_MANIFEST_INSTALL=OFF `
   -DAOAHID_USE_FAKE_LIBUSB=OFF
 cmake --build build/release --config Release
+```
+
+## Language bindings
+
+- **Python** ([bindings/python/](../bindings/python)): pure `ctypes` package
+  (`aoahid`). Pass the path of `libaoahid.so`, `libaoahid.dylib`, or
+  `aoahid.dll` to `aoahid.load(...)` (or set `AOAHID_LIBRARY_PATH`), or install
+  the shared library on the system loader path. Build a wheel with
+  `python3 -m build --wheel bindings/python`.
+- **C#** ([bindings/csharp/AoaHid/](../bindings/csharp/AoaHid)): .NET 8 P/Invoke
+  binding (`AoaHid`). Pack with
+  `dotnet pack bindings/csharp/AoaHid/AoaHid.csproj -c Release`.
+- **Rust** ([bindings/rust/](../bindings/rust)): workspace with the raw FFI
+  crate (`aoahid-sys`) and safe wrapper crate (`aoahid`). Set `AOAHID_LIB_DIR`
+  (and `AOAHID_INCLUDE_DIR` when needed) before running `cargo build` or
+  `cargo test`.
+
+The FFI declarations and ABI layout tests are generated from
+[include/aoahid.h](../include/aoahid.h) by `tools/bindings/generate.py`. Verify
+that the checked-in bindings match the header with:
+
+```sh
+python3 tools/bindings/generate.py --check
 ```
