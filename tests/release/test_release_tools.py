@@ -30,6 +30,7 @@ sys.path.insert(0, str(REPOSITORY / "tools" / "release"))
 sys.path.insert(0, str(REPOSITORY / "tools" / "symbol-lint"))
 sys.path.insert(0, str(REPOSITORY / "tools"))
 
+import check_doc_references  # noqa: E402
 import check_license_headers  # noqa: E402
 import glibc_versions  # noqa: E402
 import collect_release  # noqa: E402
@@ -1308,6 +1309,68 @@ class SingleArchiveReleaseTests(unittest.TestCase):
                     created_epoch=EPOCH,
                     libusb_version="1.0.30",
                 )
+
+
+class DocReferenceTests(unittest.TestCase):
+    def make_tree(self, root: Path, document: str, allowlist: str = "") -> None:
+        (root / "include").mkdir()
+        (root / "include" / "aoahid.h").write_text(
+            "int aoahid_real_call(void);\n#define AOAHID_REAL_VALUE 1\n", encoding="utf-8"
+        )
+        (root / "include" / "aoahid.hpp").write_text(
+            "namespace aoahid { inline int real_call() { return 0; } }\n", encoding="utf-8"
+        )
+        (root / "src").mkdir()
+        (root / "src" / "present.cpp").write_text("// SPDX\n", encoding="utf-8")
+        (root / "docs").mkdir()
+        (root / "docs" / "PAGE.md").write_text(document, encoding="utf-8")
+        if allowlist:
+            (root / "tools").mkdir()
+            (root / "tools" / "doc_reference_allowlist.txt").write_text(
+                allowlist, encoding="utf-8"
+            )
+
+    def problems(self, document: str, allowlist: str = "") -> list[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_tree(root, document, allowlist)
+            return [str(problem) for problem in check_doc_references.find_problems(root)]
+
+    def test_existing_identifiers_and_paths_pass(self) -> None:
+        document = (
+            "Call `aoahid_real_call`, read `AOAHID_REAL_VALUE`, use `aoahid::real_call`,\n"
+            "any `AOAHID_REAL_*` or `AOAHID_` prefix, and see `src/present.cpp:3`.\n"
+            "```c\naoahid_real_call();\n```\n"
+        )
+        self.assertEqual(self.problems(document), [])
+
+    def test_missing_identifier_is_reported(self) -> None:
+        problems = self.problems("Use `aoahid::default_device_options()`.\n")
+        self.assertEqual(len(problems), 1)
+        self.assertIn("docs/PAGE.md:1", problems[0])
+        self.assertIn("aoahid::default_device_options", problems[0])
+
+    def test_missing_identifier_in_fenced_code_is_reported(self) -> None:
+        problems = self.problems("```c\naoahid_gone();\n```\n")
+        self.assertEqual(len(problems), 1)
+        self.assertIn("docs/PAGE.md:2", problems[0])
+
+    def test_missing_path_is_reported(self) -> None:
+        problems = self.problems("See `src/absent.cpp`.\n")
+        self.assertEqual(len(problems), 1)
+        self.assertIn("path does not exist", problems[0])
+
+    def test_allowlist_needs_a_reason(self) -> None:
+        document = "See `include/linux/hid.h` and `aoahid_external`.\n"
+        self.assertEqual(
+            self.problems(document, "include/linux/hid.h # kernel path\naoahid_external # other repo\n"),
+            [],
+        )
+        problems = self.problems(document, "include/linux/hid.h\n")
+        self.assertTrue(any("needs '# <reason>'" in problem for problem in problems))
+
+    def test_repository_documents_pass(self) -> None:
+        self.assertEqual(check_doc_references.find_problems(REPOSITORY), [])
 
 
 if __name__ == "__main__":

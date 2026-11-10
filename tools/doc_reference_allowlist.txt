@@ -1,0 +1,11 @@
+# References that tools/check_doc_references.py may not find in this repository.
+# One reference per line, then '#' and why it is allowed.
+
+include/linux/hid.h # a Linux kernel source file, cited as the kernel's path
+include/uapi/linux/usb/f_accessory.h # an Android common kernel source file, cited as the kernel's path
+include/libusb-1.0/libusb.h # a path inside a release archive, where libusb's header is bundled
+aoahid_verify_keyboard # a CMake target made by the foreach loop in examples/CMakeLists.txt (aoahid_verify_${name})
+aoahid_verify_mouse # a CMake target made by the foreach loop in examples/CMakeLists.txt
+aoahid_verify_touch # a CMake target made by the foreach loop in examples/CMakeLists.txt
+aoahid_verify_toggle # a CMake target made by the foreach loop in examples/CMakeLists.txt
+aoahid_verify_all # a CMake target made by the foreach loop in examples/CMakeLists.txt
