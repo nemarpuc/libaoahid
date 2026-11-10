@@ -3,7 +3,8 @@
 `include/aoahid.h` is the stable C ABI. It exposes opaque handles and
 fixed-width types only; no libusb or C++ type crosses the boundary. Each
 exported function has an Ownership / Blocking / Synchronization / Returns
-contract in the header; this page summarizes how the pieces fit together. For
+contract in the header; this page explains how the pieces fit together and
+ends with a [reference entry for each function](#function-reference). For
 the object model and threading internals see [ARCHITECTURE.md](ARCHITECTURE.md);
 for the AOA requests themselves see [PROTOCOL.md](PROTOCOL.md).
 
@@ -35,8 +36,9 @@ structure layout does not change when a compiler uses short enums.
 
 The initializers are `static inline` functions in `aoahid.h`, so they are not
 in the binary ABI and the language bindings do not have them; a binding sets
-the same fields itself. `aoahid.hpp` adds functions that return an initialized
-structure (`aoahid::default_device_options`, ...).
+the same fields itself. `aoahid.hpp` adds one function per initializer that
+returns the initialized structure (`aoahid::device_options` returns what
+`aoahid_device_options_init` fills in; see [C++ header](#c-header)).
 
 | Initializer | What it fills in |
 |---|---|
@@ -73,15 +75,14 @@ that work with the same phones; the library never uses them by itself.
 | `aoahid_channel` | One claimed Bulk interface on the Device's USB handle, its own transfer pool, and read-ahead state. | Until `aoahid_channel_close` returns anything but `AOAHID_CLOSE_PENDING`, or its Device closes. |
 
 AOA HID IDs are allocated per Context and per physical port (bus plus port
-path), starting at 1, and are never reused within that Context. Android
-tears down a disconnected device's HID objects asynchronously, so reusing an
-ID right after a reconnect could collide with an old registration. `aoahid_node_id` returns the ID.
+path), starting at 1, and are never reused within that Context, also when the
+device enumerates again on the same port. `aoahid_node_id` returns the ID.
 
 `aoahid_spec_descriptor` and `aoahid_spec_manifest` pointers stay valid while
 the Spec reference is held. `aoahid_node_manifest` pointers stay valid until the
 Node closes.
 
-## Event modes and threading
+## Event modes and threading {#event-modes-and-threading}
 
 `aoahid_context_options.event_mode` is one of two modes
 (`aoahid_context_options_init` selects the internal thread):
@@ -113,7 +114,7 @@ runs the test suite under ThreadSanitizer, including repeated overlap of
 completion callbacks and Node close. It covers only the concurrency the API
 allows; calls the caller must serialize are still the caller's responsibility.
 
-## Functions
+## Functions {#functions}
 
 | Group | Functions |
 |---|---|
@@ -128,12 +129,13 @@ allows; calls the caller must serialize are still the caller's responsibility.
 | Node | `aoahid_node_open`, `aoahid_node_close`, `aoahid_node_id`, `aoahid_node_manifest`, `aoahid_node_submit`, `aoahid_node_submit_blocking` |
 | Profile state | `aoahid_keyboard_key`, `aoahid_mouse_move`, `aoahid_mouse_scroll`, `aoahid_mouse_button`, `aoahid_toggle_usage`, `aoahid_gamepad_button`, `aoahid_gamepad_axis`, `aoahid_gamepad_dpad`, `aoahid_touchscreen_contact`, `aoahid_touchpad_contact`, `aoahid_touchpad_button`, `aoahid_pen_update`, `aoahid_digitizer_update`, `aoahid_battery_update`, `aoahid_raw_submit` |
 
+Each function has an entry in the [Function reference](#function-reference).
 `aoahid_version()` returns `(major << 24) | (minor << 16) | patch`; the header
 also defines `AOAHID_VERSION_MAJOR`, `_MINOR`, and `_PATCH`.
 `aoahid_result_name()` returns the constant's name, or
 `"AOAHID_RESULT_UNKNOWN"` for an unknown value.
 
-## Open sequence
+## Open sequence {#open-sequence}
 
 1. `aoahid_context_create`.
 2. `aoahid_discover(context, control_timeout_ms, &discovery)` (a zero timeout
@@ -154,14 +156,14 @@ also defines `AOAHID_VERSION_MAJOR`, `_MINOR`, and `_PATCH`.
    allocated.
 
    **Wait briefly before the first input.** Android's `f_accessory.c` only
-   schedules the HID's registration when the last descriptor fragment
-   arrives (`schedule_work`), and request 57 is refused until that work has
-   added the device. Right after `aoahid_node_open` returns, a report
-   therefore STALLs, or is accepted before anything on the phone has opened
-   the new input device and is silently lost. On a Galaxy Tab S11, reports
-   were refused for 6-16 ms and accepted-but-unseen reports lasted up to
-   about 60 ms. Leave a short gap (for example 100 ms) between opening the
-   Nodes and sending input.
+   schedules the HID's registration (`acc_hid_work`) when the last
+   descriptor fragment arrives, and refuses request 57 for an ID whose
+   `hid_device` that work has not registered yet
+   ([PROTOCOL.md](PROTOCOL.md#hid-flow)). Nothing tells the host when it is
+   done, so a report sent right after `aoahid_node_open` returns may STALL,
+   or be accepted before anything on the phone reads the new input device
+   and be lost. Leave a short gap (the README's first program waits 100 ms)
+   between opening the Nodes and sending input.
 6. Change state with the profile calls and send it with `aoahid_node_submit`
    or `aoahid_node_submit_blocking`.
 7. Optionally `aoahid_channel_open` for Bulk data on the same USB handle, for
@@ -169,11 +171,12 @@ also defines `AOAHID_VERSION_MAJOR`, `_MINOR`, and `_PATCH`.
 
 ### Switching a device to accessory mode
 
-Switching is not required for HID: `aoahid_device_open` works in the device's
-current USB mode, and HID requests 54-57 have been confirmed there on the
-devices in [TARGET_MATRIX.md](TARGET_MATRIX.md). The official AOA 2.0 page does
-not say whether HID needs `ACCESSORY_START`, so a device that STALLs HID
-registration in its current mode can be switched first. The library exposes
+Switching is not required by the library: `aoahid_device_open` works in the
+device's current USB mode. The official AOA 2.0 page does not say whether HID
+needs `ACCESSORY_START`, and whether a device answers requests 54-57 in its
+normal USB mode depends on its kernel gadget configuration
+([PROTOCOL.md](PROTOCOL.md#accessory-mode-vs-the-current-usb-mode)), so a
+device that STALLs HID registration in its current mode can be switched first. The library exposes
 the switch as one call and leaves the rest to the application:
 
 1. `aoahid_accessory_start(context, info, &options, control_timeout_ms)` sends
@@ -247,12 +250,14 @@ the values in one Linux revision.
 
 `aoahid_device_open` copies the options; your structure is never modified.
 
-## Timeouts
+## Timeouts {#timeouts}
 
 No wait is kept in the library: every call that can wait takes its timeout in
 milliseconds as an argument, and zero is refused with `AOAHID_ERR_UNSET_FIELD`
-before anything is done (nothing is consumed). libusb
-treats a zero timeout as "no timeout", which is why zero is not accepted. A
+before anything is done (nothing is consumed). For libusb a zero timeout
+means none at all ("For an unlimited timeout, use value 0",
+[`libusb_control_transfer`](https://libusb.sourceforge.io/api-1.0/group__libusb__syncio.html),
+retrieved 2026-11-10), so zero cannot mean "unset" and be passed on. A
 timeout is a failure deadline, not a delay: a transfer that completes earlier
 returns immediately. libmimhid follows the same rule with the same argument
 names.
@@ -294,12 +299,18 @@ leaving at least one shared slot on the Device.
 `aoahid_channel_open(device, &options, drain_timeout_ms, &channel)`:
 
 1. waits, within `drain_timeout_ms`, until no HID report
-   transfer is in flight (`AOAHID_ERR_TIMEOUT` otherwise). libusb's WinUSB
-   backend claims an interface around each control transfer and releases it
-   afterwards, which would otherwise undo the Channel's claim;
-2. selects configuration 1 only if the device is unconfigured (AOA 1.0 asks the
-   host to do so; re-selecting an active configuration would reset the
-   device);
+   transfer is in flight (`AOAHID_ERR_TIMEOUT` otherwise). When no interface
+   is claimed, libusb's WinUSB backend claims one for a control transfer and
+   releases it when the transfer completes (`auto_claim` and `auto_release` in
+   libusb v1.0.30
+   [`libusb/os/windows_winusb.c`](https://github.com/libusb/libusb/blob/87a55632db62c9bdc58cd31d3ccfa673f1bb017f/libusb/os/windows_winusb.c),
+   retrieved 2026-11-10), which would undo a Channel claim made while a
+   report was in flight;
+2. selects configuration 1 only if the device is unconfigured: on a device
+   already in that configuration, `libusb_set_configuration` "will act as a
+   lightweight device reset"
+   ([libusb device handling](https://libusb.sourceforge.io/api-1.0/group__libusb__dev.html),
+   retrieved 2026-11-10);
 3. picks the first interface (alternate setting 0) whose class, subclass, and
    protocol equal `interface_class` / `interface_subclass` /
    `interface_protocol` and that has one Bulk IN and one Bulk OUT endpoint
@@ -327,9 +338,14 @@ HID on EP0 is unaffected.
 
 A Bulk IN transfer completes only when full or on a short packet. In stream
 mode, a message whose length is a multiple of `wMaxPacketSize` and is not
-followed by a zero-length packet waits until more data arrives. adbd sends no
-such zero-length packet; host adb reads the 24-byte header and then exactly the
-payload length. Request mode reads the same way.
+followed by a zero-length packet waits until more data arrives. Request mode
+reads the way host adb does: it reads the 24-byte `amessage` header, then
+exactly `data_length` payload bytes (`UsbReadMessage` and `UsbReadPayload` in
+AOSP
+[`client/transport_usb.cpp`](https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/client/transport_usb.cpp),
+`struct amessage` in
+[`types.h`](https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/types.h),
+retrieved 2026-11-10), so a read never waits for a zero-length packet.
 
 `aoahid_channel_read` returns bytes in order and may return part of a
 transfer; the caller does its own framing. It returns `AOAHID_OK` with at least
@@ -347,8 +363,10 @@ how many bytes were queued. A failed OUT completion is reported once by the
 next write. Nothing is retried.
 
 `zero_length_termination = 1` ends a write whose length is a nonzero multiple of
-`wMaxPacketSize` with an explicit zero-length transfer, which works on every
-backend (libusb's zero-packet flag is Linux-only).
+`wMaxPacketSize` with an explicit zero-length transfer. libusb's own
+`LIBUSB_TRANSFER_ADD_ZERO_PACKET` flag "is currently only supported on Linux"
+([libusb asynchronous I/O](https://libusb.sourceforge.io/api-1.0/group__libusb__asyncio.html),
+retrieved 2026-11-10), so the library does not use it.
 
 ### Errors and threading
 
@@ -445,12 +463,8 @@ is in [PROFILES.md](PROFILES.md). In short:
   and twist in that sample go out as given, so repeat the last position to
   leave the pointer where it was.
 - **Touch together with a mouse.** A Touchscreen Node and a Mouse Node on the
-  same device are separate input devices. Observed on a Galaxy Tab S11: when
-  both report at the same time, Android drops the one that was there first,
-  so a mouse report sent while a touch contact is down cancels the contact
-  (the contact does not end as a lift). libaoahid does not prevent this and
-  has no primary source for it; hold the mouse reports back while a contact is
-  down, and send the contact's lift before the next mouse report.
+  same device are separate input devices; the library does not coordinate
+  their reports.
 - **Battery report.** `aoahid_battery_update` works on a Node whose Spec was
   created with `enable_battery = 1`. The level is sent by the next submit that
   has no input report to send, and only when it changed.
@@ -458,17 +472,18 @@ is in [PROFILES.md](PROFILES.md). In short:
 No profile generates key repeat, debounce, long-press, or any other timed
 action.
 
-### C++ header
+### C++ header {#c-header}
 
 `include/aoahid.hpp` forwards every function of `aoahid.h` unchanged under
 namespace `aoahid`, without the `aoahid_` prefix (`aoahid_keyboard_key` is
-`aoahid::keyboard_key`). Types, arguments, and results are those of the C API.
-It adds two things:
+`aoahid::keyboard_key`). Types, arguments, and results are those of the C API;
+the header adds no type aliases. It adds two things:
 
-- one helper function per initializer that returns the initialized structure by
-  value (`aoahid::default_device_options` returns what
-  `aoahid_device_options_init` fills in), alongside unprefixed type aliases
-  (`aoahid::device_options` for `aoahid_device_options`);
+- one function per initializer that returns the initialized structure by
+  value: `aoahid::context_options`, `aoahid::device_options`,
+  `aoahid::accessory_options`, `aoahid::channel_options`,
+  `aoahid::node_options`, one per profile (`aoahid::keyboard_options` to
+  `aoahid::raw_options`), and `aoahid::capability_manifest`;
 - `aoahid::SpecPtr` and `aoahid::DiscoveryPtr`, `std::unique_ptr` types that
   release a Spec reference or destroy a discovery snapshot. Context, Device,
   Node and Channel stay plain pointers: closing them takes timeouts and may
@@ -496,7 +511,7 @@ A generated descriptor may contain a Constant Feature item such as Contact
 Count Maximum. It is metadata only; `feature_transport_supported` stays 0 and
 there is no Feature or Output path back to the host.
 
-## Close and destroy
+## Close and destroy {#close-and-destroy}
 
 Closing a Node waits for its in-flight report, sends a neutral/release report
 if the device is still present, then sends request 55 (unregister). No
@@ -526,7 +541,7 @@ everything once the callbacks have run, and reports any error of it from
 `aoahid_context_poll` or `aoahid_context_destroy`. A consumed pointer must never
 be passed to the API again.
 
-## Errors
+## Errors {#errors}
 
 `aoahid_last_error()` returns the calling thread's diagnostic record without
 changing it. Every other function replaces the record: success resets it to
@@ -581,22 +596,1033 @@ including the internal event thread. It must return promptly, must not call
 back into or destroy the same Context, and must be thread-safe in
 internal-thread mode. The library holds no internal lock while calling it.
 
-## Differences from `libmimhid`
+## Function reference {#function-reference}
 
-[`libmimhid`](https://github.com/nemarpuc/libmimhid) is the sister library that
-sends the same nine HID profiles to any USB host through a microcontroller
-board over a serial port. Profile `Spec` factories, report state machines, and
-per-profile mutation calls share the same structure (`s/aoahid/mimhid/`); the
-APIs differ only where AOA 2.0 over `libusb` differs from a physical MCU USB
-device:
+One entry per exported function, in the order of `include/aoahid.h`. The
+signature, Ownership, Blocking, Threads (the header's "Synchronization") and
+Returns lines are the header's contract; `tools/check_public_contracts.py`
+checks that the header has all four for every function. Each entry lists only
+what is particular to the function: the rules every function follows
+(results recorded for `aoahid_last_error`, `out_*` pointers set to null first,
+the close rule, zero timeouts refused, `AOAHID_ERR_INTERNAL` from any call)
+are in [Errors](#errors), [Close and destroy](#close-and-destroy) and
+[Timeouts](#timeouts). "Context domain" means the call must not run at the same
+time as any other call on the same Context, its Devices, Nodes or Channels
+([Event modes and threading](#event-modes-and-threading)).
 
-| Area | `libaoahid` (Android Open Accessory 2.0) | `libmimhid` (MCU USB-HID bridge) |
+### Diagnostics
+
+#### aoahid_last_error
+
+```c
+const aoahid_error_detail* aoahid_last_error(void);
+```
+
+**Ownership:** Returns the calling thread's record, valid until that thread's next call.
+
+**Blocking:** None.
+
+**Threads:** The record belongs to the calling thread; do not pass it to another.
+
+**Returns:** Never null. Results of report transfers completed on the event thread are not here; they come back from a later call (see [Errors](#errors)), `AOAHID_OK` and `AOAHID_ERR_*` alike.
+
+#### aoahid_result_name
+
+```c
+const char* aoahid_result_name(aoahid_result result);
+```
+
+- `result`: any value.
+
+**Ownership:** Returns a string that lives as long as the process.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** The constant's name, such as `"AOAHID_OK"` or `"AOAHID_ERR_STALL"`, or `"AOAHID_RESULT_UNKNOWN"` (with `AOAHID_ERR_PARAM` recorded) for a value that is not a result.
+
+#### aoahid_version
+
+```c
+uint32_t aoahid_version(void);
+```
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** `(major << 24) | (minor << 16) | patch` of the loaded library; `AOAHID_OK` and the `AOAHID_ERR_*` codes do not apply.
+
+### Context
+
+#### aoahid_context_create
+
+```c
+aoahid_result aoahid_context_create(const aoahid_context_options* options, aoahid_context** out_context);
+```
+
+- `options`: the options; start from `aoahid_context_options_init`.
+- `out_context`: receives the new Context; set to null first and left null when the call fails.
+
+**Ownership:** Keeps log_sink and log_user until the Context is destroyed.
+
+**Blocking:** Initializes libusb and, in `AOAHID_EVENT_INTERNAL_THREAD` mode, starts the event thread. Sends nothing to any device.
+
+**Threads:** Any thread; the new Context is a domain of its own.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null pointer or a wrong struct_size; `AOAHID_ERR_UNSET_FIELD` for an unknown event mode or log level, or a log level without a sink; a transport error when libusb cannot start.
+
+#### aoahid_context_poll
+
+```c
+aoahid_result aoahid_context_poll(aoahid_context* context, uint32_t timeout_ms);
+```
+
+- `context`: the Context.
+- `timeout_ms`: how long to handle events, in milliseconds; zero handles only what is ready.
+
+**Ownership:** Nothing.
+
+**Blocking:** Handles libusb events for up to timeout_ms (zero only handles what is ready). Report completions and Device teardowns the Context finishes run inside this call.
+
+**Threads:** Context domain; `AOAHID_EVENT_CALLER_POLL` only.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null Context; `AOAHID_ERR_UNSUPPORTED` in `AOAHID_EVENT_INTERNAL_THREAD` mode; a transport error from libusb or an earlier failure the Context kept, such as one of a Device teardown it finished.
+
+#### aoahid_context_destroy
+
+```c
+aoahid_result aoahid_context_destroy(aoahid_context* context, uint32_t control_timeout_ms, uint32_t drain_timeout_ms);
+```
+
+- `context`: the Context.
+- `control_timeout_ms`: the deadline of each AOA control request, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
+- `drain_timeout_ms`: how long to wait for transfers in flight, in milliseconds (see Blocking); zero is `AOAHID_ERR_UNSET_FIELD`.
+
+**Ownership:** Closes every open Device as `aoahid_device_close` does, then frees the Context. Follows the [close rule](#close-and-destroy): `AOAHID_CLOSE_PENDING` while a Device teardown is still waiting for a transfer callback.
+
+**Blocking:** control_timeout_ms for each AOA request and drain_timeout_ms for each Device's reports, then joins the event thread. It never waits for a callback past these.
+
+**Threads:** Context domain; not from the log sink.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null Context; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; `AOAHID_CLOSE_PENDING`; otherwise the first error of the teardown, and the Context is gone.
+
+#### aoahid_context_destroy_blocking
+
+```c
+aoahid_result aoahid_context_destroy_blocking(aoahid_context* context, uint32_t control_timeout_ms, uint32_t drain_timeout_ms, uint32_t timeout_ms);
+```
+
+- `context`: the Context.
+- `control_timeout_ms`: the deadline of each AOA control request, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
+- `drain_timeout_ms`: how long to wait for transfers in flight, in milliseconds (see Blocking); zero is `AOAHID_ERR_UNSET_FIELD`.
+- `timeout_ms`: the deadline of the whole call, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
+
+**Ownership:** As `aoahid_context_destroy`, retried until it no longer returns `AOAHID_CLOSE_PENDING` or timeout_ms has passed.
+
+**Blocking:** Up to timeout_ms, handling libusb events itself when no thread does.
+
+**Threads:** Context domain; not from the event thread or the log sink.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null Context; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; `AOAHID_CLOSE_PENDING` when timeout_ms passed first (the Context is still the caller's); otherwise as `aoahid_context_destroy`.
+
+### Discovery and accessory mode
+
+#### aoahid_discover
+
+```c
+aoahid_result aoahid_discover(aoahid_context* context, uint32_t control_timeout_ms, aoahid_discovery** out_discovery);
+```
+
+The snapshot is outside it.
+
+- `context`: the Context.
+- `control_timeout_ms`: the deadline of each AOA control request, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
+- `out_discovery`: receives the new snapshot; set to null first and left null when the call fails.
+
+**Ownership:** Returns a snapshot that owns every entry and string in it; free it with `aoahid_discovery_destroy`.
+
+**Blocking:** Sends AOA request 51 to every USB device, waiting up to control_timeout_ms for each.
+
+**Threads:** Context domain.
+
+**Returns:** `AOAHID_OK`, with only the devices that answered a nonzero AOA version (HID needs 2); `AOAHID_ERR_PARAM` for a null argument; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; a transport error from enumeration.
+
+#### aoahid_discovery_count
+
+```c
+size_t aoahid_discovery_count(const aoahid_discovery* discovery);
+```
+
+- `discovery`: the snapshot.
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Any thread, but not during `aoahid_discovery_destroy`.
+
+**Returns:** The number of entries. Zero is also returned for a null snapshot, with `AOAHID_ERR_PARAM` recorded; `AOAHID_OK` is recorded otherwise.
+
+#### aoahid_discovery_get
+
+```c
+const aoahid_device_info* aoahid_discovery_get(const aoahid_discovery* discovery, size_t index);
+```
+
+- `discovery`: the snapshot.
+- `index`: the entry, from 0 to `aoahid_discovery_count` minus 1.
+
+**Ownership:** The entry and its strings belong to the snapshot.
+
+**Blocking:** None.
+
+**Threads:** Any thread, but not during `aoahid_discovery_destroy`.
+
+**Returns:** The entry with `AOAHID_OK` recorded, or null with `AOAHID_ERR_PARAM` recorded for a null snapshot or an index out of range.
+
+#### aoahid_discovery_destroy
+
+```c
+void aoahid_discovery_destroy(aoahid_discovery* discovery);
+```
+
+- `discovery`: the snapshot.
+
+**Ownership:** Frees the snapshot and every entry it returned.
+
+**Blocking:** None.
+
+**Threads:** Not during any other call on the snapshot.
+
+**Returns:** Nothing. `AOAHID_OK` is recorded, or `AOAHID_ERR_PARAM` for null (nothing is done).
+
+#### aoahid_accessory_start
+
+```c
+aoahid_result aoahid_accessory_start(aoahid_context* context, const aoahid_device_info* selected, const aoahid_accessory_options* options, uint32_t control_timeout_ms);
+```
+
+- `context`: the Context.
+- `selected`: the device: an entry of `aoahid_discovery_get`, or one the caller filled in (only `bus_number`, `device_address` and `port_path` identify it).
+- `options`: the options; start from `aoahid_accessory_options_init`.
+- `control_timeout_ms`: the deadline of each AOA control request, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
+
+**Ownership:** Nothing is kept.
+
+**Blocking:** Sends AOA request 51, request 52 for each non-null string and request 53 (start), each waiting up to control_timeout_ms, and returns once request 53 completes. The device then disconnects and comes back in accessory mode (VID 0x18D1, PID 0x2D00 to 0x2D05); find it again with `aoahid_discover`. A device already in accessory mode gets no request.
+
+**Threads:** Context domain.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null argument or a wrong struct_size; `AOAHID_ERR_UNSET_FIELD` for a zero timeout, a missing manufacturer or model, or a nonzero reserved; `AOAHID_ERR_NOT_AOA` when request 51 shows no AOA support; `AOAHID_ERR_OVERFLOW`, before any request, for a string over 256 bytes or a port path over 7 ports; a transport error from the requests (after a failed request 53 the device may still have switched).
+
+### Device
+
+#### aoahid_device_open
+
+```c
+aoahid_result aoahid_device_open(aoahid_context* context, const aoahid_device_info* selected, const aoahid_device_options* options, aoahid_device** out_device);
+```
+
+- `context`: the Context.
+- `selected`: the device: an entry of `aoahid_discovery_get`, or one the caller filled in (only `bus_number`, `device_address` and `port_path` identify it).
+- `options`: the options; start from `aoahid_device_options_init`.
+- `out_device`: receives the new Device; set to null first and left null when the call fails.
+
+**Ownership:** Copies selected and options. The Device belongs to the caller and to the Context, which closes it if it is still open when the Context is destroyed.
+
+**Blocking:** Opens the USB device as it is, claims interface_number if asked, and allocates the transfer pool. Sends no AOA request: a device without AOA 2.0 HID opens and then fails at `aoahid_node_open` with `AOAHID_ERR_STALL`.
+
+**Threads:** Context domain.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null argument, a wrong struct_size or an invalid value; `AOAHID_ERR_UNSET_FIELD` for a zero required field; `AOAHID_ERR_OVERFLOW` for a size above one of the byte policies or a port path over 7 ports; a transport error from opening or claiming.
+
+#### aoahid_device_close
+
+```c
+aoahid_result aoahid_device_close(aoahid_device* device, uint32_t control_timeout_ms, uint32_t drain_timeout_ms);
+```
+
+- `device`: the Device.
+- `control_timeout_ms`: the deadline of each AOA control request, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
+- `drain_timeout_ms`: how long to wait for transfers in flight, in milliseconds (see Blocking); zero is `AOAHID_ERR_UNSET_FIELD`.
+
+**Ownership:** Closes every Node (as `aoahid_node_close` does) and Channel of the Device, then the Device. It never returns `AOAHID_CLOSE_PENDING`: when a transfer is still in flight at the drain deadline, the Context finishes the teardown and reports its errors from `aoahid_context_poll` or `aoahid_context_destroy`.
+
+**Blocking:** drain_timeout_ms for all reports together, control_timeout_ms for each request 55.
+
+**Threads:** Context domain; not from the log sink.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null Device or one already closed; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; otherwise the first error of the teardown.
+
+#### aoahid_device_latched_error
+
+```c
+aoahid_result aoahid_device_latched_error(aoahid_device* device);
+```
+
+The event thread may record an error at the same time.
+
+- `device`: the Device.
+
+**Ownership:** Clears the error it returns, except `AOAHID_ERR_NO_DEVICE`, which stays.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** `AOAHID_OK` when no error is waiting; `AOAHID_ERR_PARAM` for an invalid Device; otherwise the error a report transfer, control request or event left on the Device or its Context.
+
+### Channel
+
+#### aoahid_channel_open
+
+```c
+aoahid_result aoahid_channel_open(aoahid_device* device, const aoahid_channel_options* options, uint32_t drain_timeout_ms, aoahid_channel** out_channel);
+```
+
+- `device`: the Device.
+- `options`: the options; start from `aoahid_channel_options_init`.
+- `drain_timeout_ms`: how long to wait for transfers in flight, in milliseconds (see Blocking); zero is `AOAHID_ERR_UNSET_FIELD`.
+- `out_channel`: receives the new Channel; set to null first and left null when the call fails.
+
+**Ownership:** The Channel shares the Device's USB handle; `aoahid_device_close` closes it too.
+
+**Blocking:** Waits up to drain_timeout_ms for report transfers in flight, selects configuration 1 if the device has none (AOA 1.0), claims the interface, and submits the read-ahead transfers.
+
+**Threads:** Context domain.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null argument, a wrong struct_size or a closing Device; `AOAHID_ERR_UNSET_FIELD` for a zero required field or timeout, a nonzero reserved field, or a flag other than 0 or 1; `AOAHID_ERR_UNSUPPORTED` when no interface matches; `AOAHID_ERR_TIMEOUT` when report transfers were still in flight; `AOAHID_ERR_OVERFLOW` for transfer_bytes above the libusb limit; a transport error from claiming or submitting.
+
+#### aoahid_channel_close
+
+```c
+aoahid_result aoahid_channel_close(aoahid_channel* channel, uint32_t drain_timeout_ms);
+```
+
+- `channel`: the Channel.
+- `drain_timeout_ms`: how long to wait for transfers in flight, in milliseconds (see Blocking); zero is `AOAHID_ERR_UNSET_FIELD`.
+
+**Ownership:** Follows the [close rule](#close-and-destroy): `AOAHID_CLOSE_PENDING` while a cancelled transfer has not completed.
+
+**Blocking:** Cancels every transfer and waits up to drain_timeout_ms for them, then within the same time for report transfers in flight, and releases the interface.
+
+**Threads:** Context domain; never during a read or write on the Channel.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null Channel; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; `AOAHID_CLOSE_PENDING`; a transport error from handling libusb events.
+
+#### aoahid_channel_write
+
+```c
+aoahid_result aoahid_channel_write(aoahid_channel* channel, const uint8_t* data, size_t length, size_t* out_written, uint32_t timeout_ms);
+```
+
+- `channel`: the Channel.
+- `data`: the bytes to write.
+- `length`: how many.
+- `out_written`: receives how many bytes were queued.
+- `timeout_ms`: how long to wait for free OUT transfers, in milliseconds; zero does not wait.
+
+**Ownership:** Copies data. out_written is set on every return.
+
+**Blocking:** Waits up to timeout_ms (zero does not wait) for free OUT transfers and returns once every byte is submitted. It does not wait for completion and never retries.
+
+**Threads:** In `AOAHID_EVENT_INTERNAL_THREAD` mode one thread may write while another reads, alongside other calls on the Context, but not while the Channel, its Device or the Context is closing. In `AOAHID_EVENT_CALLER_POLL` mode, Context domain.
+
+**Returns:** `AOAHID_OK` when every byte was queued; `AOAHID_ERR_PARAM` for a null pointer; `AOAHID_ERR_TIMEOUT` when the transfers stayed busy; `AOAHID_ERR_NO_DEVICE` once the Channel is lost; a transport error of an earlier write, returned once.
+
+#### aoahid_channel_read
+
+```c
+aoahid_result aoahid_channel_read(aoahid_channel* channel, uint8_t* buffer, size_t capacity, size_t* out_received, uint32_t timeout_ms);
+```
+
+- `channel`: the Channel.
+- `buffer`: where the bytes go.
+- `capacity`: its size in bytes; zero is `AOAHID_ERR_PARAM`.
+- `out_received`: receives how many bytes were read.
+- `timeout_ms`: how long to wait for data, in milliseconds; zero does not wait.
+
+**Ownership:** out_received is set on every return.
+
+**Blocking:** Waits up to timeout_ms (zero does not wait) for data. A call may return part of a transfer or stop at a transfer boundary. In `AOAHID_CHANNEL_READ_REQUEST` mode a read with nothing buffered submits one transfer sized from capacity; a timeout leaves it submitted and the next read waits for it, so nothing is lost. Zero-length packets are skipped.
+
+**Threads:** As `aoahid_channel_write`; one reader at a time.
+
+**Returns:** `AOAHID_OK` with at least one byte; `AOAHID_ERR_PARAM` for a null pointer or a zero capacity; `AOAHID_ERR_TIMEOUT` when nothing arrived; `AOAHID_ERR_NO_DEVICE` once the Channel is lost; a transport error of a failed IN transfer, which also loses the Channel.
+
+### Spec
+
+The factories copy their options and every array and string the options
+point to. The new Spec holds one reference for the caller. "As every factory"
+below means: `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null pointer, a wrong
+`struct_size` or a value out of range; `AOAHID_ERR_UNSET_FIELD` for a required
+field left zero; `AOAHID_ERR_OVERFLOW` when the descriptor or report would be
+too large. What each field may hold is in [PROFILES.md](PROFILES.md).
+
+#### aoahid_spec_create_keyboard
+
+```c
+aoahid_result aoahid_spec_create_keyboard(const aoahid_keyboard_options* options, aoahid_spec** out_spec);
+```
+
+- `options`: the options; start from `aoahid_keyboard_options_init`.
+- `out_spec`: receives the new Spec; set to null first and left null when the call fails.
+
+**Ownership:** As every factory.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** As every factory, `AOAHID_OK` through `AOAHID_ERR_OVERFLOW`; `AOAHID_ERR_PARAM` also for a range that includes 0x00 to 0x03 or the modifiers.
+
+#### aoahid_spec_create_mouse
+
+```c
+aoahid_result aoahid_spec_create_mouse(const aoahid_mouse_options* options, aoahid_spec** out_spec);
+```
+
+- `options`: the options; start from `aoahid_mouse_options_init`.
+- `out_spec`: receives the new Spec; set to null first and left null when the call fails.
+
+**Ownership:** As every factory.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** As every factory, `AOAHID_OK` through `AOAHID_ERR_OVERFLOW`.
+
+#### aoahid_spec_create_toggle
+
+```c
+aoahid_result aoahid_spec_create_toggle(const aoahid_toggle_options* options, aoahid_spec** out_spec);
+```
+
+- `options`: the options; start from `aoahid_toggle_options_init`.
+- `out_spec`: receives the new Spec; set to null first and left null when the call fails.
+
+**Ownership:** As every factory.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** As every factory, `AOAHID_OK` through `AOAHID_ERR_OVERFLOW`; `AOAHID_ERR_UNSUPPORTED` for a semantic that press and release cannot express, or a Camera Control Usage that is not `AOAHID_USAGE_ONE_SHOT`.
+
+#### aoahid_spec_create_gamepad
+
+```c
+aoahid_result aoahid_spec_create_gamepad(const aoahid_gamepad_options* options, aoahid_spec** out_spec);
+```
+
+- `options`: the options; start from `aoahid_gamepad_options_init`.
+- `out_spec`: receives the new Spec; set to null first and left null when the call fails.
+
+**Ownership:** As every factory.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** As every factory, `AOAHID_OK` through `AOAHID_ERR_OVERFLOW`.
+
+#### aoahid_spec_create_touchscreen
+
+```c
+aoahid_result aoahid_spec_create_touchscreen(const aoahid_touchscreen_options* options, aoahid_spec** out_spec);
+```
+
+- `options`: the options; start from `aoahid_touchscreen_options_init`.
+- `out_spec`: receives the new Spec; set to null first and left null when the call fails.
+
+**Ownership:** As every factory.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** As every factory, `AOAHID_OK` through `AOAHID_ERR_OVERFLOW`.
+
+#### aoahid_spec_create_touchpad
+
+```c
+aoahid_result aoahid_spec_create_touchpad(const aoahid_touchpad_options* options, aoahid_spec** out_spec);
+```
+
+- `options`: the options; start from `aoahid_touchpad_options_init`.
+- `out_spec`: receives the new Spec; set to null first and left null when the call fails.
+
+**Ownership:** As every factory.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** As every factory, `AOAHID_OK` through `AOAHID_ERR_OVERFLOW`.
+
+#### aoahid_spec_create_pen
+
+```c
+aoahid_result aoahid_spec_create_pen(const aoahid_pen_options* options, aoahid_spec** out_spec);
+```
+
+- `options`: the options; start from `aoahid_pen_options_init`.
+- `out_spec`: receives the new Spec; set to null first and left null when the call fails.
+
+**Ownership:** As every factory.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** As every factory, `AOAHID_OK` through `AOAHID_ERR_OVERFLOW`.
+
+#### aoahid_spec_create_digitizer
+
+```c
+aoahid_result aoahid_spec_create_digitizer(const aoahid_digitizer_options* options, aoahid_spec** out_spec);
+```
+
+- `options`: the options; start from `aoahid_digitizer_options_init`.
+- `out_spec`: receives the new Spec; set to null first and left null when the call fails.
+
+**Ownership:** As every factory.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** As every factory, `AOAHID_OK` through `AOAHID_ERR_OVERFLOW`.
+
+#### aoahid_spec_create_raw
+
+```c
+aoahid_result aoahid_spec_create_raw(const aoahid_raw_options* options, aoahid_spec** out_spec);
+```
+
+- `options`: the options; start from `aoahid_raw_options_init`.
+- `out_spec`: receives the new Spec; set to null first and left null when the call fails.
+
+**Ownership:** As every factory.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** As every factory, `AOAHID_OK` through `AOAHID_ERR_OVERFLOW`; `AOAHID_ERR_PARAM` also for a descriptor that does not parse or does not match the report table; `AOAHID_ERR_UNSUPPORTED` without the acknowledgement, with requires_output or requires_feature_response set, or for a long item or a construct the parser does not handle.
+
+#### aoahid_spec_retain
+
+```c
+void aoahid_spec_retain(aoahid_spec* spec);
+```
+
+- `spec`: the Spec.
+
+**Ownership:** Adds a reference for the caller, who must already hold one.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** Nothing. `AOAHID_OK` is recorded; `AOAHID_ERR_PARAM` for null, or `AOAHID_ERR_OVERFLOW` when the count is full (no reference is added).
+
+#### aoahid_spec_release
+
+```c
+void aoahid_spec_release(aoahid_spec* spec);
+```
+
+- `spec`: the Spec.
+
+**Ownership:** Gives up one of the caller's references; the last one frees the Spec. A Node keeps its own reference until it closes.
+
+**Blocking:** None.
+
+**Threads:** Any thread, as long as the last release does not race any other use.
+
+**Returns:** Nothing. `AOAHID_OK` is recorded, or `AOAHID_ERR_PARAM` for null (nothing is done).
+
+#### aoahid_spec_descriptor
+
+```c
+aoahid_result aoahid_spec_descriptor(const aoahid_spec* spec, const uint8_t** bytes, size_t* length);
+```
+
+- `spec`: the Spec.
+- `bytes`: receives a pointer to the descriptor, which belongs to the Spec.
+- `length`: receives its length in bytes.
+
+**Ownership:** The bytes belong to the Spec.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null pointer.
+
+#### aoahid_spec_manifest
+
+```c
+aoahid_result aoahid_spec_manifest(const aoahid_spec* spec, aoahid_capability_manifest* manifest);
+```
+
+- `spec`: the Spec.
+- `manifest`: the caller's manifest, with `struct_size` set (`aoahid_capability_manifest_init`) and `reserved` zero.
+
+**Ownership:** Fills the caller's manifest; manifest->reports belongs to the Spec.
+
+**Blocking:** None.
+
+**Threads:** Any thread.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null pointer, a wrong struct_size or a nonzero reserved.
+
+### Node
+
+#### aoahid_node_open
+
+```c
+aoahid_result aoahid_node_open(aoahid_device* device, aoahid_spec* spec, const aoahid_node_options* options, uint32_t control_timeout_ms, aoahid_node** out_node);
+```
+
+- `device`: the Device.
+- `spec`: the Spec.
+- `options`: the options; start from `aoahid_node_options_init`.
+- `control_timeout_ms`: the deadline of each AOA control request, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
+- `out_node`: receives the new Node; set to null first and left null when the call fails.
+
+**Ownership:** The Node keeps a reference to spec until it closes.
+
+**Blocking:** Sends request 54 (register) and the descriptor in request 56 fragments, each waiting up to control_timeout_ms. Android registers the HID after the last fragment, without telling the host: a report sent at once may STALL or be lost, so wait a little before the first one ([Open sequence](#open-sequence)).
+
+**Threads:** Context domain.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null argument, a wrong struct_size or a reservation that leaves no shared slot; `AOAHID_ERR_UNSET_FIELD` for a zero timeout or a reservation that is not 0/0 or 1/0..1; `AOAHID_ERR_OVERFLOW` when the Spec exceeds a policy of the Device or no AOA HID ID is left; a transport error from the requests (`AOAHID_ERR_STALL`: the device has no AOA 2.0 HID).
+
+#### aoahid_node_close
+
+```c
+aoahid_result aoahid_node_close(aoahid_node* node, uint32_t control_timeout_ms, uint32_t drain_timeout_ms);
+```
+
+- `node`: the Node.
+- `control_timeout_ms`: the deadline of each AOA control request, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
+- `drain_timeout_ms`: how long to wait for transfers in flight, in milliseconds (see Blocking); zero is `AOAHID_ERR_UNSET_FIELD`.
+
+**Ownership:** Follows the [close rule](#close-and-destroy): `AOAHID_CLOSE_PENDING` while a report of the Node is still in flight at the drain deadline.
+
+**Blocking:** Finishes a touch frame that has started, sends the neutral report (keys and buttons up, contacts lifted, axes at rest) within drain_timeout_ms, then request 55 (unregister) within control_timeout_ms. A failed step does not stop the next one.
+
+**Threads:** Context domain; not from the log sink.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null or closed Node; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; `AOAHID_CLOSE_PENDING`; otherwise the first error on the way out, such as a report that failed earlier or a refused request 55.
+
+#### aoahid_node_id
+
+```c
+uint16_t aoahid_node_id(const aoahid_node* node);
+```
+
+- `node`: the Node.
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** The Node's AOA HID ID (nonzero) with `AOAHID_OK` recorded, or 0 with `AOAHID_ERR_PARAM` recorded for a null or closed Node.
+
+#### aoahid_node_manifest
+
+```c
+aoahid_result aoahid_node_manifest(const aoahid_node* node, aoahid_capability_manifest* manifest);
+```
+
+- `node`: the Node.
+- `manifest`: the caller's manifest, with `struct_size` set (`aoahid_capability_manifest_init`) and `reserved` zero.
+
+**Ownership:** As `aoahid_spec_manifest`; manifest->reports is valid while the Node is open.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null pointer, a wrong struct_size or a nonzero reserved.
+
+#### aoahid_node_submit
+
+```c
+aoahid_result aoahid_node_submit(aoahid_node* node, uint32_t send_timeout_ms);
+```
+
+- `node`: the Node.
+- `send_timeout_ms`: the deadline of the queued request-57 transfer, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
+
+**Ownership:** The report is built in the library's own transfer buffer.
+
+**Blocking:** Queues one report of the Node's current state, if it changed, and returns. In `AOAHID_EVENT_CALLER_POLL` mode it then handles ready libusb events once without waiting. send_timeout_ms is the deadline of that transfer; its failure comes back from a later call.
+
+**Threads:** Context domain.
+
+**Returns:** `AOAHID_OK`, also when there was nothing to send; `AOAHID_ERR_PARAM` for an invalid Node; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; `AOAHID_ERR_UNSUPPORTED` for a Raw Node (use `aoahid_raw_submit`); `AOAHID_ERR_BUSY` when the Node's report is still in flight or the pool is full; a transport error of this or an earlier transfer.
+
+#### aoahid_node_submit_blocking
+
+```c
+aoahid_result aoahid_node_submit_blocking(aoahid_node* node, uint32_t timeout_ms);
+```
+
+- `node`: the Node.
+- `timeout_ms`: the deadline of the whole call, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
+
+**Ownership:** As `aoahid_node_submit`.
+
+**Blocking:** Sends reports until the Node's state has been delivered, a mouse's pending movement included, or timeout_ms has passed. Each report's deadline is what is left of timeout_ms. In `AOAHID_EVENT_CALLER_POLL` mode this call handles libusb events.
+
+**Threads:** Context domain.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for an invalid Node; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; `AOAHID_ERR_TIMEOUT` when timeout_ms passed first; a transport error of a transfer.
+
+### Input
+
+These calls change a Node's state; `aoahid_node_submit` sends it. None of
+them blocks, allocates or does I/O. Each belongs to the Context domain and
+works only on a Node of its own profile. A press and the release after it are
+never merged: until the report carrying the press has completed, the release
+is refused with `AOAHID_ERR_BUSY`, so a quick tap is not lost. "As every input
+call" below means: `AOAHID_OK`; `AOAHID_ERR_PARAM` for a Node of another
+profile or a value out of range; `AOAHID_ERR_BUSY` while the Node's report is
+in flight or an opposite edge is unsent; `AOAHID_ERR_NO_DEVICE` once the
+device is gone.
+
+#### aoahid_keyboard_key
+
+```c
+aoahid_result aoahid_keyboard_key(aoahid_node* node, uint16_t usage, uint32_t down);
+```
+
+Presses (down 1) or releases (down 0) one Keyboard page Usage, a modifier or a key of the Spec's range. Closing the Node releases every key still down.
+
+- `node`: the Node.
+- `usage`: a Keyboard page Usage: a modifier (0xE0 to 0xE7) or one of the Spec's range.
+- `down`: 1 presses, 0 releases.
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`.
+
+#### aoahid_mouse_move
+
+```c
+aoahid_result aoahid_mouse_move(aoahid_node* node, int32_t dx, int32_t dy);
+```
+
+Adds to the pending X and Y movement. A report carries as much as the fields hold and keeps the rest for the next one.
+
+- `node`: the Node.
+- `dx`: X movement added to the pending total.
+- `dy`: Y movement added to the pending total.
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`; `AOAHID_ERR_OVERFLOW` when the 64-bit pending total overflows.
+
+#### aoahid_mouse_scroll
+
+```c
+aoahid_result aoahid_mouse_scroll(aoahid_node* node, int32_t wheel, int32_t pan);
+```
+
+Adds to the pending wheel and pan movement, as `aoahid_mouse_move` does.
+
+- `node`: the Node.
+- `wheel`: wheel movement added to the pending total.
+- `pan`: pan movement added to the pending total.
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`; `AOAHID_ERR_UNSUPPORTED` for a nonzero value on a field the Spec lacks; `AOAHID_ERR_OVERFLOW` when the 64-bit pending total overflows.
+
+#### aoahid_mouse_button
+
+```c
+aoahid_result aoahid_mouse_button(aoahid_node* node, uint32_t button, uint32_t down);
+```
+
+Presses (down 1) or releases (down 0) button 1 to button_count.
+
+- `node`: the Node.
+- `button`: the button, from 1 to the Spec's `button_count`.
+- `down`: 1 presses, 0 releases.
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`.
+
+#### aoahid_toggle_usage
+
+```c
+aoahid_result aoahid_toggle_usage(aoahid_node* node, uint16_t usage, uint32_t down);
+```
+
+Presses (down 1) or releases (down 0) one Usage of the Spec's allow-list; any number may be pressed at once. Closing the Node releases every Usage still down.
+
+- `node`: the Node.
+- `usage`: a Usage of the Spec's allow-list.
+- `down`: 1 presses, 0 releases.
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`.
+
+#### aoahid_gamepad_button
+
+```c
+aoahid_result aoahid_gamepad_button(aoahid_node* node, uint32_t button, uint32_t down);
+```
+
+Presses (down 1) or releases (down 0) button 1 to button_count.
+
+- `node`: the Node.
+- `button`: the button, from 1 to the Spec's `button_count`.
+- `down`: 1 presses, 0 releases.
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`.
+
+#### aoahid_gamepad_axis
+
+```c
+aoahid_result aoahid_gamepad_axis(aoahid_node* node, size_t axis_index, int32_t value);
+```
+
+Sets axes[axis_index] of the Spec to value, which must be in its logical range.
+
+- `node`: the Node.
+- `axis_index`: the index of the axis in the Spec's `axes`.
+- `value`: the value, in that axis's logical range.
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`.
+
+#### aoahid_gamepad_dpad
+
+```c
+aoahid_result aoahid_gamepad_dpad(aoahid_node* node, uint32_t up, uint32_t down, uint32_t right, uint32_t left);
+```
+
+Sets the D-pad from four 0/1 directions. With a Hat, up and down (or left and right) together are refused and no direction sends the Null state; with four buttons the bits go out as given.
+
+- `node`: the Node.
+- `up`: 0 or 1.
+- `down`: 0 or 1.
+- `right`: 0 or 1.
+- `left`: 0 or 1.
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`; `AOAHID_ERR_PARAM` also when the Spec has no D-pad.
+
+#### aoahid_touchscreen_contact
+
+```c
+aoahid_result aoahid_touchscreen_contact(aoahid_node* node, uint32_t contact_id, uint32_t down, int32_t x, int32_t y, const aoahid_touchscreen_extra* extra);
+```
+
+down 1 places contact_id in a free slot, or moves it if it is already down; down 0 lifts it at x, y. A lifted contact_id can be placed again once its lift has been sent. While a frame split over several reports is being sent, every call is refused with `AOAHID_ERR_BUSY`.
+
+- `node`: the Node.
+- `contact_id`: the contact's ID.
+- `down`: 1 places or moves the contact, 0 lifts it.
+- `x`: X of the contact.
+- `y`: Y of the contact.
+- `extra`: the optional values of the contact, or null.
+
+**Ownership:** Copies extra, which may be null (every optional field 0).
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`; `AOAHID_ERR_PARAM` also for lifting a contact_id that is not down; `AOAHID_ERR_BUSY` also for placing one whose lift is unsent; `AOAHID_ERR_OVERFLOW` when every slot is taken.
+
+#### aoahid_touchpad_contact
+
+```c
+aoahid_result aoahid_touchpad_contact(aoahid_node* node, uint32_t contact_id, uint32_t down, int32_t x, int32_t y, const aoahid_touchpad_extra* extra);
+```
+
+As `aoahid_touchscreen_contact`, for a Touchpad Node.
+
+- `node`: the Node.
+- `contact_id`: the contact's ID.
+- `down`: 1 places or moves the contact, 0 lifts it.
+- `x`: X of the contact.
+- `y`: Y of the contact.
+- `extra`: the optional values of the contact, or null.
+
+**Ownership:** Copies extra, which may be null.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As `aoahid_touchscreen_contact`, `AOAHID_OK` through `AOAHID_ERR_OVERFLOW`.
+
+#### aoahid_touchpad_button
+
+```c
+aoahid_result aoahid_touchpad_button(aoahid_node* node, uint32_t button, uint32_t down);
+```
+
+Presses (down 1) or releases (down 0) click button 1 to button_count.
+
+- `node`: the Node.
+- `button`: the button, from 1 to the Spec's `button_count`.
+- `down`: 1 presses, 0 releases.
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`.
+
+#### aoahid_pen_update
+
+```c
+aoahid_result aoahid_pen_update(aoahid_node* node, const aoahid_pen_sample* sample);
+```
+
+Sets the whole pen state. in_range 0 takes the pen away: In Range, Tip, pressure, Invert and the barrel bits go out as 0 with the sample's own X, Y, tilt and twist, so repeat the last position to leave the pointer where it was. Switching between tip and eraser while in range first sends an out-of-range report.
+
+- `node`: the Node.
+- `sample`: the whole tool state.
+
+**Ownership:** Copies sample.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`.
+
+#### aoahid_digitizer_update
+
+```c
+aoahid_result aoahid_digitizer_update(aoahid_node* node, const aoahid_digitizer_sample* sample);
+```
+
+As `aoahid_pen_update`, for a Digitizer Node.
+
+- `node`: the Node.
+- `sample`: the whole tool state.
+
+**Ownership:** Copies sample.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`.
+
+#### aoahid_battery_update
+
+```c
+aoahid_result aoahid_battery_update(aoahid_node* node, int32_t strength);
+```
+
+Sets the battery level of a Node whose Spec has enable_battery. It goes out with the next `aoahid_node_submit` that has no input report to send, and only when it changed. A level not yet sent is dropped on close.
+
+- `node`: the Node.
+- `strength`: the level, in the logical range of the Spec's `battery.strength`.
+
+**Ownership:** Nothing.
+
+**Blocking:** None.
+
+**Threads:** Context domain.
+
+**Returns:** As every input call, `AOAHID_OK` through `AOAHID_ERR_NO_DEVICE`; `AOAHID_ERR_PARAM` also for a Node without a battery report.
+
+#### aoahid_raw_submit
+
+```c
+aoahid_result aoahid_raw_submit(aoahid_node* node, const uint8_t* report, size_t length, uint32_t send_timeout_ms);
+```
+
+- `node`: the Node.
+- `report`: the report as it goes on the wire, with its Report ID byte when it has one.
+- `length`: its length in bytes.
+- `send_timeout_ms`: the deadline of the queued request-57 transfer, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
+
+**Ownership:** Copies report.
+
+**Blocking:** Queues the report and returns; send_timeout_ms is the deadline of its transfer.
+
+**Threads:** Context domain.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a Node that is not Raw, a null report, a Report ID or length the Spec does not accept, or nonzero padding bits; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; `AOAHID_ERR_BUSY` while the Node's report is in flight or the pool is full; a transport error of this or an earlier transfer.
+
+## Differences from `libmimhid` {#differences-from-libmimhid}
+
+[`libmimhid`](https://github.com/nemarpuc/libmimhid) is the sister library
+that sends the same kind of input to any USB host through a microcontroller
+board on a serial port. The profile factories, the input calls, the options
+layout, the close rule and the timeout rule have the same shape
+(`aoahid_keyboard_key` is `mimhid_keyboard_key`). The table lists what differs;
+the libmimhid names are from its header, `mimhid.h`.
+
+| Area | libaoahid | libmimhid |
 | --- | --- | --- |
-| **Target & transport** | Android phone/tablet directly over USB (`libusb`, AOA 2.0 control requests `51`–`57` on endpoint 0) | Any USB host (PC, console, phone) through an MCU board over a host serial port (`termios` / `Win32`) |
-| **Top-level handles & event loop** | `aoahid_context*` (owns `libusb` runtime in `AOAHID_EVENT_CALLER_POLL` via `aoahid_context_poll` or `AOAHID_EVENT_INTERNAL_THREAD`), `aoahid_discovery*`, `aoahid_device*`, `aoahid_spec*`, `aoahid_node*`, `aoahid_channel*` | No `Context` handle: `mimhid_discovery*`, `mimhid_device*` (owns its serial reader thread), `mimhid_spec*`, `mimhid_node*` |
-| **Initializers (`*_init`)** | `aoahid_*_options_init` fills in one working set of values for a current Android phone | `mimhid_*_init` zeroes the structure and sets `struct_size` only; every required field is set by the caller |
-| **USB descriptors** | Fixed by the Android gadget (`aoahid_accessory_start` sends AOA identification strings `0`–`5` only) | Caller supplies full USB Device, Configuration, Interface, and Endpoint descriptors (`mimhid_device_config`, `mimhid_node_config`) |
-| **Opening & closing a Node** | `aoahid_node_open` immediately registers the HID descriptor on EP0 (requests `54` and `56`) with a single `control_timeout_ms`; `aoahid_node_close` sends request `55` | `mimhid_node_open` / `mimhid_node_close` take `const mimhid_commit_timeouts*` (`control_timeout_ms` + `reconnect_timeout_ms`) and re-enumerate the board immediately, or stage changes inside `mimhid_device_batch_begin` / `mimhid_device_batch_end` |
-| **Submit calls** | `aoahid_node_submit` (asynchronous single-report submit on EP0) and `aoahid_node_submit_blocking` (waits for completion and drains multi-packet frames and relative remainders) | `mimhid_node_submit` (synchronous single-report send) and `mimhid_node_submit_blocking` (drains multi-packet frames and relative remainders) |
-| **Sideband channels vs. two-way HID** | Input-only HID (AOA 2.0 defines no Output or Feature report requests); USB Bulk `aoahid_channel` (`aoahid_channel_open` / `read` / `write` / `close`) for sideband bulk interfaces such as ADB | Full two-way HID via `transport.event_sink` (`OUTPUT_REPORT`, `FEATURE_REPORT`, `SET_PROTOCOL`, `SET_IDLE`, `REPORT_LOST`, bus state), `mimhid_node_set_feature_response`, `mimhid_device_disconnect` / `connect` / `remote_wakeup`, and EP0 control transfer routing (`mimhid_device_set_control_routing`, `mimhid_device_control_reply`) |
-| **Result codes** | Shares the common integer values (`0..3`, `6..8`, `10..14`, `16`) plus `4` (`AOAHID_ERR_NOT_AOA`), `9` (`AOAHID_ERR_STALL`), and `15` (`AOAHID_CLOSE_PENDING`) | Shares the common integer values plus `4` (`MIMHID_ERR_PROTOCOL`), reserving `5`, `9`, and `15` |
+| Target and transport | An Android device over USB through libusb: AOA requests 51 to 57 on endpoint 0 | Any USB host, through a board the host drives over a serial port |
+| Handles | `aoahid_context` drives libusb (`aoahid_context_poll`, or an internal event thread), with Devices, Nodes and Channels under it | No Context: `mimhid_device` is the top-level handle, with Nodes under it |
+| `*_init` | Fill in working values; `AOAHID_CONTROL_TIMEOUT_MS`, `AOAHID_SEND_TIMEOUT_MS` and `AOAHID_DRAIN_TIMEOUT_MS` are working timeouts | Zero the structure and set `struct_size` only; a required field left zero is `MIMHID_ERR_UNSET_FIELD` |
+| USB identity | The phone's own; `aoahid_accessory_start` sends only the AOA strings 0 to 5 | The caller's: `mimhid_device_config` and `mimhid_node_config` carry the USB descriptors the board presents |
+| Opening a Node | `aoahid_node_open` registers the HID at once (requests 54 and 56) within `control_timeout_ms`; `aoahid_node_close` sends request 55 | `mimhid_node_open` and `mimhid_node_close` take `mimhid_commit_timeouts` (`control_timeout_ms`, `reconnect_timeout_ms`) because the board enumerates again; `mimhid_device_batch_begin` and `mimhid_device_batch_end` group several changes |
+| Submitting | `aoahid_node_submit` queues an asynchronous transfer; its failure comes back from a later call | `mimhid_node_submit` writes to the serial port and returns once the driver has the bytes |
+| Direction | Input reports only; Bulk `aoahid_channel` reaches other interfaces such as ADB | Two-way HID: Output and Feature reports reach `event_sink`; `mimhid_node_set_feature_response`, `mimhid_device_set_control_routing` and `mimhid_device_control_reply` answer the host |
+| Closing | A close can return `AOAHID_CLOSE_PENDING` while a USB transfer is in flight; the handle stays the caller's | No pending close: writes finish inside the call |
+| Result numbers | 4 is `AOAHID_ERR_NOT_AOA`, 9 is `AOAHID_ERR_STALL`, 15 is `AOAHID_CLOSE_PENDING`; 5 is unused | 4 is `MIMHID_ERR_PROTOCOL`; 5, 9 and 15 are unused. Every other number means the same in both |
