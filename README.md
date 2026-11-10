@@ -5,8 +5,9 @@
 Send keyboard, mouse, gamepad, touchscreen, touchpad, pen, and media-key input
 from a PC to an Android device over a plain USB cable. The device needs no
 root, no app, and no USB debugging: it sees an ordinary USB keyboard or
-touchscreen. Windows and Linux, plus macOS builds that are not yet tested with
-a device; usable from C, C++, Python, C#, and Rust. MIT licensed.
+touchscreen. Builds for Linux, Windows, and macOS; so far tested on a phone
+only from Linux ([Verification status](#verification-status)). Usable from C,
+C++, Python, C#, and Rust. MIT licensed.
 
 `libaoahid` is a C++20 library with a stable C ABI. It drives the HID feature
 of [Android Open Accessory 2.0](https://source.android.com/docs/core/interaction/accessories/aoa2)
@@ -33,7 +34,7 @@ An introduction to how the library works and why it was built is
 - **Not two-way.** Sends Input reports only; nothing comes back from the phone (no keyboard LEDs, rumble, or Feature reports; [PROTOCOL.md](docs/PROTOCOL.md#input-only)).
 - **Not for every phone.** Requires AOA version 2 (reported by discovery). Devices and builds beyond [TARGET_MATRIX.md](docs/TARGET_MATRIX.md) have not been tested.
 - **Not a scheduler.** Never retries, waits for re-enumeration, or generates key repeat, debounce, or timed actions. Every wait is an explicit call argument.
-- **Not a source of defaults.** Infers no product or target value; the header's `*_init` functions fill in one working set, and you change what differs.
+- **Not a guesser.** Infers no product or target value and refuses a required value left zero. The header's `*_init` functions and `AOAHID_*_TIMEOUT_MS` constants do fill in one working set of values, which you start from and change.
 
 ## Install
 
@@ -46,8 +47,34 @@ Requirements: a C++20 compiler, CMake 3.20+, and libusb 1.0.30+ in the 1.0 line 
 
 ## First program
 
+It types one `a` on the first device that reports AOA version 2 or later.
+Every call is checked, and it waits 100 ms after `aoahid_node_open`, because
+Android registers the new HID after the last descriptor fragment without
+telling the host ([API.md](docs/API.md#open-sequence)).
+
 ```c
+#define _POSIX_C_SOURCE 200809L /* nanosleep */
 #include <aoahid.h>
+#include <stdio.h>
+#if defined(_WIN32)
+#include <windows.h>
+static void sleep_ms(unsigned ms) { Sleep(ms); }
+#else
+#include <time.h>
+static void sleep_ms(unsigned ms) {
+    struct timespec t = {(time_t)(ms / 1000U), (long)(ms % 1000U) * 1000000L};
+    nanosleep(&t, NULL);
+}
+#endif
+
+static int failed(const char* step, aoahid_result result) {
+    /* Read the record first: every other call, aoahid_result_name too, replaces it. */
+    const aoahid_error_detail* detail = aoahid_last_error();
+    fprintf(stderr, "%s failed (%s: %s): ", step, detail->field ? detail->field : "-",
+            detail->reason ? detail->reason : "-");
+    fprintf(stderr, "%s\n", aoahid_result_name(result));
+    return 1;
+}
 
 int main(void) {
     aoahid_context_options ctx_opts;
@@ -59,34 +86,85 @@ int main(void) {
     aoahid_keyboard_options_init(&kb_opts);
     aoahid_node_options_init(&node_opts);
 
-    aoahid_context *ctx = NULL;
-    aoahid_discovery *disc = NULL;
-    aoahid_device *dev = NULL;
-    aoahid_spec *spec = NULL;
-    aoahid_node *kb = NULL;
+    aoahid_context* ctx = NULL;
+    aoahid_discovery* disc = NULL;
+    aoahid_device* dev = NULL;
+    aoahid_spec* spec = NULL;
+    aoahid_node* kb = NULL;
+    const aoahid_device_info* phone = NULL;
+    aoahid_result r;
+    int status = 1;
 
-    if (aoahid_context_create(&ctx_opts, &ctx) == AOAHID_OK &&
-        aoahid_discover(ctx, AOAHID_CONTROL_TIMEOUT_MS, &disc) == AOAHID_OK &&
-        aoahid_discovery_count(disc) > 0 &&
-        aoahid_device_open(ctx, aoahid_discovery_get(disc, 0), &dev_opts, &dev) == AOAHID_OK &&
-        aoahid_spec_create_keyboard(&kb_opts, &spec) == AOAHID_OK &&
-        aoahid_node_open(dev, spec, &node_opts, AOAHID_CONTROL_TIMEOUT_MS, &kb) == AOAHID_OK) {
-        /* Wait ~100 ms in real code so Android's input reader attaches first. */
-        aoahid_keyboard_key(kb, 0x04, 1); /* Keyboard a and A */
-        aoahid_node_submit_blocking(kb, AOAHID_SEND_TIMEOUT_MS);
-        aoahid_keyboard_key(kb, 0x04, 0);
-        aoahid_node_submit_blocking(kb, AOAHID_SEND_TIMEOUT_MS);
+    if ((r = aoahid_context_create(&ctx_opts, &ctx)) != AOAHID_OK) return failed("context", r);
+    if ((r = aoahid_discover(ctx, AOAHID_CONTROL_TIMEOUT_MS, &disc)) != AOAHID_OK) {
+        failed("discover", r);
+        goto done;
     }
+    /* Discovery lists every device that answered request 51; HID needs version 2. */
+    for (size_t i = 0; i < aoahid_discovery_count(disc) && phone == NULL; ++i) {
+        const aoahid_device_info* info = aoahid_discovery_get(disc, i);
+        if (info != NULL && info->protocol_version >= 2) phone = info;
+    }
+    if (phone == NULL) {
+        fprintf(stderr, "no device with AOA version 2 or later\n");
+        goto done;
+    }
+    if ((r = aoahid_device_open(ctx, phone, &dev_opts, &dev)) != AOAHID_OK) {
+        failed("device", r);
+        goto done;
+    }
+    if ((r = aoahid_spec_create_keyboard(&kb_opts, &spec)) != AOAHID_OK) {
+        failed("spec", r);
+        goto done;
+    }
+    if ((r = aoahid_node_open(dev, spec, &node_opts, AOAHID_CONTROL_TIMEOUT_MS, &kb)) != AOAHID_OK) {
+        failed("node", r);
+        goto done;
+    }
+    /* Android registers the HID after the last descriptor fragment without telling the host;
+     * a report sent at once can STALL or be lost (docs/API.md, "Open sequence"). */
+    sleep_ms(100);
 
-    if (kb != NULL) aoahid_node_close(kb, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    if ((r = aoahid_keyboard_key(kb, 0x04, 1)) != AOAHID_OK || /* Keyboard a and A */
+        (r = aoahid_node_submit_blocking(kb, AOAHID_SEND_TIMEOUT_MS)) != AOAHID_OK ||
+        (r = aoahid_keyboard_key(kb, 0x04, 0)) != AOAHID_OK ||
+        (r = aoahid_node_submit_blocking(kb, AOAHID_SEND_TIMEOUT_MS)) != AOAHID_OK) {
+        failed("key", r);
+        goto done;
+    }
+    status = 0;
+
+done:
+    if (kb != NULL) {
+        r = aoahid_node_close(kb, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+        /* AOAHID_CLOSE_PENDING leaves the Node open; aoahid_device_close below closes it. */
+        if (r != AOAHID_OK && r != AOAHID_CLOSE_PENDING) status = failed("node close", r);
+    }
     if (spec != NULL) aoahid_spec_release(spec);
-    if (dev != NULL) aoahid_device_close(dev, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    if (dev != NULL && (r = aoahid_device_close(dev, AOAHID_CONTROL_TIMEOUT_MS,
+                                                AOAHID_DRAIN_TIMEOUT_MS)) != AOAHID_OK) {
+        status = failed("device close", r);
+    }
     if (disc != NULL) aoahid_discovery_destroy(disc);
-    if (ctx != NULL) aoahid_context_destroy_blocking(ctx, AOAHID_CONTROL_TIMEOUT_MS,
-                                                     AOAHID_DRAIN_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
-    return 0;
+    if ((r = aoahid_context_destroy_blocking(ctx, AOAHID_CONTROL_TIMEOUT_MS,
+                                             AOAHID_DRAIN_TIMEOUT_MS,
+                                             AOAHID_DRAIN_TIMEOUT_MS)) != AOAHID_OK) {
+        status = failed("context destroy", r);
+    }
+    return status;
 }
 ```
+
+Build it against an installed package or an unpacked release archive:
+
+```sh
+cc first.c $(pkg-config --cflags --libs aoahid) -o first
+```
+
+or, in CMake, `find_package(aoahid CONFIG REQUIRED COMPONENTS shared)` and
+`target_link_libraries(first PRIVATE aoahid::aoahid)`. With an archive, point
+`PKG_CONFIG_PATH` at its `lib/pkgconfig`, and the loader at its `lib/` when
+you run it.
 
 [QUICKSTART.md](docs/QUICKSTART.md) takes you from a fresh checkout to a phone
 reacting to the verification programs under `examples/c/verify/`.
@@ -117,31 +195,53 @@ What each profile derives for you and what you specify is in [PROFILES.md](docs/
 
 ## Moving between libaoahid and libmimhid
 
-Both libraries share the same profile `Spec` factories, report state machines,
-and error model (`s/aoahid/mimhid/` for profile and mutation calls). They differ
-where the hardware differs: `libaoahid` drives an Android phone over `libusb`
-with a `Context` handle (`aoahid_context_poll` or internal event thread), AOA 2.0
-control requests `54`–`57`, and optional Bulk `Channel`s, whereas `libmimhid`
-drives an MCU board over a host serial port with full USB/endpoint descriptors,
-`mimhid_commit_timeouts`, and two-way HID callbacks. The full comparison is in
-[API.md](docs/API.md#differences-from-libmimhid).
+The two headers have the same shape: options structures that start with
+`struct_size`, one close rule, every timeout an argument, and the same profile
+factories and input calls (`aoahid_keyboard_key` is `mimhid_keyboard_key`).
+The transport differs: here a Context drives libusb (`aoahid_context_poll` or
+an internal event thread), AOA requests 51 to 57 register and feed the HIDs,
+and Bulk `Channel`s reach other interfaces; `libmimhid` drives a board over a
+serial port, uploads full USB descriptors, and carries two-way HID. Three
+things behave differently under the same names:
+
+- **`*_init`.** Here the initializers fill in working values, and
+  `AOAHID_CONTROL_TIMEOUT_MS`, `AOAHID_SEND_TIMEOUT_MS`, and
+  `AOAHID_DRAIN_TIMEOUT_MS` are working timeouts. libmimhid's `*_init` only
+  zeroes the structure and sets `struct_size`, and a required field left zero
+  is `MIMHID_ERR_UNSET_FIELD`, so code moved there must set every value itself.
+- **`AOAHID_CLOSE_PENDING` (15).** A close here can return it while a USB
+  transfer is still in flight, and the handle stays yours. libmimhid has no
+  such result (15 is unused there): its writes finish inside the call.
+- **Result 4.** Here it is `AOAHID_ERR_NOT_AOA` (the device does not speak
+  AOA); in libmimhid it is `MIMHID_ERR_PROTOCOL` (the board's firmware has
+  another version).
+
+The full comparison is in [API.md](docs/API.md#differences-from-libmimhid).
 
 ## Verification status
 
-- Hardware: touchscreen, touchpad, keyboard, mouse, gamepad (Hat Switch, raw D-pad buttons, and no D-pad), Consumer Control media keys, pen, and digitizer took effect on a Samsung Galaxy Tab S11 and a POCO F6 Pro (pen, digitizer, and touchpad on the Tab S11 under Arch Linux only), from Windows 10 x64 and Arch Linux, in 2026-09 and 2026-10.
-- Battery report: `BATTERY` device class registration via `dumpsys input` was confirmed on the Samsung Galaxy Tab S11 (2026-10-11); live percentage reporting to the Android UI is not yet verified.
-- Release 0.1.0 itself is not hardware-verified: the API around the verified transport and profiles has changed since ([CHANGELOG.md](CHANGELOG.md)).
-- Not tested on hardware: raw reports, the System Control, Camera, and Telephony toggles, live battery percentage reporting, and macOS.
-- Every unit and `sim` test runs in CI against a deterministic fake libusb, with ASan, UBSan, and ThreadSanitizer builds and an 87% line / 75% branch coverage floor ([VERIFICATION.md](docs/VERIFICATION.md)).
+- Hardware: the transport and the Keyboard, Mouse, Toggle, Gamepad,
+  Touchscreen, Touchpad, Pen, and Digitizer profiles were verified on a
+  Samsung Galaxy Tab S11 from Arch Linux, with `devtest` and kernel `getevent`
+  ([CHANGELOG.md](CHANGELOG.md)).
+- Release 0.1.0 itself is not hardware-verified: the API around that transport
+  and those profiles has changed since.
+- Every unit and `sim` test runs in CI against a deterministic fake libusb,
+  with ASan, UBSan, and ThreadSanitizer builds and an 87% line / 75% branch
+  coverage floor ([VERIFICATION.md](docs/VERIFICATION.md)).
 
 ## ADB on the same phone
 
-On Windows only one process can open a USB device. The companion library
+On Windows only one process can open a USB device
+([PROTOCOL.md](docs/PROTOCOL.md#host-side-caveats)). The companion library
 [aoahid_adb_proxy](https://github.com/nemarpuc/aoahid_adb_proxy) opens the
 phone's ADB interface as a Channel ([API.md](docs/API.md#bulk-channels)) and
 serves it on a loopback TCP port (`adb connect 127.0.0.1:6555`, outside the
-5555–5585 emulator scan range); otherwise run `adb kill-server` first
-([QUICKSTART.md](docs/QUICKSTART.md#4-windows-adb-or-a-manufacturer-driver-can-block-you)).
+odd ports 5555 to 5585 that the adb server polls for emulators,
+`PollAllLocalPortsForEmulator` in AOSP
+[`client/transport_emulator.cpp`](https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/client/transport_emulator.cpp),
+retrieved 2026-11-10); otherwise run `adb kill-server` first
+([QUICKSTART.md](docs/QUICKSTART.md#windows)).
 
 ## Documentation
 
@@ -149,7 +249,7 @@ serves it on a loopback TCP port (`adb connect 127.0.0.1:6555`, outside the
 |---|---|
 | [QUICKSTART.md](docs/QUICKSTART.md) | First run on a real device: cables, permissions, drivers, verification programs |
 | [BUILDING.md](docs/BUILDING.md) | Requirements, CMake options and presets, tests, sanitizers, coverage, using the installed package |
-| [API.md](docs/API.md) | C API reference: objects, options, errors, every function |
+| [API.md](docs/API.md) | C API guide and a reference entry for each of the 53 functions |
 | [PROFILES.md](docs/PROFILES.md) | Descriptor and state-machine contract of each profile |
 | [EXAMPLES.md](docs/EXAMPLES.md) | Walkthrough of the example programs in C, C++, Python, C#, and Rust |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Object model, threading, send path, design decisions |

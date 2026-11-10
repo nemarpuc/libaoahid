@@ -17,10 +17,13 @@ drivers, and human-observable verification programs), see
   compile as C99/C17 and C++20.
 - **CMake 3.20 or later.**
 - **libusb 1.0.30 or later** in the `1.0` API line (for real-USB builds where
-  `AOAHID_USE_FAKE_LIBUSB=OFF`). When `aoahid_context_create` initializes
-  libusb at runtime, it inspects `libusb_get_version()` and refuses any library
-  outside the `1.0` line or older than `1.0.30` with `AOAHID_ERR_UNSUPPORTED`
-  (`src/transport/transport.cpp`).
+  `AOAHID_USE_FAKE_LIBUSB=OFF`). CMake checks the headers it finds
+  (`LIBUSB_API_VERSION` at least `0x0100010C`, `cmake/aoahid-check-libusb.cmake`),
+  and `aoahid_context_create` checks the runtime: it reads `libusb_get_version`
+  and refuses a library outside the `1.0` line or older than `1.0.30` with
+  `AOAHID_ERR_UNSUPPORTED` (`supported_libusb_runtime` in
+  `src/transport/discovery.cpp`). [QUICKSTART.md](QUICKSTART.md#1-install-the-build-tools-and-libusb-1030)
+  shows how to get 1.0.30 where the distribution packages an older one.
 - **Platform USB access.** On Linux, install `udev/51-aoahid.rules` (see
   [PORTING.md](PORTING.md#linux)). On Windows, the phone must use a
   WinUSB-compatible driver (see [PORTING.md](PORTING.md#windows)).
@@ -34,13 +37,13 @@ Every project-specific CMake option is declared in `CMakeLists.txt`:
 | `AOAHID_WERROR` | `ON` | Treat compiler warnings as errors (`/WX` on MSVC, `-Werror` on GCC and Clang). Turn `OFF` when testing with a newer compiler that adds warnings not yet in CI. |
 | `AOAHID_BUILD_SHARED` | `ON` | Build the shared library (`aoahid` target: `libaoahid.so`, `libaoahid.dylib`, or `aoahid.dll`). |
 | `AOAHID_BUILD_STATIC` | `ON` | Build the static archive (`aoahid_static` target: `libaoahid_static.a` or `aoahid_static.lib`). At least one of `AOAHID_BUILD_SHARED` or `AOAHID_BUILD_STATIC` must be `ON`. |
-| `AOAHID_BUILD_TESTS` | `ON` | Build the unit, `sim`, and ABI verification executables and register CTest targets. |
-| `AOAHID_BUILD_EXAMPLES` | `ON` | Build the C and C++ example programs under `examples/`. |
+| `AOAHID_BUILD_TESTS` | `OFF` | Build the unit, `sim`, and ABI verification executables and register CTest targets. Requires `AOAHID_USE_FAKE_LIBUSB=ON`. |
+| `AOAHID_BUILD_EXAMPLES` | `OFF` | Build the C and C++ example programs under `examples/` (into `<build>/examples/`; on Windows next to `aoahid.dll`). |
 | `AOAHID_BUILD_FUZZ` | `OFF` | Build the Clang libFuzzer target `aoahid_fuzz_descriptor`. Requires Clang and cannot be combined with `AOAHID_COVERAGE`. |
-| `AOAHID_SANITIZE` | `OFF` | Enable AddressSanitizer and UndefinedBehaviorSanitizer (`-fsanitize=address,undefined -fno-omit-frame-pointer` on GCC/Clang; `/fsanitize=address` on MSVC). Mutually exclusive with `AOAHID_TSAN` and `AOAHID_COVERAGE`. |
-| `AOAHID_TSAN` | `OFF` | Enable ThreadSanitizer (`-fsanitize=thread -fno-omit-frame-pointer` on GCC/Clang). Mutually exclusive with `AOAHID_SANITIZE` and `AOAHID_COVERAGE`. |
+| `AOAHID_SANITIZE` | `OFF` | Enable AddressSanitizer and UndefinedBehaviorSanitizer (`-fsanitize=address,undefined -fno-omit-frame-pointer`). GCC and Clang only: with MSVC the option adds no flag. Mutually exclusive with `AOAHID_TSAN` and `AOAHID_COVERAGE`. |
+| `AOAHID_TSAN` | `OFF` | Enable ThreadSanitizer (`-fsanitize=thread -fno-omit-frame-pointer`). Linux only, with GCC 12 or later or Clang. Mutually exclusive with `AOAHID_SANITIZE`, `AOAHID_COVERAGE`, and `AOAHID_BUILD_FUZZ`. |
 | `AOAHID_CHECK_SERIALIZATION` | `OFF` | Abort the process with the offending and active call names if two threads enter the same `aoahid_context` serialization domain concurrently (see [ARCHITECTURE.md](ARCHITECTURE.md#checking-the-serialization-rule)). |
-| `AOAHID_USE_FAKE_LIBUSB` | `OFF` | Link against the deterministic in-memory `tests/fake_libusb` backend instead of the system `libusb-1.0`. Required for the `sim` transport test suites (`aoahid_tests`, `aoahid_sim_*`). |
+| `AOAHID_USE_FAKE_LIBUSB` | `OFF` | Link against the deterministic in-memory `tests/fake_libusb` backend instead of the system `libusb-1.0`. `AOAHID_BUILD_TESTS` requires it. |
 | `AOAHID_COVERAGE` | `OFF` | Instrument targets for `gcov` (`--coverage -O0 -fprofile-update=atomic` on GCC/Clang). Mutually exclusive with `AOAHID_SANITIZE`, `AOAHID_TSAN`, and `AOAHID_BUILD_FUZZ`. |
 
 ## CMake presets
@@ -50,11 +53,11 @@ Every project-specific CMake option is declared in `CMakeLists.txt`:
 | Preset | Build directory | Key flags | Purpose |
 | --- | --- | --- | --- |
 | `dev` | `build/dev` | `Debug`, `-DAOAHID_BUILD_TESTS=ON`, `-DAOAHID_BUILD_EXAMPLES=ON`, `-DAOAHID_USE_FAKE_LIBUSB=ON`, `-DAOAHID_CHECK_SERIALIZATION=ON` | Fast local development and full unit + `sim` test suite with no USB hardware. |
-| `release` | `build/release` | `Release`, `-DAOAHID_USE_FAKE_LIBUSB=OFF`, `-DAOAHID_BUILD_TESTS=OFF` | Production shared and static libraries plus examples against the system `libusb-1.0`. |
+| `release` | `build/release` | `Release`, `-DAOAHID_BUILD_TESTS=OFF` (the other options keep their defaults: real libusb, no examples) | Shared and static libraries against the system `libusb-1.0`. |
 | `tsan` | `build/tsan` | `RelWithDebInfo`, `-DAOAHID_BUILD_TESTS=ON`, `-DAOAHID_BUILD_EXAMPLES=ON`, `-DAOAHID_USE_FAKE_LIBUSB=ON`, `-DAOAHID_TSAN=ON` | ThreadSanitizer verification of internal-thread mode, Channels, and teardown. |
 | `coverage` | `build/coverage` | `Debug`, `-DAOAHID_USE_FAKE_LIBUSB=ON`, `-DAOAHID_CHECK_SERIALIZATION=ON`, `-DAOAHID_COVERAGE=ON`, `-DAOAHID_BUILD_EXAMPLES=OFF` | Line and branch coverage measurement over `src/` with `gcovr`. |
 
-### Standard build against system libusb
+### Release build against system libusb
 
 ```sh
 cmake --preset release
@@ -95,6 +98,7 @@ To run individual suites in `aoahid_tests` (`item_writer`, `profiles`,
 ```sh
 cmake -S . -B build/asan -G Ninja \
   -DCMAKE_BUILD_TYPE=Debug \
+  -DAOAHID_BUILD_TESTS=ON \
   -DAOAHID_USE_FAKE_LIBUSB=ON \
   -DAOAHID_CHECK_SERIALIZATION=ON \
   -DAOAHID_SANITIZE=ON
@@ -227,16 +231,16 @@ cmake --build build/release --config Release
 
 - **Python** ([bindings/python/](../bindings/python)): pure `ctypes` package
   (`aoahid`). Pass the path of `libaoahid.so`, `libaoahid.dylib`, or
-  `aoahid.dll` to `aoahid.load(...)` (or set `AOAHID_LIBRARY_PATH`), or install
-  the shared library on the system loader path. Build a wheel with
+  `aoahid.dll` to `aoahid.load(path)`; the package looks for no library by
+  itself. Build a wheel with
   `python3 -m build --wheel bindings/python`.
 - **C#** ([bindings/csharp/AoaHid/](../bindings/csharp/AoaHid)): .NET 8 P/Invoke
   binding (`AoaHid`). Pack with
   `dotnet pack bindings/csharp/AoaHid/AoaHid.csproj -c Release`.
 - **Rust** ([bindings/rust/](../bindings/rust)): workspace with the raw FFI
   crate (`aoahid-sys`) and safe wrapper crate (`aoahid`). Set `AOAHID_LIB_DIR`
-  (and `AOAHID_INCLUDE_DIR` when needed) before running `cargo build` or
-  `cargo test`.
+  to the directory that holds the library before running `cargo build` or
+  `cargo test` (`bindings/rust/aoahid-sys/build.rs`).
 
 The FFI declarations and ABI layout tests are generated from
 [include/aoahid.h](../include/aoahid.h) by `tools/bindings/generate.py`. Verify
