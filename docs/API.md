@@ -31,7 +31,7 @@ structure layout does not change when a compiler uses short enums.
 - `enable_*`, `has_*` and the other flags are exactly 0 or 1. A disabled
   field's declaration must be all zero.
 
-## Initial values
+## Initial values {#initial-values}
 
 The initializers are `static inline` functions in `aoahid.h`, so they are not
 in the binary ABI and the language bindings do not have them; a binding sets
@@ -289,7 +289,7 @@ To reserve a slot for a Node, set `has_reserved_slots = 1` and
 `reserved_slots = 1` (a Node has one report in flight, so 0 or 1 is allowed),
 leaving at least one shared slot on the Device.
 
-## Bulk Channels
+## Bulk Channels {#bulk-channels}
 
 `aoahid_channel_open(device, &options, drain_timeout_ms, &channel)`:
 

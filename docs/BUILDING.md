@@ -125,7 +125,7 @@ gcovr --root . --object-directory build/coverage --filter 'src/' \
 ```
 
 See [VERIFICATION.md](VERIFICATION.md#coverage) and
-[tests/README.md](../tests/README.md) for what the coverage gate checks and
+[tests/README.md](../tests/README.md#tests) for what the coverage gate checks and
 what is deliberately left out.
 
 ### Fuzzing (`AOAHID_BUILD_FUZZ`)

@@ -5,9 +5,9 @@ covers each feature, the exact hardware-verification status, line and branch
 coverage numbers over `src/`, and known platform-specific open items.
 
 For how to run and extend the test suites, see
-[tests/README.md](../tests/README.md). For running the hardware checks on a
-physical Android phone, see [tests/hw/README.md](../tests/hw/README.md),
-[tools/device-check/README.md](../tools/device-check/README.md), and
+[tests/README.md](../tests/README.md#tests). For running the hardware checks on a
+physical Android phone, see [tests/hw/README.md](../tests/hw/README.md#hardware-checks),
+[tools/device-check/README.md](../tools/device-check/README.md#device-check), and
 [TARGET_MATRIX.md](TARGET_MATRIX.md).
 
 ## Verification layers
