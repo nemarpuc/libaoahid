@@ -8,22 +8,26 @@ For building from source or consuming the CMake and `pkg-config` files, see
 [BUILDING.md](BUILDING.md). For internal release-script gates, see
 [INTERNALS.md](INTERNALS.md#version-and-release).
 
-## Release triggers and dry runs
+## Release triggers and dry runs {#release-triggers-and-dry-runs}
 
-`.github/workflows/release.yml` runs in two modes:
+`.github/workflows/release.yml` has these jobs: `validate`, `build` (one per
+target), `binding-packages`, `assemble` (after `validate` and `build`),
+`publish` (after `validate`, `assemble` and `binding-packages`), and
+`publish-pypi` and `publish-nuget` (after `publish`). It runs in two modes:
 
-- **Tag push (`v*`).** Validates that every version-bearing file in the
-  repository matches the tag (`tools/release/version_files.py`) and that
-  `CHANGELOG.md` has a dated section for that version with an explicit
-  `hardware-verified` status statement (`tools/release/validate_release.py`),
-  builds and tests every target, assembles the release, and publishes the
-  GitHub Release and language-binding packages.
-- **Manual dry run (`workflow_dispatch`, `dry_run: true`).** Takes the version
-  from the newest dated section in `CHANGELOG.md`, runs the `validate`,
-  `build`, `package`, and `assemble` jobs with every binary and SPDX check, and
-  uploads the complete `dist/` directory as the `release-dist` workflow
-  artifact without creating a GitHub Release or publishing to package
-  registries.
+- **Tag push (`v*`).** `validate` checks that every version-bearing file in
+  the repository matches the tag (`tools/release/version_files.py`) and that
+  `CHANGELOG.md` has a dated section for that version containing the word
+  `hardware-verified` (`tools/release/validate_release.py`). The other jobs
+  build and test every target, assemble the release, and `publish` creates the
+  GitHub Release. `publish-pypi` and `publish-nuget` run only when the
+  repository variable `AOAHID_PUBLISH_BINDINGS` is `true`.
+- **Manual dry run (`workflow_dispatch`, `dry_run: true`; `false` is
+  refused).** Takes the version from the newest dated section in
+  `CHANGELOG.md`, runs `validate`, `build`, `binding-packages` and `assemble`
+  with every binary and SPDX check, and uploads the assembled set as the
+  `release-dist` workflow artifact. `publish`, `publish-pypi` and
+  `publish-nuget` do not run.
 
 ## The 10 release assets
 
@@ -35,8 +39,8 @@ Every GitHub Release has **exactly 10 uploaded assets**:
 | `libaoahid-X.Y.Z-linux-aarch64-ubuntu22.04.tar.gz` | Linux AArch64 shared + static binary archive (`GLIBC_2.35` baseline) |
 | `libaoahid-X.Y.Z-macos-arm64.tar.gz` | macOS Apple Silicon (`arm64`) shared + static binary archive (macOS 11.0 baseline) |
 | `libaoahid-X.Y.Z-macos-x86_64.tar.gz` | macOS Intel (`x86_64`) shared + static binary archive (macOS 11.0 baseline) |
-| `libaoahid-X.Y.Z-windows-x86_64.zip` | Windows x64 shared + static binary archive (MSVC `/MD`) |
-| `libaoahid-X.Y.Z-windows-arm64.zip` | Windows ARM64 shared + static binary archive (MSVC `/MD`) |
+| `libaoahid-X.Y.Z-windows-x86_64.zip` | Windows x64 shared + static binary archive (MSVC) |
+| `libaoahid-X.Y.Z-windows-arm64.zip` | Windows ARM64 shared + static binary archive (MSVC) |
 | `libaoahid-X.Y.Z.spdx.json` | Release-wide SPDX 2.3 SBOM covering the source archive and all six binary archives |
 | `libaoahid-X.Y.Z-source.tar.gz` | Deterministic source archive matching the tagged commit |
 | `release-manifest.json` | Machine-readable manifest of archives, SHA-256 digests, target architectures, and glibc baselines |
@@ -47,7 +51,7 @@ or `-runtime` bundles are uploaded. Shipping one self-contained archive per
 platform guarantees that the headers, CMake targets, `pkg-config` metadata,
 `libusb` runtime, and LGPL-2.1 license and source material stay together.
 
-## Binary archive layout
+## Binary archive layout {#binary-archive-layout}
 
 Each platform archive unpacks to a single top-level directory named after the
 archive stem (`libaoahid-X.Y.Z-<platform>-<arch>[-ubuntu22.04]/`):
@@ -73,14 +77,13 @@ archive stem (`libaoahid-X.Y.Z-<platform>-<arch>[-ubuntu22.04]/`):
   so `libaoahid.so` finds the bundled `libusb-1.0.so.0` in the same `lib/`
   directory without `LD_LIBRARY_PATH` changes. The C++ standard library
   (`-static-libstdc++ -static-libgcc`) is linked statically into
-  `libaoahid.so` when the toolchain supports it.
+  `libaoahid.so` (`CMakeLists.txt`).
 - **macOS (`arm64`, `x86_64`).** Built with `MACOSX_DEPLOYMENT_TARGET=11.0`,
   `LC_RPATH` set to `@loader_path`, and install names `@rpath/libaoahid.0.dylib`
   and `@rpath/libusb-1.0.0.dylib`. Every `.dylib` is ad-hoc signed
-  (`codesign --force --sign -`), as required on Apple Silicon; the binaries are
+  (`codesign --force --sign -`); the binaries are
   not notarized with an Apple Developer ID.
-- **Windows (`x86_64`, `arm64`).** Built with MSVC using the dynamic CRT
-  (`/MD`). `aoahid.dll` and `libusb-1.0.dll` are placed in `bin/`; import
+- **Windows (`x86_64`, `arm64`).** Built with MSVC. `aoahid.dll` and `libusb-1.0.dll` are placed in `bin/`; import
   libraries (`aoahid.lib`, `usb-1.0.lib`) and the static library
   (`aoahid_static.lib`) are in `lib/`. CI verifies that `aoahid_static.lib`
   contains no `/EXPORT:aoahid_` linker directives so linking it into an
@@ -95,9 +98,8 @@ The Python (`bindings/python`), C# (`bindings/csharp`), and Rust
 - **PyPI (`aoahid`) and NuGet (`AoaHid`).** Contain the pure language
   declarations (`ctypes` and P/Invoke) only; they do not bundle native
   binaries. Point them at `libaoahid.so`, `libaoahid.dylib`, or `aoahid.dll`
-  from a release archive or source build (for example via `AOAHID_LIBRARY_PATH`
-  or the explicit library path argument in Python, or standard native library
-  search paths in .NET).
+  from a release archive or source build: in Python pass its path to
+  `aoahid.load(path)`; in .NET put it on the native library search path.
 - **Rust (`aoahid-sys` and `aoahid`).** Built from the repository workspace
   against `AOAHID_LIB_DIR`; crates are not published to `crates.io` yet.
 
