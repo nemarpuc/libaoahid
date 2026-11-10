@@ -7,14 +7,9 @@
 namespace profile_test {
 
 void test_raw_report_id_order() {
-    const std::array<std::uint8_t, 17> valid{0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U,
-                                             0x85U, 0x01U, 0x15U, 0x00U, 0x25U, 0x01U,
-                                             0x75U, 0x01U, 0x95U, 0x01U, 0x81U};
-    // Complete the Input item data and collection in a separate exact array.
     const std::array<std::uint8_t, 21> accepted{0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U, 0x85U,
                                                 0x01U, 0x15U, 0x00U, 0x25U, 0x01U, 0x75U, 0x01U,
                                                 0x95U, 0x01U, 0x09U, 0x01U, 0x81U, 0x02U, 0xC0U};
-    (void)valid;
     const aoahid_raw_report report{{1U, 1U, {}}, 2U};
     AOAHID_CHECK(aoa::hid::validate_raw(accepted.data(), accepted.size(), &report, 1U).result ==
                  AOAHID_OK);

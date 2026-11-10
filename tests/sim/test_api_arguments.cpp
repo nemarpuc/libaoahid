@@ -58,11 +58,13 @@ void test_context_arguments() {
     AOAHID_CHECK(refused(options));
     AOAHID_CHECK(aoahid_fake_libusb_init_context_count() == 0U);
 
-    AOAHID_CHECK(aoahid_context_poll(nullptr, 1U) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_context_poll(nullptr, 1U) == AOAHID_ERR_PARAM && field_is("context"));
     AOAHID_CHECK(aoahid_context_destroy(nullptr, kControlTimeoutMs, kDrainTimeoutMs) ==
-                 AOAHID_ERR_PARAM);
+                     AOAHID_ERR_PARAM &&
+                 field_is("context.destroy"));
     AOAHID_CHECK(aoahid_context_destroy_blocking(nullptr, kControlTimeoutMs, kDrainTimeoutMs,
-                                                 kDrainTimeoutMs) == AOAHID_ERR_PARAM);
+                                                 kDrainTimeoutMs) == AOAHID_ERR_PARAM &&
+                 field_is("context.destroy"));
 
     options = sim::context_options();
     AOAHID_CHECK(aoahid_context_create(&options, &context) == AOAHID_OK);
@@ -104,10 +106,13 @@ void test_runtime_failures() {
     aoahid_fake_libusb_queue_event_result(LIBUSB_ERROR_INTERRUPTED);
     AOAHID_CHECK(aoahid_context_poll(context, 1U) == AOAHID_OK);
     // A discovery whose enumeration fails reports the probe request.
-    AOAHID_CHECK(aoahid_discover(context, kControlTimeoutMs, nullptr) == AOAHID_ERR_PARAM);
-    AOAHID_CHECK(aoahid_discover(nullptr, kControlTimeoutMs, nullptr) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_discover(context, kControlTimeoutMs, nullptr) == AOAHID_ERR_PARAM &&
+                 field_is("discover"));
+    AOAHID_CHECK(aoahid_discover(nullptr, kControlTimeoutMs, nullptr) == AOAHID_ERR_PARAM &&
+                 field_is("discover"));
     aoahid_discovery* discovery = nullptr;
-    AOAHID_CHECK(aoahid_discover(context, 0U, &discovery) == AOAHID_ERR_UNSET_FIELD);
+    AOAHID_CHECK(aoahid_discover(context, 0U, &discovery) == AOAHID_ERR_UNSET_FIELD &&
+                 field_is("control_timeout_ms"));
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
     aoahid_fake_libusb_reset();
 }
@@ -156,7 +161,8 @@ void test_discovery_arguments() {
                  last_error_is(AOAHID_ERR_PARAM) && field_is("discovery.index") &&
                  aoahid_last_error()->offset == 1U && aoahid_last_error()->length == 1U);
     AOAHID_CHECK(aoahid_discovery_get(nullptr, 0U) == nullptr && field_is("discovery"));
-    AOAHID_CHECK(aoahid_discovery_count(nullptr) == 0U && last_error_is(AOAHID_ERR_PARAM));
+    AOAHID_CHECK(aoahid_discovery_count(nullptr) == 0U && last_error_is(AOAHID_ERR_PARAM) &&
+                 field_is("discovery"));
     aoahid_discovery_destroy(nullptr);
     AOAHID_CHECK(last_error_is(AOAHID_ERR_PARAM) && field_is("discovery"));
     aoahid_discovery_destroy(discovery);
