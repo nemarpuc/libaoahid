@@ -16,13 +16,13 @@ the wire protocol in [PROTOCOL.md](PROTOCOL.md), and every limit in
 | `aoahid_channel` | `src/api/internal.hpp` | A `transport::Channel` (its own transfers and one `Port` reference). |
 | `aoahid_spec` | `src/api/internal.hpp` | An atomic reference count, the descriptor bytes, the `ReportLayout`, the `DescriptorRequirements`, and the copied options. |
 
-A `Port` (`src/transport/transport.hpp`) is the only owner
-of a libusb device handle. A Device and each of its Channels hold one
-reference; the handle closes when the last is released, which each holder does
-only after its own transfers have drained. `Device::open` always opens a new
-handle through `src/transport/port.cpp`.
-The Runtime's Port list exists so discovery and `start_accessory` can probe a
-device that is already open through its existing handle.
+A `Port` (`src/transport/transport.hpp`) is the only owner of a libusb device
+handle. A Device and each of its Channels hold one reference; the handle
+closes when the last is released, which each holder does only after its own
+transfers have drained. `Device::open` always opens a new handle
+(`src/transport/port.cpp`). The Runtime's Port list exists so discovery and
+accessory start can probe a device that is already open through its existing
+handle.
 
 No libusb type appears above `src/transport/transport.hpp`.
 
@@ -30,37 +30,37 @@ No libusb type appears above `src/transport/transport.hpp`.
 
 | Lock | Guards | Notes |
 | --- | --- | --- |
-| `aoahid_context::mutex` | `devices`, `graveyard`, `deferred_error`, `event_thread_error` | Taken through `active_state_mutex`, which is null in caller-poll mode, so `src/api/internal.hpp` locks nothing there. |
+| `aoahid_context::mutex` | `devices`, `graveyard`, `deferred_error`, `event_thread_error` | Taken through `active_state_mutex`, which is null in caller-poll mode, so `ModeMutexGuard` (`src/api/internal.hpp`) locks nothing there. |
 | `aoahid_node::completion_mutex` | The hand-over of a completion to a thread blocked in `aoahid_node_submit_blocking` | Also the callback-exit barrier Node close takes. Null in caller-poll mode. |
 | `aoahid_device::slot_mutex` | The wait for a free pool slot | `slot_generation` is bumped by every report completion. |
-| Transport `StateGuard` (`src/transport/transport.cpp`) | The transfer pool: `free_stack`, reservations, `outstanding`, `callbacks_active`, the Device error latch | An `atomic_flag` spinlock. `libusb_submit_transfer` is called while it is held. |
+| Transport `StateGuard` (`src/transport/transport.cpp`) | The transfer pool: `free_stack`, reservations, `outstanding`, `callbacks_active`, the Device error latch | An `atomic_flag` spinlock, taken only in internal-thread mode. `libusb_submit_transfer` is called while it is held. |
 | `Runtime::ports_mutex_`, `Port::claims_mutex_` | The open-Port list; the per-interface claim counts | Leaf locks, open and close paths only. |
 
 Order: the Context mutex is taken before the transport spinlock
-(`src/api/context_ops.cpp` calls `graph_drained` under it).
-Nothing takes them the other way round.
+(`reap_graveyard` in `src/api/context_ops.cpp` calls `graph_drained` under
+it). Nothing takes them the other way round.
 
 Profile calls need no lock: a mutator returns `AOAHID_ERR_BUSY` while
-`transfer_inflight` is set (`src/profiles/state.cpp`),
-so the event thread and the application never write Node state at the same
-time.
+`transfer_inflight` is set (`usable` in `src/profiles/state.cpp`), so the
+event thread and the application never write Node state at the same time.
 
 ## Event thread
 
-Internal-thread mode starts one thread in
-`src/api/c_api_context.cpp`. Its loop is
-`Runtime::poll(60 s)` followed by `reap_graveyard`
-(`src/api/c_api_context.cpp`).
-A failed poll latches a Context error and backs off 10 ms on `graveyard_cv`.
+Internal-thread mode starts one thread in `aoahid_context_create`
+(`src/api/c_api_context.cpp`). Its loop is `Runtime::poll` with
+`kInternalEventPollTimeoutMs` (60 000 ms) followed by `reap_graveyard`. A
+failed poll latches a Context error and waits 10 ms on `graveyard_cv` before
+the next poll.
 
-`src/transport/discovery.cpp` is one
+`Runtime::poll` (`src/transport/discovery.cpp`) is one
 `libusb_handle_events_timeout_completed`. An interrupted wait counts as
 success.
 
 Stopping sets `stop_event_thread`, then calls
-`src/transport/discovery.cpp`, then
-joins (`src/api/c_api_context.cpp`). The 60-second
-timeout only bounds a backend that ignores the interrupt.
+`Runtime::interrupt_event_handler` (`libusb_interrupt_event_handler`), then
+joins the thread (`request_event_thread_stop` and `aoahid_context_destroy` in
+`src/api/c_api_context.cpp`). The 60-second timeout only bounds a backend that
+ignores the interrupt.
 
 The log sink can run on the event thread. Exceptions from it are swallowed.
 
@@ -75,30 +75,33 @@ Per report, in internal-thread mode:
    `preflight_context`, which reads the `event_thread_failed` atomic and then
    checks the deferred error latch under the Context mutex
    (`src/api/context_ops.cpp`).
-3. `src/transport/transport.cpp` pops a slot
-   from `free_stack` (last in, first out). A slot is handed out only while
-   more are free than other Nodes have reserved, unless the caller is filling
-   its own reservation. Per acquire only wValue (HID ID) and wLength are
-   written; the rest of the setup packet was written at open.
-4. `src/profiles/state.cpp` writes the report
-   into the slot buffer. With `validate_reports` it is decoded again by
-   `src/profiles/state.cpp`.
-5. `src/transport/transport.cpp` submits the
-   control transfer. In caller-poll mode `aoahid_node_submit` then runs one
-   zero-timeout poll; a failure there is latched in the Context, not returned.
-6. `src/profiles/state.cpp` publishes
-   `completion_result` and then clears `transfer_inflight`. A completed length
-   other than the report length is `AOAHID_ERR_SHORT_TRANSFER`.
+3. `Device::acquire` (`src/transport/transport.cpp`) pops a slot from
+   `free_stack`, a `std::vector<Slot*>` used as a stack (last in, first out).
+   A slot is handed out only while more are free than other Nodes have
+   reserved, unless the caller is filling its own reservation. It writes only
+   wValue (the HID ID) and wLength (`store_le16` at offsets 2 and 6); the rest
+   of the setup packet was written at open by `libusb_fill_control_setup`.
+4. `serialize_node` (`src/profiles/state.cpp`) writes the report into the
+   slot buffer. With `validate_reports` it is decoded again by
+   `validate_serialized_report`.
+5. `Device::submit` submits the control transfer. In caller-poll mode
+   `aoahid_node_submit` then runs one zero-timeout poll; a failure there is
+   latched in the Context, not returned.
+6. The completion callback (`transfer_complete` in `src/profiles/state.cpp`)
+   publishes `completion_result` and then clears `transfer_inflight`. A
+   completed length other than the report length is
+   `AOAHID_ERR_SHORT_TRANSFER`.
 
 A STALL, or a submit libusb did not accept, keeps the state pending for a
 resend: nothing was applied. Any other failed completion (a timeout, a
 cancellation) may have reached the device, so a mouse report consumes the
 motion it carried and motion is never sent twice.
 
-`aoahid_node_submit_blocking` waits in
-`poll_until_idle` (`src/api/node_ops.cpp`): on the Node's
-`completion_cv`, or on the Device's `slot_cv` when every pool slot is taken.
-Both waits wake every 10 ms to check for a Context error.
+`aoahid_node_submit_blocking` waits in `poll_until_idle`
+(`src/api/node_ops.cpp`): on the Node's `completion_cv`, or on the Device's
+`slot_cv` when every pool slot is taken. In internal-thread mode both waits
+wake every 10 ms to check for a Context error; in caller-poll mode the loop
+runs `Runtime::poll` for 1 ms at a time instead.
 
 ## Errors
 
@@ -118,16 +121,15 @@ Both waits wake every 10 ms to check for a Context error.
 
 `device_close_impl` (`src/api/node_ops.cpp`) marks the
 Device closing, closes every Node (neutral report, request 55, reservation)
-inside one `drain_timeout_ms` budget (an argument of `aoahid_device_close`), loses every Channel, cancels all
-transfers, and waits for them to drain.
+inside one `drain_timeout_ms` budget (an argument of `aoahid_device_close`),
+loses every Channel, cancels all transfers, and waits for them to drain.
 
 - Drained means `outstanding == 0 && callbacks_active == 0`
-  (`src/transport/transport.cpp`). `callbacks_active`
-  is decremented only after the completion callback returns.
-- A drained Device is destroyed at once
-  (`src/api/node_ops.cpp`).
-- Otherwise the whole graph moves to `graveyard`
-  (`src/api/context_ops.cpp`) and `aoahid_device_close` still consumes the handle;
+  (`Device::drained` in `src/transport/transport.cpp`). `callbacks_active` is
+  decremented only after the completion callback returns.
+- A drained Device is destroyed at once (`device_close_impl`).
+- Otherwise the whole graph moves to `graveyard` (`park_in_graveyard` in
+  `src/api/context_ops.cpp`) and `aoahid_device_close` still consumes the handle;
   errors of the rest of the teardown come back from `aoahid_context_poll` or
   `aoahid_context_destroy`. The event thread reaps it after a poll returns;
   in caller-poll mode `aoahid_context_poll` and context destroy do. Nothing
@@ -146,24 +148,23 @@ between polls.
 
 `allocate_hid_id` (`src/api/context_ops.cpp`) takes the next ID of the
 Device's domain (USB bus plus port path). IDs start at 1 and are never reused
-while the Context lives; passing 65535 returns `AOAHID_ERR_OVERFLOW`.
+while the Context lives; once ID 65535 has been handed out, the next
+allocation in that domain returns `AOAHID_ERR_OVERFLOW`.
 
-`src/transport/transport.cpp` sends
-request 54 and then request 56 in fragments. When a request fails in a way the
-device may still have accepted (timeout, I/O error, short transfer:
-`src/transport/transport.cpp`), a
-best-effort request 55 follows. The Node is published only after success.
+`Device::register_hid` (`src/transport/transport.cpp`) sends request 54 and
+then request 56 in fragments. When a request fails in a way the device may
+still have accepted (timeout, I/O error, short transfer:
+`control_outcome_may_be_accepted`), a best-effort request 55 follows. The Node
+is published only after success.
 
 ## Channel
 
-`src/transport/channel.cpp` owns fixed IN and OUT
+`transport::Channel` (`src/transport/channel.cpp`) owns fixed IN and OUT
 slots allocated at open. `read`, `write`, and the callback never allocate.
 
 - Completions reach the reader, and free OUT slots reach the writer, through
-  single-producer single-consumer rings
-  (`src/transport/channel.cpp`). The callback takes
-  the waiter mutex only when a thread is waiting
-  (`src/transport/channel.cpp`).
+  single-producer single-consumer rings (`IndexRing`). The callback takes the
+  waiter mutex only when a thread is waiting (`Waiter::notify`).
 - Stream mode keeps `in_transfers` IN transfers submitted. Request mode has
   one IN slot and submits it from `read`, sized from the caller's capacity and
   rounded up to a whole packet; a timed-out read leaves it pending and the
@@ -180,8 +181,8 @@ slots allocated at open. `read`, `write`, and the callback never allocate.
 Behavior to know before changing it:
 
 - The packet size used for rounding and for the zero-length packet rule is
-  the larger of the IN and OUT `wMaxPacketSize`
-  (`src/transport/channel.cpp`).
+  the larger of the IN and OUT `wMaxPacketSize` (`max_packet`, set in
+  `find_bulk_interface`).
 - A halted endpoint is not cleared: the library never calls
   `libusb_clear_halt`.
 - In stream mode, when a later IN submit fails during open while an earlier
@@ -190,28 +191,28 @@ Behavior to know before changing it:
 
 ## Descriptor generation
 
-`src/profiles/spec.cpp` runs the same
-emit function twice: once counting into null storage, once writing into a
-buffer of exactly that size. The count is capped at 65535 bytes, the 16-bit
-AOA length (`src/profiles/spec.cpp`).
+`build_generated_spec` (`src/profiles/spec.cpp`) runs the same emit function
+twice: once counting into null storage, once writing into a buffer of exactly
+that size. The count is capped at 65535 bytes, the 16-bit AOA length
+(`kAoaDescriptorWireMaximum`).
 
-- `src/hid/item_writer.cpp` writes short items
-  of 0, 1, 2, or 4 data bytes. Minimum items are signed. A Maximum is unsigned
-  when both extents are non-negative.
-- `src/hid/descriptor_builder.cpp` adds
-  one field and its `FieldLayout` entry (semantic, bit offset, width, range).
-  It first pads to the next byte boundary when the field would
-  otherwise touch a fifth byte.
-- `src/profiles/spec.cpp` pads to a byte boundary at the
-  fixed points listed in LIMITS.md.
-- `src/hid/validator.cpp` parses the
-  result again and checks it against the layout.
+- `ItemWriter` (`src/hid/item_writer.cpp`) writes short items of 0, 1, 2, or
+  4 data bytes. Minimum items are signed. A Maximum is unsigned when both
+  extents are non-negative.
+- `DescriptorBuilder::variable` (`src/hid/descriptor_builder.cpp`) adds one
+  field and its `FieldLayout` entry (semantic, bit offset, width, range). It
+  first pads to the next byte boundary when the field would otherwise touch a
+  fifth byte.
+- `pad_report` (`src/profiles/spec.cpp`) pads to a byte boundary at the fixed
+  points listed in [LIMITS.md](LIMITS.md).
+- `validate_generated` (`src/hid/validator.cpp`) parses the result again and
+  checks it against the layout.
 - `DescriptorRequirements` records what the descriptor needs of the target
   parser (usages, fields per report, report bits). `aoahid_node_open` compares
   it with the Device's `linux_hid` (`aoahid_linux_hid_policy`) values.
 
-`src/profiles/state.cpp` writes a value little-endian at
-its layout offset and rejects one outside the logical range, except the null
+`store_bits` (`src/profiles/state.cpp`) writes a value little-endian at its
+layout offset; values outside the logical range are rejected, except the null
 value of a Null State field.
 
 ## State machines
@@ -231,74 +232,103 @@ value of a Null State field.
 
 ## Design decisions
 
-High-level API rationales are in
-[ARCHITECTURE.md](ARCHITECTURE.md#design-decisions). The implementation choices
-below record the internal mechanism, its recorded reason, and the rejected
-alternative:
+The API-level decisions are in
+[ARCHITECTURE.md](ARCHITECTURE.md#design-decisions); these are the
+implementation's, in the same format. Version numbers in the cited commit
+subjects predate the restart of the version line at 0.1.0 (commit `5e9e8a7`).
 
-- **Pre-allocated transfer pool, LIFO free list, and condition-variable wait (`src/transport/transport.cpp`, commits `15a6491`, `97bbd17`, `aa3dbf9`).**
-  `transport::Device::open` allocates a fixed vector of `Slot` structures, each
-  owning one `libusb_transfer` and a buffer of `8 + maximum_report_bytes` bytes
-  with the unchanging setup fields (`bmRequestType`, `bRequest = 57`, `wValue = 0`)
-  written during `acquire()` (`commit 15a6491`). Free slots are chained through
-  `Slot::next_free` on `free_head_`, a singly-linked LIFO list popped by
-  `acquire()` and pushed by `release_slot()`. (The codebase records pre-allocation
-  to keep `aoahid_node_submit` and `aoahid_raw_submit` allocation-free; why
-  `free_head_` uses LIFO order rather than FIFO or a ring index is not recorded
-  in code comments or commit history.)
-  *Rejected alternatives:* Rewriting unchanging setup fields in `submit()`
-  (`commit 15a6491`), and spinning or sleeping 1 ms in
-  `aoahid_node_submit_blocking` when every pool slot is held by other Nodes
-  (replaced in commits `97bbd17` and `aa3dbf9` by a Device-level condition
-  variable woken on transfer completion).
-- **Byte-wise report serialization and plain `StateGuard` spin (`src/profiles/state.cpp`, `src/transport/transport.cpp`, commits `0f7739e`, `15a6491`).**
-  `src/profiles/state.cpp` packs and validates report bits a byte at a time
-  rather than bit by bit, measured at ~2.9× faster for a 16-contact touchscreen
-  report with identical wire bytes (`commit 15a6491`). `transport::Device::StateGuard`
-  is a plain `std::atomic_flag` `test_and_set` spinlock around pool slot and
-  counter updates.
-  *Rejected alternative:* A two-stage CPU-pause/yield backoff in `StateGuard`
-  and an unbenchmarked byte-aligned special case from `0.5.1`, reverted in
-  commit `0f7739e` because they added branch complexity without benchmark or
-  hardware evidence.
-- **Two-pass descriptor emission and automatic 4-byte span padding (`src/profiles/spec.cpp`, `src/hid/descriptor_builder.cpp`, commits `3a7c30d`, `61d7d2c`).**
-  `src/profiles/spec.cpp` runs the profile's emit function twice—first with a
-  `nullptr` buffer to compute exact byte length, then into an exact-sized
-  buffer while `DescriptorBuilder` records `FieldLayout` bit offsets—and
-  `DescriptorBuilder::variable` pads to the next byte boundary whenever a field
-  would touch a fifth byte (HID 1.11 §8.4).
-  *Rejected alternative:* Rejecting field-width combinations whose cumulative
-  bit offset caused an otherwise valid 1–32 bit field to cross a fifth byte
-  (fixed in commits `3a7c30d` and `61d7d2c` by inserting constant byte-alignment
-  padding at chained field boundaries and before any >4-byte span).
-- **Pre-reserved `Context` graveyard and single close rule (`src/api/c_api_device.cpp`, `src/api/context_ops.cpp`, `src/api/node_ops.cpp`, commits `0e48856`, `26bc5c5`).**
-  libusb transfer cancellation (`libusb_cancel_transfer`) is asynchronous: a
-  `Device` or `Node` structure cannot be freed until `Runtime::poll` has
-  returned from every cancelled transfer's callback. `aoahid_device_open`
-  reserves capacity in both `context->devices` and `context->graveyard` up
-  front (`src/api/c_api_device.cpp`), and `aoahid_device_close` waits within its
-  `drain_timeout_ms` budget (`commit 26bc5c5`) before moving an undrained
-  `Device` graph to `context->graveyard` without allocating.
-  *Rejected alternatives:* Freeing `Device` or `Node` memory immediately on a
-  timed-out cancel (which would cause a use-after-free when libusb delivers the
-  cancellation callback), or parking a `Device` in the graveyard in
-  internal-thread mode without first waiting for an in-progress callback return
-  (`commit 26bc5c5`).
-- **Pre-allocating all host state before AOA request 54 (`src/api/c_api_node.cpp`).**
-  In `aoahid_node_open`, `initialize_node_state`, `device->nodes.reserve`,
-  `retain_spec`, and `set_reservation` all run before `register_hid` sends AOA
-  request 54 (`ACCESSORY_REGISTER_HID`). Publishing the registered `Node` into
-  `device->nodes` afterward is a non-allocating pointer push.
-  *Rejected alternative:* Allocating or growing `device->nodes` after request
-  54 succeeds, which could fail under OOM and leave an orphaned HID ID
-  registered inside Android's `f_accessory` driver (`src/api/c_api_node.cpp`).
-- **Separate ` [[gnu::noinline]] ` / `__declspec(noinline)` neutralizers per profile (`src/profiles/state.cpp`, commits `297729f`, `26c7153`, `963548f`).**
-  `make_neutral` dispatches to a separate `AOAHID_NOINLINE` helper for each
-  `NodeState` variant arm (`neutralize_keyboard`, `neutralize_mouse`, etc.).
-  *Rejected alternative:* Inlining all `NodeState` neutralization arms into a
-  single function, which caused GCC 14 `-O3` to unify value-range analysis
-  across sibling `std::variant` arms and emit a false-positive
-  `-Wstringop-overflow` error (`commits 26c7153`, `963548f`).
+### Setup packet written once per slot
+
+**Decision:** Each pool slot's setup packet is filled at open
+(`libusb_fill_control_setup`, request 57, wValue 0); `Device::acquire` writes
+only wValue (the HID ID) and wLength per report. Free slots are a
+`std::vector<Slot*>` used as a stack (`free_stack`): `acquire` takes the last
+one and a completion pushes it back.
+
+**Reason:** Commit `15a6491`: "The transport no longer rewrites the setup
+fields acquire() already wrote." Why the free slots are reused last-in
+first-out is not recorded.
+
+**Rejected:** Rewriting the unchanging setup fields per submission
+(`15a6491`).
+
+### Byte-wise serialization and a plain spinlock
+
+**Decision:** `store_bits` (`src/profiles/state.cpp`) packs and checks report
+fields a byte at a time. `StateGuard` (`src/transport/transport.cpp`) is a
+plain `std::atomic_flag` `test_and_set` loop around the pool and counter
+updates.
+
+**Reason:** Commit `15a6491` measured byte-wise packing as "about 2.9 times
+faster for a 16-contact touchscreen report; the bytes on the wire are
+unchanged". Commit `0f7739e` reverted a pause/yield backoff in `StateGuard` and
+a byte-aligned fast path in `store_bits` because they were "implemented from a
+plan document's claims about bottlenecks, not from profiling this codebase".
+
+**Rejected:** The `StateGuard` backoff and the `store_bits` fast path
+(`0f7739e`).
+
+### Two-pass descriptor emission and span padding
+
+**Decision:** `build_generated_spec` runs the profile's emit function twice,
+first counting and then into a buffer of exactly that size, and
+`DescriptorBuilder::variable` pads to the next byte when a field would touch a
+fifth byte (HID 1.11 section 8.4, as the code comment says).
+
+**Reason:** Commits `3a7c30d` and `61d7d2c` ("accept every field width
+combination"): a valid field of 1 to 32 bits must not be refused because of
+where earlier fields ended. Why the length is counted in a first pass instead
+of grown is not recorded.
+
+**Rejected:** Refusing width combinations whose offsets made a field cross a
+fifth byte (`3a7c30d`, `61d7d2c`).
+
+### Room in the graveyard reserved at open
+
+**Decision:** `aoahid_device_open` reserves room in `context->devices` and
+`context->graveyard` (`src/api/c_api_device.cpp`), so moving an undrained
+Device graph to the graveyard at close cannot allocate. `aoahid_device_close`
+first waits within its `drain_timeout_ms` for the transfers to drain.
+
+**Reason:** The code comment: "This keeps close teardown recoverable even
+under OOM." `libusb_cancel_transfer` "returns immediately, but this does not
+indicate cancellation is complete"
+([libusb asynchronous I/O](https://libusb.sourceforge.io/api-1.0/group__libusb__asyncio.html),
+retrieved 2026-11-10), so the graph must outlive the close. Commit
+`26bc5c5` made Device close wait for the drain in internal-thread mode
+instead of parking a Device that had already drained.
+
+**Rejected:** Parking a drained Device in the graveyard (`26bc5c5`).
+
+### Host state allocated before request 54
+
+**Decision:** In `aoahid_node_open` (`src/api/c_api_node.cpp`),
+`initialize_node_state`, `device->nodes.reserve`, `retain_spec` and
+`set_reservation` all run before `register_hid` sends request 54, so
+publishing the registered Node is a push that cannot allocate.
+
+**Reason:** The code comment: "After Android accepts a registration,
+publishing the Node into this pre-reserved vector cannot allocate or orphan
+it."
+
+
+**Rejected:** None recorded.
+
+### One neutralizer function per profile
+
+**Decision:** `make_neutral` (`src/api/node_ops.cpp`) calls a separate
+`AOAHID_NOINLINE` function for each `NodeState` alternative
+(`neutralize_keyboard`, `neutralize_mouse`, `neutralize_gamepad`,
+`neutralize_touch`, `neutralize_pen`).
+
+**Reason:** Commits `297729f`, `26c7153` and `963548f`: with every
+alternative inlined into one function, GCC 14 at `-O3` reported a false
+`-Wstringop-overflow`, which `-Werror` turns into a build failure. Spelling
+the hint `[[gnu::noinline]]` then broke MSVC under `/WX` (C5030 becomes C2220),
+so `AOAHID_NOINLINE` expands to `__declspec(noinline)` there and
+`__attribute__((noinline))` elsewhere.
+
+**Rejected:** One function with every alternative inlined.
 
 ## Tests and checks
 
@@ -385,4 +415,4 @@ differ only in the copyright line).
   `libusb_claim_interface` ("a purely logical operation; it does not cause any
   requests to be sent over the bus"):
   <https://libusb.sourceforge.io/api-1.0/group__libusb__dev.html>, retrieved
-  2026-10-04.
+  2026-11-10.
