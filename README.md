@@ -2,13 +2,20 @@
 
 [Canonical repository](https://github.com/nemarpuc/libaoahid)
 
-Send keyboard, mouse, gamepad, touchscreen, touchpad, pen, and media-key input from a PC to
-an Android device over a plain USB cable. The device needs no root, no app,
-and no USB debugging: it sees an ordinary USB keyboard or touchscreen.
-Windows and Linux, and macOS builds that are not yet tested with a device;
-usable from C, C++, Python, C#, and Rust. It sends input only: nothing comes
-back from the phone. The phone must support AOA version 2, which discovery
-reports.
+Send keyboard, mouse, gamepad, touchscreen, touchpad, pen, and media-key input
+from a PC to an Android device over a plain USB cable. The device needs no
+root, no app, and no USB debugging: it sees an ordinary USB keyboard or
+touchscreen. Windows and Linux, plus macOS builds that are not yet tested with
+a device; usable from C, C++, Python, C#, and Rust. MIT licensed.
+
+`libaoahid` is a C++20 library with a stable C ABI. It drives the HID feature
+of [Android Open Accessory 2.0](https://source.android.com/docs/core/interaction/accessories/aoa2)
+over libusb. You describe each input device (ranges, bit widths, Report IDs,
+Usages), starting from initializers that fill in values that work with a
+current Android phone; the library builds a valid HID descriptor, registers it
+with Android, and keeps the report state machines (multi-touch contacts, key
+rollover, pointer deltas) correct. A required value left zero is refused, never
+guessed.
 
 Sister library of [`libmimhid`](https://github.com/nemarpuc/libmimhid), which
 sends the same kind of input to any USB target (a PC, a console, and so on)
@@ -18,188 +25,99 @@ changes; see [Moving between libaoahid and libmimhid](https://github.com/nemarpu
 
 https://github.com/user-attachments/assets/f6a93ffe-34ea-438b-a09f-d6c55a1f5e23
 
-`libaoahid` is a C++20 library with a stable C ABI. It drives the HID feature
-of [Android Open Accessory 2.0](https://source.android.com/docs/core/interaction/accessories/aoa2)
-over libusb. You describe each input device (ranges, bit widths, Report IDs,
-Usages), starting from initializers that fill in values that work with a
-current Android phone; the library builds a valid HID descriptor, registers it
-with Android, and keeps the report state machines (multi-touch contacts,
-key rollover, pointer deltas) correct. A required value left zero is refused,
-never guessed. MIT licensed.
+An introduction to how the library works and why it was built is
+[on DEV](https://dev.to/nemarpuc/libaoahid-a-c-abi-library-for-sending-hid-input-to-android-over-usb-1h6f).
 
-For an overview of how the library works and why it was built, see
-[the introduction on DEV](https://dev.to/nemarpuc/libaoahid-a-c-abi-library-for-sending-hid-input-to-android-over-usb-1h6f).
+## What it is not
 
-## Hardware status
+- **Not two-way.** It sends Input reports only; nothing comes back from the
+  phone (no keyboard LEDs, no rumble, no Feature reports). AOA defines no
+  request for them ([PROTOCOL.md](docs/PROTOCOL.md#input-only)).
+- **Not for every phone.** The phone must support AOA version 2, which
+  discovery reports. Other Android versions, OEMs and kernels than the ones in
+  [TARGET_MATRIX.md](docs/TARGET_MATRIX.md) have not been tested.
+- **Not a scheduler.** The library never retries, never waits for
+  re-enumeration, and generates no key repeat, debounce or other timed action.
+  Every wait is an argument of the call that waits.
+- **Not a source of defaults.** It infers no product or target value; the
+  `*_init` functions in the header fill in one working set, and you change
+  what differs.
 
-Tested on a Samsung Galaxy Tab S11 and a POCO F6 Pro, from Windows 10 x64 and
-Arch Linux:
+## Install
 
-| Input | Tested on hardware |
-|---|---|
-| Touchscreen (multi-touch) | yes |
-| Touchpad (slide, click) | yes |
-| Keyboard (full NKRO) | yes |
-| Mouse (move, buttons, wheel) | yes |
-| Gamepad (sticks, buttons, D-pad) | yes |
-| Media keys (volume, play/pause, next/previous) | yes |
-| Pen (stylus, buttons, eraser, pressure, tilt) | yes |
-| Digitizer (stylus, buttons, eraser, pressure, tilt) | yes |
-| Battery report (on a keyboard) | registered; level not read back |
-| Raw report | not yet |
+Requirements: a C++20 compiler, CMake 3.20 or later, and libusb 1.0.30 or
+later (the 1.0 line only; other versions are refused when a Context is
+created). On Windows the phone needs a WinUSB-class driver
+([PORTING.md](docs/PORTING.md#windows)).
 
-Details per device and OS are in [TARGET_MATRIX.md](docs/TARGET_MATRIX.md).
+- **Release archive.** Each GitHub [Release](https://github.com/nemarpuc/libaoahid/releases)
+  publishes **exactly 10 uploaded assets**: six binary archives
+  (`libaoahid-X.Y.Z-<platform>-<arch>[-ubuntu22.04].tar.gz` or `.zip`), one
+  SPDX 2.3 SBOM (`libaoahid-X.Y.Z.spdx.json`), the source archive,
+  `release-manifest.json`, and `SHA256SUMS`. Each binary archive carries both
+  shared and static libraries, headers, CMake and pkg-config files, and the
+  libusb runtime ([RELEASES.md](docs/RELEASES.md)).
+- **CMake.** `find_package(aoahid CONFIG REQUIRED COMPONENTS shared)` or
+  `COMPONENTS static` (or both), then link `aoahid::aoahid` or
+  `aoahid::aoahid_static`. A `0.1` request is met by a 0.1.x install only.
+- **pkg-config.** `pkg-config --cflags --libs aoahid` for the shared library,
+  `pkg-config --static --cflags --libs aoahid-static` for the static one.
+- **vcpkg.** There is no libaoahid port. The repository's `vcpkg.json`
+  manifest installs libusb for a source build.
+- **From source.** `cmake --preset release && cmake --build --preset release`
+  builds against the system libusb; `cmake --preset dev` builds and tests
+  against the bundled fake libusb with no USB hardware ([BUILDING.md](docs/BUILDING.md)).
 
-## Build
-
-Requirements: CMake 3.20+, a C++20 compiler, and libusb 1.0.30 or later
-(1.0.x only; other major/minor versions are rejected at load time). Shared and
-static libraries are selected with explicit switches. Prebuilt archives are on
-the [Releases](https://github.com/nemarpuc/libaoahid/releases) page. On
-Windows the phone also needs a WinUSB-class driver; see
-[Windows drivers](#windows-drivers).
-
-```sh
-cmake -S . -B build -DAOAHID_BUILD_SHARED=ON -DAOAHID_BUILD_STATIC=ON
-cmake --build build --config Release
-cmake --install build --prefix staging --config Release
-```
-
-For deterministic transport tests, configure with
-`-DAOAHID_USE_FAKE_LIBUSB=ON -DAOAHID_BUILD_TESTS=ON`, build, and then run
-`ctest --test-dir build -C Release --output-on-failure`. The fake backend is
-test code and is never enabled in a release build.
-
-`AOAHID_BUILD_TESTS` and `AOAHID_BUILD_EXAMPLES` are off by default.
-`AOAHID_WERROR` (on by default) makes compiler warnings errors in the library, the tests and the
-ABI checks; turn it off when a newer compiler than CI's warns about code that is correct.
-`examples/CMakeLists.txt` also builds the examples against an installed package on its own.
-
-### Sanitizers and allocation checks
-
-`cmake --preset tsan` (then build and `ctest --preset tsan`) builds the library,
-tests, and examples with ThreadSanitizer against the fake libusb backend;
-[PORTING.md](docs/PORTING.md#threadsanitizer) lists what it requires. Use a
-normal optimized build for timing. The test suite also checks that a prewarmed
-caller-poll keyboard update/submit/completion cycle performs no C++ heap
-allocation and takes no Context or Node mutex. These are host-side checks, not
-end-to-end USB latency numbers; see [LATENCY.md](docs/LATENCY.md).
-
-## Use
-
-New to a real device? [QUICKSTART.md](docs/QUICKSTART.md) is a step-by-step
-walkthrough covering cables and hubs, Linux udev permissions, the Windows `adb`
-conflict, and small programs under [examples/c/verify/](examples/c/verify)
-built to be watched (typing text, dragging on the touchscreen, moving the mouse
-in circles), so you can confirm a real phone reacts before writing product
-code. The complete C session, with reconnection and threads, is
-[examples/c/multi_profile.c](examples/c/multi_profile.c); for a single profile in
-isolation, [examples/c/profiles/](examples/c/profiles) has one self-contained
-program per HID profile kind and one for the battery report, all ten of which
-run without a device.
-
-In outline: create a context, discover and select a device, open it in its
-current USB mode (or first switch it with `aoahid_accessory_start`), build
-immutable specs and register each as its own HID node, update state and submit
-reports, then close nodes, device and context. Every step is an explicit call;
-the library never waits for re-enumeration and never retries. The steps in
-order, with their requests, are in [API.md](docs/API.md#open-sequence). Typing
-one key on the first phone found, with the error checks left out (every call
-returns an `aoahid_result`):
+## First program
 
 ```c
-#include "aoahid.h"
+#include <aoahid.h>
 
 int main(void) {
-    aoahid_context_options context_options;
-    aoahid_context_options_init(&context_options);
-    aoahid_context* context = NULL;
-    aoahid_context_create(&context_options, &context);
+    aoahid_context_options ctx_opts;
+    aoahid_device_options dev_opts;
+    aoahid_keyboard_options kb_opts;
+    aoahid_node_options node_opts;
+    aoahid_context_options_init(&ctx_opts);
+    aoahid_device_options_init(&dev_opts);
+    aoahid_keyboard_options_init(&kb_opts);
+    aoahid_node_options_init(&node_opts);
 
-    aoahid_discovery* discovery = NULL;
-    aoahid_discover(context, AOAHID_CONTROL_TIMEOUT_MS, &discovery);
-    aoahid_device_options device_options;
-    aoahid_device_options_init(&device_options);
-    aoahid_device* device = NULL;
-    aoahid_device_open(context, aoahid_discovery_get(discovery, 0), &device_options, &device);
-    aoahid_discovery_destroy(discovery);
+    aoahid_context *ctx = NULL;
+    aoahid_discovery *disc = NULL;
+    aoahid_device *dev = NULL;
+    aoahid_spec *spec = NULL;
+    aoahid_node *kb = NULL;
 
-    aoahid_keyboard_options keyboard;
-    aoahid_keyboard_options_init(&keyboard);
-    aoahid_spec* spec = NULL;
-    aoahid_spec_create_keyboard(&keyboard, &spec);
-    aoahid_node_options node_options;
-    aoahid_node_options_init(&node_options);
-    aoahid_node* node = NULL;
-    aoahid_node_open(device, spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS, &node);
-    aoahid_spec_release(spec); /* the Node keeps its own reference */
-    /* Give Android about 100 ms to register the keyboard before the first report. */
+    if (aoahid_context_create(&ctx_opts, &ctx) == AOAHID_OK &&
+        aoahid_discover(ctx, AOAHID_CONTROL_TIMEOUT_MS, &disc) == AOAHID_OK &&
+        aoahid_discovery_count(disc) > 0 &&
+        aoahid_device_open(ctx, aoahid_discovery_get(disc, 0), &dev_opts, &dev) == AOAHID_OK &&
+        aoahid_spec_create_keyboard(&kb_opts, &spec) == AOAHID_OK &&
+        aoahid_node_open(dev, spec, &node_opts, AOAHID_CONTROL_TIMEOUT_MS, &kb) == AOAHID_OK) {
+        /* Wait ~100 ms in real code so Android's input reader attaches first. */
+        aoahid_keyboard_key(kb, 0x04, 1); /* Keyboard a and A */
+        aoahid_node_submit_blocking(kb, AOAHID_SEND_TIMEOUT_MS);
+        aoahid_keyboard_key(kb, 0x04, 0);
+        aoahid_node_submit_blocking(kb, AOAHID_SEND_TIMEOUT_MS);
+    }
 
-    aoahid_keyboard_key(node, 0x04, 1); /* Keyboard a */
-    aoahid_node_submit_blocking(node, AOAHID_SEND_TIMEOUT_MS);
-    aoahid_keyboard_key(node, 0x04, 0);
-    aoahid_node_submit_blocking(node, AOAHID_SEND_TIMEOUT_MS);
-
-    aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
-    aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
-    aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    if (kb != NULL) aoahid_node_close(kb, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    if (spec != NULL) aoahid_spec_release(spec);
+    if (dev != NULL) aoahid_device_close(dev, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    if (disc != NULL) aoahid_discovery_destroy(disc);
+    if (ctx != NULL) aoahid_context_destroy_blocking(ctx, AOAHID_CONTROL_TIMEOUT_MS,
+                                                     AOAHID_DRAIN_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     return 0;
 }
 ```
 
-The C header is [include/aoahid.h](include/aoahid.h). The optional C++ header
-forwards every C function under namespace `aoahid` and adds functions that
-return initialized options, plus owning pointers for Specs and discovery
-snapshots. Python ctypes, C# P/Invoke, and Rust `-sys` plus typed wrappers live
-under `bindings/`; they preserve the C layout. The initializers are inline C,
-so a binding sets every field itself ([docs/API.md](docs/API.md#initial-values)
-lists the values).
-
-Every wait is an argument of the call that waits, and a required value or
-timeout of zero is refused with `AOAHID_ERR_UNSET_FIELD`
-([API.md](docs/API.md#timeouts)). `aoahid_device_open` never switches modes;
-devices whose firmware accepts AOA HID requests only after `ACCESSORY_START`
-are reached with `aoahid_accessory_start`
-([API.md](docs/API.md#switching-a-device-to-accessory-mode),
-[PROTOCOL.md](docs/PROTOCOL.md)).
-
-## ADB on the same phone
-
-Both `adb` and libaoahid want the phone's USB interfaces. On Windows a USB
-device can be opened by only one process, so `adb` and a libaoahid application
-cannot both hold the same phone. The companion library
-[aoahid_adb_proxy](https://github.com/nemarpuc/aoahid_adb_proxy) solves this
-from inside your application: it opens the phone's ADB interface as a Channel on
-the application's own USB handle and serves it on a loopback TCP port. Then
-
-```sh
-adb connect 127.0.0.1:6555
-```
-
-reaches the phone while HID reports keep using endpoint 0. Keep the port
-outside 5555-5585, which the adb server scans for emulators. Without the proxy,
-run `adb kill-server` before starting your program (see
-[QUICKSTART.md](docs/QUICKSTART.md#4-windows-adb-or-a-manufacturer-driver-can-block-you)).
-On Linux an `adb` server rarely blocks libaoahid. The Channel calls themselves
-are in [API.md](docs/API.md#bulk-channels).
-
-## Windows drivers
-
-On Windows, libusb can use a phone only through WinUSB (or libusbK / libusb0).
-HID alone (control transfers) worked with Samsung's own driver on the Galaxy
-Tab S11, but its ADB interface (a bulk interface) did not until the whole
-device was switched to WinUSB; the POCO F6 Pro had WinUSB from the start. If a
-phone cannot be opened, or you open a bulk interface, replacing the whole
-device's driver with WinUSB in [Zadig](https://zadig.akeo.ie/) may fix it. That
-is not guaranteed on every phone. The full story is in
-[PORTING.md](docs/PORTING.md#windows).
+[QUICKSTART.md](docs/QUICKSTART.md) takes you from a fresh checkout to a phone
+reacting to the verification programs under `examples/c/verify/`.
+[EXAMPLES.md](docs/EXAMPLES.md) walks through every C, C++, Python, C#, and
+Rust example (`examples/c/multi_profile.c`, `include/aoahid.hpp`).
 
 ## Profiles
-
-The library builds nine kinds of HID profile, plus a battery report that any
-of them can carry. The table classifies each one and says what a target still
-has to confirm; what has been tested on real phones is in
-[Hardware status](#hardware-status).
 
 <!-- profile-table:start -->
 | Profile | Manifest status | Input | Output | Feature transport | Qualification |
@@ -219,141 +137,56 @@ has to confirm; what has been tested on real phones is in
 | Validated raw descriptor | unknown | yes | no | no | Explicit no-Android-support acknowledgement |
 <!-- profile-table:end -->
 
-"Manifest status" is the library's own classification of how portable a
-descriptor shape is across Android targets; it is reported at runtime by the
-Spec and Node manifests. The table is generated from those manifests by
-`tools/generate-support-table/generate.py`. Hardware results are in
-[Hardware status](#hardware-status).
+What each profile derives for you and what you specify is in [PROFILES.md](docs/PROFILES.md).
 
-### What the library handles for you
+## Verification status
 
-Each profile derives the report mechanics from its immutable Spec; the product
-and target values are what its options say (the `*_init` functions fill in one
-working set).
+- Hardware: touchscreen, touchpad, keyboard, mouse, gamepad, Consumer Control media keys, pen and digitizer took effect on a Samsung Galaxy Tab S11 and a POCO F6 Pro (pen, digitizer and touchpad on the Tab S11 under Arch Linux only), from Windows 10 x64 and Arch Linux, in 2026-09 and 2026-10.
+- Release 0.1.0 itself is not hardware-verified: the API around the verified transport and profiles has changed since ([CHANGELOG.md](CHANGELOG.md)).
+- Not tested on hardware: raw reports, the System Control, Camera and Telephony toggles, the battery level, and macOS.
+- Every unit and `sim` test runs in CI against a deterministic fake libusb, with ASan, UBSan and ThreadSanitizer builds and an 87% line / 75% branch coverage floor.
+- [VERIFICATION.md](docs/VERIFICATION.md) has the feature-by-layer table and how to reproduce each check.
 
-| Profile | Derived by the library | You specify |
-|---|---|---|
-| Keyboard | Modifier routing and a full N-Key Rollover bitmap: every declared key has its own bit, so any number of simultaneous keys is reported. | Key Usage range, Report ID, layout, locale, IME behavior. |
-| Mouse | Signed 64-bit pending totals for X, Y, Wheel, and AC Pan, split into in-range report fragments; a fragment is consumed only when its transfer completes. | Axis ranges and widths, button count, Wheel/Pan presence, Report ID. |
-| Consumer, System, Camera, Telephony | One allow-listed field per press; press/release/tap produce the `1` then `0` sequence each HID control type expects. | Each allowed Usage and its semantics, Report ID. |
-| Gamepad | D-pad directions become the eight Hat values plus Null (`15`); adjacent pairs become diagonals, opposite pairs are rejected. Raw four-bit D-pad and no-D-pad modes are also available. | Axes (role, range, width, neutral), buttons, D-pad form, Report ID. |
-| Touchscreen / touchpad | Contact Count, multi-report frames, Tip=0 release records with stable Contact IDs, Scan Time, packet sequencing. | Coordinate ranges, maximum contacts, contacts per report, optional fields. |
-| Pen, Digitizer | Tip/pressure consistency, out-of-range normalization, automatic leave-and-re-enter when switching pen/eraser. | Coordinate and optional-field ranges, hover/eraser/barrel options. |
-| Battery report | A second Input report inside any profile, sent only when the level changed and no input report is waiting. | Range, width, both Report IDs. |
-| Raw Input | Only length, Report ID, and padding are checked against your descriptor. | Descriptor and report bytes. |
+## ADB on the same phone
 
-A state change is kept until its report is accepted; a conflicting change
-before then returns `AOAHID_ERR_BUSY` instead of being merged. See
-[PROFILES.md](docs/PROFILES.md) for the exact contract of each profile.
-
-## Releases
-
-A pushed `v*` tag runs the gate before creating a GitHub Release. The release
-matrix produces and architecture-checks:
-
-- Linux x86_64 and AArch64 shared objects and static archives;
-- Windows x86_64 and ARM64 DLLs, import libraries, and static archives;
-- macOS arm64 and x86_64 dynamic libraries and static archives;
-- headers, relocatable CMake/pkg-config metadata, notices, checksums, and an
-  SPDX SBOM.
-
-For version `X.Y.Z`, the GitHub Release contains exactly 10 uploaded assets:
-
-- six archives, one per platform: `libaoahid-X.Y.Z-linux-{x86_64,aarch64}-ubuntu22.04.tar.gz`,
-  `libaoahid-X.Y.Z-macos-{arm64,x86_64}.tar.gz`, and
-  `libaoahid-X.Y.Z-windows-{x86_64,arm64}.zip`;
-- one SPDX 2.3 SBOM, `libaoahid-X.Y.Z.spdx.json`, with one package per archive
-  (its SHA-256 and every file it contains, each with its own license) and the
-  source archive they are built from;
-- the deterministic tagged-tree archive `libaoahid-X.Y.Z-source.tar.gz`;
-- `release-manifest.json` and `SHA256SUMS`.
-
-GitHub also displays its automatically generated source-code links separately;
-the uploaded `*-source.tar.gz` is the release workflow's byte-validated archive
-and is covered by `release-manifest.json` and `SHA256SUMS`.
-
-Each archive carries both flavours of libaoahid from one build: the shared
-library (`libaoahid.so.X.Y.Z`, `libaoahid.X.Y.Z.dylib`, or `aoahid.dll` with
-`aoahid.lib`) and the static one (`libaoahid_static.a` or
-`aoahid_static.lib`), with the headers, the libusb runtime the shared library
-loads, and the libusb header and link library a static link needs. Its CMake
-package provides both components, so `find_package(aoahid CONFIG REQUIRED
-COMPONENTS shared)` or `COMPONENTS static` (or both) work from the same
-unpacked directory, and pkg-config has `aoahid` (shared) and `aoahid-static`
-(use with `--static`). To deploy next to an application that is already built,
-take the libraries from the archive: it carries the license set for both -
-`LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, libusb's LGPL-2.1 text, and
-libusb's official corresponding source archive. No bare `.so` or `.dll` is
-published on its own, because an asset that ships the libusb runtime has to
-carry libusb's license and corresponding source in the same distribution unit.
-
-`release.yml` can also be started by hand (`workflow_dispatch`, `dry_run`
-true): it validates, builds, packages, and assembles the whole set with every
-check, takes the version from the newest dated `CHANGELOG.md` section, and
-keeps the result as the `release-dist` workflow artifact. A dry run creates no
-GitHub Release and publishes nothing to a registry.
-
-Platform baselines: Linux archives require at most glibc 2.35
-([PORTING.md](docs/PORTING.md#release-baseline)); macOS archives target macOS 11,
-are signed ad hoc and not notarized, and have not been run against a phone
-([PORTING.md](docs/PORTING.md#macos)); Windows archives use the MSVC dynamic
-runtime (`/MD`), so deploy the architecture-matching Visual C++ v14
-Redistributable as well as the libusb runtime included next to the DLL. The
-Python wheel and NuGet package contain no native libraries, so install the
-version-matched archive as well. How the release workflow and registry
-publication work is in [INTERNALS.md](docs/INTERNALS.md#version-and-release).
+On Windows only one process can open a USB device. The companion library
+[aoahid_adb_proxy](https://github.com/nemarpuc/aoahid_adb_proxy) opens the
+phone's ADB interface as a Channel ([API.md](docs/API.md#bulk-channels)) and
+serves it on a loopback TCP port (`adb connect 127.0.0.1:6555`, outside the
+5555–5585 emulator scan range); otherwise run `adb kill-server` first
+([QUICKSTART.md](docs/QUICKSTART.md#4-windows-adb-or-a-manufacturer-driver-can-block-you)).
 
 ## Documentation
 
 | Document | Contents |
 |---|---|
 | [QUICKSTART.md](docs/QUICKSTART.md) | First run on a real device: cables, permissions, drivers, verification programs |
+| [BUILDING.md](docs/BUILDING.md) | Requirements, CMake options and presets, tests, sanitizers, coverage, using the installed package |
 | [API.md](docs/API.md) | C API reference: objects, options, errors, every function |
 | [PROFILES.md](docs/PROFILES.md) | Descriptor and state-machine contract of each profile |
 | [EXAMPLES.md](docs/EXAMPLES.md) | Walkthrough of the example programs in C, C++, Python, C#, and Rust |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Object model, threading, send path, source layout |
-| [INTERNALS.md](docs/INTERNALS.md) | Implementation notes for contributors: ownership, locks, teardown, descriptor generation, release tooling |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Object model, threading, send path, design decisions |
+| [INTERNALS.md](docs/INTERNALS.md) | For contributors: ownership, locks, teardown, descriptor generation, release tooling |
 | [PROTOCOL.md](docs/PROTOCOL.md) | How AOA 2.0 HID works and how Android handles the device |
-| [LIMITS.md](docs/LIMITS.md) | Numeric limits and validation rules |
-| [LATENCY.md](docs/LATENCY.md) | Latency behavior, tuning, and what the tests measure |
+| [LIMITS.md](docs/LIMITS.md) | Numeric limits, validation rules, and known platform differences |
+| [LATENCY.md](docs/LATENCY.md) | Latency behavior, what the tests show, and how to measure |
 | [PORTING.md](docs/PORTING.md) | Platform notes: Linux udev, Windows drivers, macOS, other hosts |
-| [TARGET_MATRIX.md](docs/TARGET_MATRIX.md) | Hardware test results |
+| [TARGET_MATRIX.md](docs/TARGET_MATRIX.md) | Hardware test results per device, host and profile |
+| [VERIFICATION.md](docs/VERIFICATION.md) | What is verified, in which layer, and how to reproduce it |
+| [RELEASES.md](docs/RELEASES.md) | Release assets, archive contents, platform baselines, licenses |
+| [CHANGELOG.md](CHANGELOG.md) | Changes per release, with the hardware-verification status of each |
 
 ## License
 
-`libaoahid` itself is **MIT** licensed. The full text is in
-[LICENSE](LICENSE); the SPDX identifier is `MIT`. The Python and C# bindings
-carry the same MIT license and ship a copy of that file inside their packages.
-
-libusb is a **separate work under LGPL-2.1-or-later**. It is never statically
-absorbed into `libaoahid`: every release links it dynamically, including the
-static libaoahid in every archive (`static` describes `libaoahid` itself, not
-libusb). Each binary archive therefore also carries libusb's own license and
-its official source tarball under
-`share/doc/libaoahid/third-party/`.
-
-| What you receive | License | Where the text is |
-|---|---|---|
-| `libaoahid` library, headers, bindings, examples | MIT | `LICENSE` |
-| `libusb-1.0` runtime shipped in release archives | LGPL-2.1-or-later | `share/doc/libaoahid/third-party/libusb-copyright` |
-| vcpkg port files bundled in Windows archives | MIT (Microsoft) | `share/doc/libaoahid/third-party/vcpkg-LICENSE.txt` |
-
-Every first-party source file carries its own
-`SPDX-License-Identifier: MIT` and copyright line, so a single file stays
-identifiable after it is copied out of this repository;
-`tools/check_license_headers.py` enforces that in CI. The release SBOM, and the
-SPDX document inside each archive, state the license of every packaged file individually rather than
-`NOASSERTION`. Redistributing a release archive unchanged satisfies both
-licenses as shipped. If you relink against a modified libusb, the LGPL
-obligations apply to that copy. [NOTICE](NOTICE) and
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) record the exact versions and
-checksums.
+`libaoahid`, its headers, bindings and examples are MIT licensed ([LICENSE](LICENSE)).
+libusb is a separate work under LGPL-2.1-or-later that every release links
+dynamically, including the static `libaoahid`; each binary archive carries
+libusb's license and official source ([RELEASES.md](docs/RELEASES.md#licenses)).
 
 ## AI disclosure
 
 Most of the code, tests, and documentation in this repository were written by
 an AI coding assistant. Architecture and design decisions, hardware
 verification steps, debugging, and review of the AI's output were done by a
-human. Hardware results are listed in
-[TARGET_MATRIX.md](docs/TARGET_MATRIX.md); review the code before relying on
-it for anything security- or safety-relevant.
+human. Hardware results are listed in [TARGET_MATRIX.md](docs/TARGET_MATRIX.md);
+review the code before relying on it for anything security- or safety-relevant.
