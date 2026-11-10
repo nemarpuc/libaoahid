@@ -81,10 +81,12 @@ signed:   -2^(w-1) .. 2^(w-1) - 1
 The logical range must fit the width. The width is always explicit; it is not
 derived from the range.
 
-## Linux HID values
+## Linux HID values {#linux-hid-values}
 
 These are values in one kernel revision, Android common kernel commit
-`35556bed836f8dc07ac55f69c8d17dce3e7f0e25` (2020-09-01). Other kernels may
+`35556bed836f8dc07ac55f69c8d17dce3e7f0e25` (2020-09-01). The battery rows,
+which name versions, were checked in mainline `drivers/hid/hid-input.c` at the
+tags v5.9 to v6.18 ([v6.18](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/hid/hid-input.c?h=v6.18), retrieved 2026-11-10). Other kernels may
 differ; check the same symbols in the kernel you target.
 
 | Symbol or function | Value or behavior | File | Consequence |
@@ -104,9 +106,10 @@ differ; check the same symbols in the kernel you target.
 | `MT_MAX_MAXCONTACT` | 250 | `drivers/hid/hid-multitouch.c` | Upper bound for a Contact Count Maximum Feature value. |
 | `mt_compute_timestamp` | Scan Time delta × 100 | `drivers/hid/hid-multitouch.c` | Scan Time must be in 100 µs units. |
 | `hidinput_setup_battery` | Only with `CONFIG_HID_BATTERY_STRENGTH` | `drivers/hid/hid-input.c` | Without it, Battery Strength is ignored. |
-| `hidinput_update_battery` (v5.10 to v6.12) | Ignores raw 0 and out-of-range values for every battery usage | `drivers/hid/hid-input.c` | A level of 0 is never published when the range starts at 0; start the range at 1. |
-| `hidinput_update_battery` (later) | Ignores out-of-range values, and raw 0 only on the Digitizers page | `drivers/hid/hid-input.c` | Out-of-range values never produce an update, so there is no "unknown" to send. |
-| `hidinput_setup_battery` (through v6.12) | One battery per HID device | `drivers/hid/hid-input.c` | A Spec has at most one battery report. |
+| `hidinput_update_battery` (v5.9 to v6.17) | Ignores raw 0 and out-of-range values for every battery usage | `drivers/hid/hid-input.c` | A level of 0 is never published when the range starts at 0; start the range at 1. |
+| `hidinput_update_battery` (v6.18) | Ignores out-of-range values, and raw 0 only on the Digitizers page | `drivers/hid/hid-input.c` | Out-of-range values never produce an update, so there is no "unknown" to send. |
+| `hidinput_update_battery` (v5.11 to v6.18) | An unchanged level is forwarded at most once in 30 seconds (`battery_ratelimit_time`) | `drivers/hid/hid-input.c` | Not present in v5.10. |
+| `hidinput_setup_battery` (v5.9 to v6.18) | One battery per HID device (`if (dev->battery) return 0;`) | `drivers/hid/hid-input.c` | A Spec has at most one battery report. |
 | `hidinput_connect` | A HID device with no input usages gets no input device, and its power supply is unregistered | `drivers/hid/hid-input.c` | The battery report rides on an input profile; there is no battery-only profile. |
 
 The `linux_hid` fields of `aoahid_device_options` (`descriptor_bytes`,

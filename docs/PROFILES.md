@@ -14,21 +14,12 @@ report rules are from
 
 ## Hardware status
 
-Tested on real hardware (Samsung Galaxy Tab S11 and POCO F6 Pro, from Windows
-10 x64 and Arch Linux hosts):
-
-- Touchscreen
-- Touchpad
-- Keyboard
-- Mouse
-- Gamepad
-- Toggle as Consumer Control media keys
-- Pen
-- Digitizer
-
-Not yet tested on hardware: Raw, and Toggle on the System Control,
-Camera Control, and Telephony pages. See [TARGET_MATRIX.md](TARGET_MATRIX.md)
-for per-target results.
+As recorded in [CHANGELOG.md](../CHANGELOG.md) for 0.1.0: the device profiles
+(Keyboard, Mouse, Toggle, Gamepad, Touchscreen, Touchpad, Pen, Digitizer) were
+verified on a Samsung Galaxy Tab S11 from an Arch Linux host, through devtest
+and kernel `getevent`, before the API reached its 0.1.0 form; 0.1.0 itself is
+not hardware-verified. Raw is not listed there. Per-target detail is in
+[TARGET_MATRIX.md](TARGET_MATRIX.md).
 
 The manifest's `android_status` is a static classification of the descriptor
 form, independent of this testing:
@@ -341,9 +332,12 @@ Touchscreen, with every field and constraint identical, except:
 - Application Collection: Digitizers / Touch Pad (`0x0D/0x05`);
 - `button_count` click buttons (0-65535; 0 for a buttonless clickpad), Button
   page Usages 1..n after Contact Count;
-- `android_status` is always `AOAHID_ANDROID_CONDITIONAL`. Android turns
-  touchpad input into mouse-style pointer motion, and gesture support varies
-  by release and OEM.
+- `android_status` is always `AOAHID_ANDROID_CONDITIONAL`. Android uses a
+  touch pad "for pointing" and shows a pointer for it (a device with
+  `INPUT_PROP_POINTER`), not direct touches
+  ([Android touch devices](https://source.android.com/docs/core/interaction/input/touch-devices),
+  retrieved 2026-11-10); which gestures a target supports is not documented
+  there.
 
 `aoahid_touchpad_contact` takes the same arguments as `aoahid_touchscreen_contact`,
 with `aoahid_touchpad_extra`. `aoahid_touchpad_button(node, button,
@@ -436,12 +430,14 @@ There is no "unknown" to send. Linux drops any battery value outside the
 declared range and reports the level as unknown until the first value arrives,
 so a Node that was never updated sends nothing and the target shows no level.
 
-Use a range that starts at 1 (for example 1 to 100). Linux v5.10 through
-v6.12 ignores a raw value of 0 for every battery usage; later kernels ignore
-it only on the Digitizers page. Linux reports
+Use a range that starts at 1 (for example 1 to 100). Linux v5.9 through
+v6.17 ignores a raw value of 0 for every battery usage; v6.18 ignores it only
+on the Digitizers page. Linux reports
 `(value - minimum) * 100 / (maximum - minimum)` percent. How often to send is
-yours: Linux forwards an unchanged level at most once in 30 seconds, and every
-forwarded change is a `power_supply` uevent.
+yours: from v5.11 on, Linux forwards an unchanged level at most once in 30
+seconds (`hidinput_update_battery` in
+[`drivers/hid/hid-input.c`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/hid/hid-input.c?h=v6.18), retrieved 2026-11-10; see
+[LIMITS.md](LIMITS.md#linux-hid-values)).
 
 Linux reports Battery Strength through its power-supply class only when the
 kernel is built with `CONFIG_HID_BATTERY_STRENGTH`. On Android an app reads

@@ -43,7 +43,7 @@ and `include/uapi/linux/usb/f_accessory.h`. The kernel driver answers request
 `0e3db17d01c94263b629b089c51c7d0988308232` and
 `9b03ed2feb9c4cc3f15d44eda080caabb3a6b843`, retrieved 2026-08-27).
 
-## HID flow
+## HID flow {#hid-flow}
 
 1. **Register** (54, `ACCESSORY_REGISTER_HID`) an ID and announce the descriptor
    length. In `f_accessory.c`, `acc_ctrlrequest` invokes `acc_register_hid(dev,
@@ -77,7 +77,7 @@ Several IDs can be registered at once on `dev->hid_list`, each with its own
 descriptor ([AOA 2.0](https://source.android.com/docs/core/interaction/accessories/aoa2),
 section "HID support").
 
-## Accessory mode vs. the current USB mode
+## Accessory mode vs. the current USB mode {#accessory-mode-vs-the-current-usb-mode}
 
 Requests 52 and 53 switch the phone into accessory mode: it disconnects and
 re-enumerates with Google's vendor ID `0x18D1` (`USB_ACCESSORY_VENDOR_ID`) and a
@@ -118,7 +118,7 @@ defines no control request or endpoint that carries Output or Feature reports
 back to the host. So keyboard LED state, force feedback, and Feature reports
 (such as a touchscreen's maximum contact count) never reach the host.
 libaoahid reflects this: capability manifests report `output_supported = 0` and
-`feature_supported = 0`, and Specs are built around Input reports.
+`feature_transport_supported = 0`, and Specs are built around Input reports.
 
 ## How Android sees the device
 
@@ -131,17 +131,19 @@ there the Linux HID core (`drivers/hid/hid-core.c`, `drivers/hid/hid-input.c`,
 `drivers/hid/hid-multitouch.c`, commit
 `35556bed836f8dc07ac55f69c8d17dce3e7f0e25`, retrieved 2026-08-27) binds a HID
 driver and creates `evdev` `/dev/input/event*` nodes. Android's
-`EventHub::openDeviceLocked` (`frameworks/native/services/inputflinger/reader/EventHub.cpp`)
+`EventHub::openDeviceLocked` ([`EventHub.cpp`](https://android.googlesource.com/platform/frameworks/native/+/4f463a6b1de9198963dc6aff74154a504ba3f8f6/services/inputflinger/reader/EventHub.cpp))
 opens those `evdev` nodes and assigns input device classes, and
 `InputReader::createDeviceLocked`
-(`frameworks/native/services/inputflinger/reader/InputReader.cpp`) attaches the
+([`InputReader.cpp`](https://android.googlesource.com/platform/frameworks/native/+/4f463a6b1de9198963dc6aff74154a504ba3f8f6/services/inputflinger/reader/InputReader.cpp), both at
+`frameworks/native` commit `4f463a6b1de9198963dc6aff74154a504ba3f8f6`,
+retrieved 2026-11-10) attaches the
 input mappers that turn kernel events into Android `KeyEvent` and `MotionEvent`
 streams ([Android Input overview](https://source.android.com/docs/core/interaction/input),
 retrieved 2026-08-27). Which kernel driver binds, and how Android classifies the
 device, depends on the descriptor and on that device's kernel and Android
 version. See [PROFILES.md](PROFILES.md) and [TARGET_MATRIX.md](TARGET_MATRIX.md).
 
-## Host-side caveats
+## Host-side caveats {#host-side-caveats}
 
 - **Windows driver.** On Windows, `libusb`'s WinUSB backend requires `WinUSB`,
   `libusbK`, or `libusb0` (`libusb-win32`) bound to the device or interface
@@ -165,8 +167,9 @@ version. See [PROFILES.md](PROFILES.md) and [TARGET_MATRIX.md](TARGET_MATRIX.md)
   needs write access to the `usbfs` device node, usually through a `udev` rule
   such as `udev/51-aoahid.rules`.
 - **libusb version.** The library requires `libusb` runtime 1.0.30 or later in
-  the 1.0 API line (`libusb_get_version()`, `src/transport/transport.cpp`) and
-  fails `aoahid_context_create` with `AOAHID_ERR_UNSUPPORTED` otherwise.
+  the 1.0 API line (`supported_libusb_runtime(libusb_get_version())` in
+  `src/transport/discovery.cpp`) and fails `aoahid_context_create` with
+  `AOAHID_ERR_UNSUPPORTED` otherwise.
 
 ## What libaoahid does, and where
 
@@ -214,10 +217,12 @@ The request implementations are in `src/transport/discovery.cpp` (51 probe),
     [`services/usb/java/com/android/server/usb/UsbDeviceManager.java`](https://android.googlesource.com/platform/frameworks/base/+/15c8b135d2c41940f53aa77f3d48354bc2e7e2d7/services/usb/java/com/android/server/usb/UsbDeviceManager.java),
     commit `15c8b135d2c41940f53aa77f3d48354bc2e7e2d7`
     (`ACCESSORY_REQUEST_TIMEOUT`), retrieved 2026-09-23.
-  - `platform/frameworks/native`,
-    `services/inputflinger/reader/EventHub.cpp` (`EventHub::openDeviceLocked`)
-    and `services/inputflinger/reader/InputReader.cpp`
-    (`InputReader::createDeviceLocked`), and
+  - `platform/frameworks/native` commit
+    `4f463a6b1de9198963dc6aff74154a504ba3f8f6`,
+    [`services/inputflinger/reader/EventHub.cpp`](https://android.googlesource.com/platform/frameworks/native/+/4f463a6b1de9198963dc6aff74154a504ba3f8f6/services/inputflinger/reader/EventHub.cpp)
+    (`EventHub::openDeviceLocked`) and
+    [`services/inputflinger/reader/InputReader.cpp`](https://android.googlesource.com/platform/frameworks/native/+/4f463a6b1de9198963dc6aff74154a504ba3f8f6/services/inputflinger/reader/InputReader.cpp)
+    (`InputReader::createDeviceLocked`), retrieved 2026-11-10, and
     [Android Input overview](https://source.android.com/docs/core/interaction/input),
     retrieved 2026-08-27.
 - **libusb v1.0.30**, commit `87a55632db62c9bdc58cd31d3ccfa673f1bb017f`:
