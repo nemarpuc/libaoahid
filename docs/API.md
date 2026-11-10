@@ -257,7 +257,7 @@ milliseconds as an argument, and zero is refused with `AOAHID_ERR_UNSET_FIELD`
 before anything is done (nothing is consumed). For libusb a zero timeout
 means none at all ("For an unlimited timeout, use value 0",
 [`libusb_control_transfer`](https://libusb.sourceforge.io/api-1.0/group__libusb__syncio.html),
-retrieved 2026-11-10), so zero cannot mean "unset" and be passed on. A
+retrieved 2026-11-10). A
 timeout is a failure deadline, not a delay: a transfer that completes earlier
 returns immediately. libmimhid follows the same rule with the same argument
 names.
