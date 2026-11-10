@@ -61,8 +61,8 @@ another):
 
 - **`CHANGELOG.md`**: the release entry says whether it was
   hardware-verified, and on what, in one line (as the `[0.1.0]` entry does).
-- **`docs/TARGET_MATRIX.md`**: one row per combination under
-  "Hardware-tested combinations", and the per-profile status.
+- **`docs/TARGET_MATRIX.md`**: the same result, one row per combination
+  under "Recorded results", once the CHANGELOG entry states it.
 - **`docs/LATENCY.md`**: measured figures, with everything they were measured
   on, in a measured table; nothing unmeasured.
 

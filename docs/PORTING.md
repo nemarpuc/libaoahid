@@ -76,16 +76,13 @@ and close Android Studio, Vysor, scrcpy, or anything else that restarts the
 server. To keep `adb` working on the same phone while your application runs,
 use [aoahid_adb_proxy](../README.md#adb-on-the-same-phone).
 
-Some manufacturers bind their own driver instead of WinUSB. On a Samsung Galaxy
-Tab S11 with Samsung's `dg_ssudbus` driver under Windows 10 x64, HID worked
-but `aoahid_channel_open` on the ADB interface failed with
-`AOAHID_ERR_UNSUPPORTED` and libusb status `-12`. Replacing only the ADB or MTP
-interface's driver did not help. Replacing the whole device's driver
-("SAMSUNG Android") with WinUSB in [Zadig](https://zadig.akeo.ie/) did: with
-the whole device on WinUSB, libusb reaches every interface through one WinUSB
-handle. The cost is losing Windows' own functions for that device, such as MTP
-file transfer. To undo it, uninstall the device in Device Manager with its
-driver and reconnect.
+Some manufacturers bind their own driver instead of WinUSB, libusbK or libusb0;
+libusb cannot use an interface bound to another driver
+([PROTOCOL.md](PROTOCOL.md#host-side-caveats)). Replacing the device's driver
+with WinUSB in [Zadig](https://zadig.akeo.ie/) gives libusb access, at the cost
+of Windows' own functions for that device, such as MTP file transfer. To undo
+it, uninstall the device in Device Manager with its driver and reconnect. No
+Windows result is recorded in [CHANGELOG.md](../CHANGELOG.md).
 
 Release archives for Windows x64 and ARM64 are built on native GitHub-hosted
 runners and include the import library and the libusb DLL with its license.

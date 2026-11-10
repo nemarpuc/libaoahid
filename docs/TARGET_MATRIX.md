@@ -1,79 +1,40 @@
 # Target Matrix
 
 This file records which combinations of host, Android device, and profile have
-been confirmed on real hardware, and which have not.
+been confirmed on real hardware, and which have not. It states only what
+[CHANGELOG.md](../CHANGELOG.md) records; a result that is not in a CHANGELOG
+section is not listed here.
 
-## Summary
+## Recorded results
 
-- Confirmed working on real hardware (2026-09, 2026-10): **touchscreen,
-  touchpad, keyboard, mouse, gamepad, pen, digitizer, and media keys (Consumer
-  Control toggle)**.
-- Devices: Samsung Galaxy Tab S11 and POCO F6 Pro (HyperOS).
-- Hosts: Windows 10 x64 (WinUSB and libusbK) and Arch Linux x86_64 (usbfs).
-- Not yet tested on hardware: raw, and the System Control, Camera, and
-  Telephony toggle forms.
+From the CHANGELOG section for 0.1.0 (2026-11-07):
 
-"Confirmed" means the profile was driven through
-[aoahid_player](https://github.com/nemarpuc/aoahid_player) or `devtest`
-and the input took effect on the device, with kernel `getevent` traces
-captured over the ADB proxy where noted.
+- 0.1.0 itself is **not hardware-verified** on a phone in its current form.
+- Before the API reached that form, the transport and the device profiles
+  Keyboard, Mouse, Toggle, Gamepad, Touchscreen, Touchpad, Pen and Digitizer
+  were verified on a Samsung Galaxy Tab S11, from an Arch Linux host, through
+  devtest and kernel `getevent`.
+- The current library is tested against the fake libusb backend (including a
+  ThreadSanitizer build), and the bindings against the compiled C ABI.
 
-## Hardware-tested combinations
-
-| Device | Android build | Host OS / libusb backend | Date |
+| Device | Host | Profiles | Library version |
 |---|---|---|---|
-| Samsung Galaxy Tab S11 | OEM release | Windows 10 x64 / WinUSB, libusbK | 2026-09 |
-| Samsung Galaxy Tab S11 | OEM release | Arch Linux x86_64 / usbfs | 2026-09 |
-| Samsung Galaxy Tab S11 | OEM release (SM-X730) | Arch Linux x86_64 / usbfs | 2026-10 |
-| POCO F6 Pro | HyperOS release | Windows 10 x64 / WinUSB, libusbK | 2026-09 |
-| POCO F6 Pro | HyperOS release | Arch Linux x86_64 / usbfs | 2026-09 |
+| Samsung Galaxy Tab S11 | Arch Linux | Keyboard, Mouse, Toggle, Gamepad, Touchscreen, Touchpad, Pen, Digitizer, and the transport | Before the 0.1.0 API |
 
-On Windows the Samsung tablet needed its whole-device driver replaced with
-WinUSB before a Bulk Channel could open; see [PORTING.md](PORTING.md#windows).
+## Not recorded on hardware {#not-recorded-on-hardware}
 
-## Per-profile status
-
-Unit, descriptor, and golden-byte tests run in CI for every profile. The
-column below is about real devices only.
-
-| Profile | Real hardware |
-|---|---|
-| Touchscreen (multi-touch) | Confirmed on both devices and both hosts |
-| Keyboard (full-NKRO bitmap) | Confirmed on both devices and both hosts |
-| Mouse | Confirmed on both devices and both hosts |
-| Gamepad, Hat switch | Confirmed on both devices and both hosts |
-| Gamepad, raw D-pad fields | Confirmed on both devices and both hosts |
-| Gamepad, no D-pad | Confirmed on both devices and both hosts |
-| Toggle: Consumer Control (media keys) | Confirmed on both devices and both hosts |
-| Toggle: System Control | Not tested |
-| Toggle: Camera | Not tested |
-| Toggle: Telephony | Not tested |
-| Pen | Confirmed on Samsung Galaxy Tab S11 (Arch Linux; devtest + getevent) |
-| Digitizer | Confirmed on Samsung Galaxy Tab S11 (Arch Linux; devtest + getevent) |
-| Touchpad | Confirmed on Samsung Galaxy Tab S11 (Arch Linux; devtest + getevent) |
-| Battery report (on a Keyboard) | Registered on Samsung Galaxy Tab S11 (Arch Linux; kernel 6.6.102-android15, Android 16, 2026-10-11): the kernel creates the power supply and `dumpsys input` lists the device with class `BATTERY` and one battery. The reported level was not read back: sysfs is not readable from the adb shell. A battery-only descriptor got no power supply on the same device. |
-| Raw report | Not tested; the library makes no claim about how Android interprets a raw descriptor |
-
-## Transport and accessory mode
-
-| Behavior | Status |
-|---|---|
-| In the current USB mode (no `ACCESSORY_START`), the device accepts AOA HID requests 54-57 and the input takes effect | Confirmed (both devices, both hosts) |
-| After `aoahid_accessory_start`, the device re-enumerates as `18d1:2d00`, or `18d1:2d01` with USB debugging on, at the same bus and port path | Confirmed (both devices, both hosts) |
-| In accessory mode, requests 54-57 register the HID and deliver input as in the current USB mode | Confirmed (both devices, both hosts) |
-| On Windows, `2d00`/`2d01` binds a libusb-usable driver (WinUSB or libusbK) | Confirmed (both devices) |
-| `GET_PROTOCOL` (request 51) sent by discovery to an accessory-mode device does not disturb the accessory session | Not tested |
-| In the current USB mode, an ADB Bulk Channel (`FF/42/01`) and an AOA HID Node work at the same time on one handle (`aoahid_adb_proxy`) | Confirmed on Samsung Galaxy Tab S11 (Windows 10 x64 after whole-device WinUSB driver replacement, 2026-09; Arch Linux `devtest` + `getevent`, 2026-10) |
-| With `2d01`, an ADB Bulk Channel and an AOA HID Node work at the same time on one handle | Not tested |
-| A zero-length Bulk OUT transfer terminates a write the same way on Linux and Windows | Not tested |
-| A first report that races HID registration STALLs rather than being dropped, so the caller's resend delivers it | Confirmed (Galaxy Tab S11, Arch Linux, 2026-09): request 57 STALLed for 6-16 ms after `aoahid_node_open` returned, then a resend was accepted. Reports accepted in the first milliseconds after that, up to about 60 ms in one run, did not reach `getevent`; see [API.md](API.md) step 5. |
-| HID latency during a large ADB transfer on the same handle stays close to the idle case | Not tested |
-| Unplugging, or `svc usb setFunctions`, returns the device from accessory mode to its normal USB functions | Not tested |
+- The Raw profile, and the battery report.
+- Any host other than Arch Linux: Windows, macOS, Linux on AArch64.
+- Any device other than the Samsung Galaxy Tab S11.
+- Which Toggle pages and Gamepad forms the recorded run covered, and the Bulk
+  Channel (ADB) and accessory-mode paths: the CHANGELOG names "the transport"
+  without listing its parts.
+- Any run of the 0.1.0 API.
 
 Other Android versions, OEMs, and kernels have not been tested. AOA HID support
 in the current USB mode depends on the device kernel; if a device STALLs the
 first `aoahid_node_open`, try `aoahid_accessory_start` (see
-[PROTOCOL.md](PROTOCOL.md)).
+[PROTOCOL.md](PROTOCOL.md#accessory-mode-vs-the-current-usb-mode)).
 
 ## Build targets
 
