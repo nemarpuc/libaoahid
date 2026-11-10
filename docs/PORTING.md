@@ -2,7 +2,7 @@
 
 The public ABI is platform-neutral. Only `src/transport` includes libusb.
 
-## Linux
+## Linux {#linux}
 
 Build against libusb 1.0.30 or newer. At run time, `aoahid_context_create`
 also checks `libusb_get_version()` and accepts only the 1.0 line with micro
@@ -33,7 +33,7 @@ shared library it ships and fails if any `GLIBC_*` requirement is newer than
 `share/doc/libaoahid/glibc-requirements.json`. These archives are not musl or
 generic-Linux builds; musl is built and tested in CI only.
 
-### ThreadSanitizer
+### ThreadSanitizer {#threadsanitizer}
 
 Linux builds with GCC 12 or newer, or Clang, can enable ThreadSanitizer:
 
@@ -52,7 +52,7 @@ is rejected because of a false condition-variable report
 uses GCC 12 with every report enabled. This is a host concurrency check, not
 a release configuration.
 
-## Windows
+## Windows {#windows}
 
 libusb can open a device only when Windows has bound WinUSB, libusbK, or
 libusb0 to it; any other driver makes the claim fail with

@@ -103,7 +103,7 @@ The Python (`bindings/python`), C# (`bindings/csharp`), and Rust
 - **Rust (`aoahid-sys` and `aoahid`).** Built from the repository workspace
   against `AOAHID_LIB_DIR`; crates are not published to `crates.io` yet.
 
-## Licenses
+## Licenses {#licenses}
 
 `libaoahid` is released under the MIT License ([LICENSE](../LICENSE)). Every
 tracked C, C++, Python, C#, Rust, and shell source file carries an

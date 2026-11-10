@@ -205,7 +205,7 @@ once the device disconnects.
 
 See [PROTOCOL.md](PROTOCOL.md) for the request details.
 
-## Device options
+## Device options {#device-options}
 
 `aoahid_device_options` has three kinds of fields; `aoahid_device_options_init`
 fills in all of them.
@@ -273,7 +273,7 @@ A Device teardown that cannot finish inside `aoahid_device_close` (a transfer
 callback has not run yet) is finished by the Context with the
 `control_timeout_ms` of that call.
 
-## Tuning values
+## Tuning values {#tuning-values}
 
 Zero in a required one fails with `AOAHID_ERR_UNSET_FIELD`; the initializers
 fill all of them in. They are the caller's choices, not USB, AOA, Android, ADB,
@@ -380,7 +380,7 @@ that the event thread signals. In caller-poll mode read and write belong to the
 Context's serialized domain, and a waiting call drives libusb events itself.
 Read and write take no lock and do not allocate.
 
-## Submission
+## Submission {#submission}
 
 `aoahid_node_submit(node, send_timeout_ms)` serializes the Node's pending state into a
 pool slot and queues request 57 asynchronously, then returns. In caller-poll mode it may run

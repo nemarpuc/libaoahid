@@ -12,7 +12,7 @@ You need:
 
 ---
 
-## 1. Install the build tools and libusb 1.0.30
+## 1. Install the build tools and libusb 1.0.30 {#1-install-the-build-tools-and-libusb-1030}
 
 libusb 1.0.30 or newer is required on every platform. Without it, CMake stops
 with `libusb headers report LIBUSB_API_VERSION older than 0x0100010C (libusb
@@ -69,7 +69,7 @@ not listed, this library cannot see it either.
 
 ## 3. Give your user access to the USB device
 
-### Linux
+### Linux {#quickstart-linux}
 
 Your distribution may already give the logged-in user access to the phone
 (for example through `uaccess` rules shipped for MTP or ADB). If
@@ -95,7 +95,7 @@ For a quick test you can skip this and run the programs with `sudo`. If a
 program fails with `AOAHID_ERR_ACCESS` but works with `sudo`, the problem is
 USB permissions.
 
-### Windows
+### Windows {#quickstart-windows}
 
 libusb can use the phone only through WinUSB, libusbK, or libusb0
 ([PROTOCOL.md](PROTOCOL.md#host-side-caveats)). Two things commonly get in the

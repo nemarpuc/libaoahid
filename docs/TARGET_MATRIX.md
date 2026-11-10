@@ -5,7 +5,7 @@ been confirmed on real hardware, and which have not. It states only what
 [CHANGELOG.md](../CHANGELOG.md) records; a result that is not in a CHANGELOG
 section is not listed here.
 
-## Recorded results
+## Recorded results {#recorded-results}
 
 From the CHANGELOG section for 0.1.0 (2026-11-07):
 
@@ -36,7 +36,7 @@ in the current USB mode depends on the device kernel; if a device STALLs the
 first `aoahid_node_open`, try `aoahid_accessory_start` (see
 [PROTOCOL.md](PROTOCOL.md#accessory-mode-vs-the-current-usb-mode)).
 
-## Build targets
+## Build targets {#build-targets}
 
 Release archives are built by `.github/workflows/release.yml`, one per target,
 each holding both artifacts:
@@ -58,7 +58,7 @@ libusb's macOS backend.
 aarch64). That is a portability check only; no release archive is published
 for it, and it has not been tested with a real device.
 
-## Checking a new device
+## Checking a new device {#checking-a-new-device}
 
 To add a device or profile, record at least:
 

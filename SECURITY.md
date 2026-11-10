@@ -18,7 +18,11 @@
   target parser bounds, and wire lengths, but makes no Android-support claim.
   USB device nodes allow arbitrary input injection into a connected Android
   device; `udev/51-aoahid.rules` is an example and must be reviewed against the
-  host's user/group access policy before installation.
+  host's user/group access policy before installation. Its active rule tags
+  every USB device with `uaccess`, so any program of the user at the local
+  seat can open any USB device; the file and
+  [docs/QUICKSTART.md](docs/QUICKSTART.md#quickstart-linux) show the narrower per-vendor
+  group rule.
 
 ## Reporting a Vulnerability
 

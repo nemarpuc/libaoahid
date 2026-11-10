@@ -211,7 +211,7 @@ cmake -S examples -B build/examples \
 cmake --build build/examples
 ```
 
-### `vcpkg`
+### `vcpkg` {#vcpkg}
 
 There is no `libaoahid` port in the public `vcpkg` registry. The repository's
 root `vcpkg.json` manifest installs `libusb` (`>= 1.0.30`) when building

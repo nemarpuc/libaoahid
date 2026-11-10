@@ -41,12 +41,29 @@ changes and submit patches through
   ctest --preset dev --output-on-failure
   ```
 
+## Releasing
+
+`python3 tools/release/sync_version.py X.Y.Z` writes the version into every
+file that carries it (the list is `tools/release/version_files.py`;
+`tools/release/validate_release.py` reads the same list) and then runs
+`tools/bindings/generate.py`, so the version constants in the generated
+bindings follow (`--no-generate` skips that step). It does not touch
+`CHANGELOG.md`: add the dated `## [X.Y.Z] - YYYY-MM-DD` section yourself and
+say in it whether the release is hardware-verified, using that word, as the
+`[0.1.0]` entry does; `validate_release.py` refuses a section without it. Run
+the release workflow by hand with `dry_run` set to `true` to build and check
+everything without publishing, then push the tag `vX.Y.Z`. What each job does
+is in [docs/RELEASES.md](docs/RELEASES.md#release-triggers-and-dry-runs).
+
 ## Submitting Changes
 
 - Add boundary and failure tests for every new validation rule or transport path,
   and run formatting, `tools/check_input_provenance.py`,
-  `tools/check_public_contracts.py`, `tools/check_license_headers.py`, and the
-  complete CTest suite before opening a pull request.
-- Hardware verification claims require all four observations recorded in
-  [docs/TARGET_MATRIX.md](docs/TARGET_MATRIX.md); source review or passing fake-libusb
-  tests alone is not hardware evidence.
+  `tools/check_public_contracts.py`, `tools/check_license_headers.py`,
+  `tools/check_doc_references.py`, and the complete CTest suite before opening a
+  pull request.
+- A hardware verification claim requires the four observations listed in
+  [docs/PROFILES.md](docs/PROFILES.md#checking-a-profile-on-a-target), recorded
+  on one device and build, and goes into the release's `CHANGELOG.md` section
+  before [docs/TARGET_MATRIX.md](docs/TARGET_MATRIX.md) lists it. Source review
+  or passing fake-libusb tests alone is not hardware evidence.

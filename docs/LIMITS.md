@@ -44,7 +44,7 @@ The field is valid when `bytes_touched <= 4`, and when `w == 32` also
 | 31 bits at offset 1 | 4 | Accepted |
 | Six 8-bit fields | 1 each, 6-byte report | Accepted |
 
-### Field ordering inside generated profiles
+### Field ordering inside generated profiles {#field-ordering-inside-generated-profiles}
 
 A field's offset depends on the fields before it, so a 1-4-bit group (buttons,
 Hat, D-pad bits, Tip Switch) can push a following wide field across a fifth
@@ -120,7 +120,7 @@ above they are 4096, 256, 12288, 4, 256 and 65528, the values
 using checked arithmetic without expanding Usage ranges, and `aoahid_node_open`
 returns `AOAHID_ERR_OVERFLOW` before registering if a policy is exceeded.
 
-## Library limits
+## Library limits {#library-limits}
 
 These are choices made by this library, not HID, Linux, or Android limits.
 

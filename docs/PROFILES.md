@@ -12,7 +12,7 @@ report rules are from
 [Device Class Definition for HID 1.11](https://www.usb.org/sites/default/files/hid1_11.pdf)
 (HID 1.11).
 
-## Hardware status
+## Hardware status {#hardware-status}
 
 As recorded in [CHANGELOG.md](../CHANGELOG.md) for 0.1.0: the device profiles
 (Keyboard, Mouse, Toggle, Gamepad, Touchscreen, Touchpad, Pen, Digitizer) were
@@ -460,7 +460,7 @@ trailing padding bits are zero), copies it, and queues it. No state, neutral
 report, or transition is generated; `aoahid_node_submit` does not apply to Raw
 Nodes.
 
-## Checking a profile on a target
+## Checking a profile on a target {#checking-a-profile-on-a-target}
 
 To confirm a profile on a device, record on the same device and build:
 

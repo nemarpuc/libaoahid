@@ -97,7 +97,7 @@ Everything else (the Raw profile, the battery report, other devices, Windows,
 macOS and AArch64 hosts) has no hardware result recorded; see
 [TARGET_MATRIX.md](TARGET_MATRIX.md#not-recorded-on-hardware).
 
-## Coverage
+## Coverage {#coverage}
 
 The `Coverage` CI job builds the library and test suites with
 `-DAOAHID_COVERAGE=ON` (`--coverage -O0 -fprofile-update=atomic`), runs CTest
@@ -137,7 +137,7 @@ lines in `src/` fall into four categories that are left uncovered on purpose:
    exceptions inside the event pump, or `libusb_interrupt_event_handler` errors
    during shutdown).
 
-## Known platform differences
+## Known platform differences {#known-platform-differences}
 
 Three checks in `tests/sim/` are currently disabled on one platform and tracked
 as open items in [tests/README.md](../tests/README.md#known-platform-differences):

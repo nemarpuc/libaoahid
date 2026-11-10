@@ -72,7 +72,7 @@ Serialization rules, from the header contracts:
 - `aoahid_last_error` is thread-local and valid until that thread's next call.
 - Never call close/destroy functions from the log sink.
 
-### Checking the serialization rule
+### Checking the serialization rule {#checking-the-serialization-rule}
 
 Breaking the first rule is undefined behavior that usually shows up far from
 its cause. A library built with `-DAOAHID_CHECK_SERIALIZATION=ON` (off by
@@ -153,7 +153,7 @@ a report is still in flight at the deadline, the Node close returns
 moves the consumed graph to the Context graveyard, which reaps it once the
 callbacks have run.
 
-## Design decisions
+## Design decisions {#design-decisions}
 
 Each decision has the same three lines as in libmimhid's ARCHITECTURE.md.
 **Reason** quotes the code or a commit message; where neither records one, it
@@ -161,7 +161,7 @@ says so. The version numbers in the cited commit subjects (1.0.1, 2.0.0, 4.0.5
 and so on) predate the restart of the version line at 0.1.0 (commit
 `5e9e8a7`); the commits are in this repository's history.
 
-### Zero inference
+### Zero inference {#zero-inference}
 
 **Decision:** Usages, logical ranges, bit widths, Report IDs, Linux HID parser
 limits, timeouts, fragment sizes, pool sizes and Channel transfer values are

@@ -380,7 +380,7 @@ differ only in the copyright line).
 - The generator refuses what it cannot bind (an unknown type, a field named like
   a Python keyword, two types with one short name) instead of guessing.
 
-## Version and release
+## Version and release {#version-and-release}
 
 - `tools/release/version_files.py` lists every file that carries the version.
   `tools/release/sync_version.py X.Y.Z` writes them all;

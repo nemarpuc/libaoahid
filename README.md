@@ -241,7 +241,7 @@ odd ports 5555 to 5585 that the adb server polls for emulators,
 `PollAllLocalPortsForEmulator` in AOSP
 [`client/transport_emulator.cpp`](https://android.googlesource.com/platform/packages/modules/adb/+/1cf2f017d312f73b3dc53bda85ef2610e35a80e9/client/transport_emulator.cpp),
 retrieved 2026-11-10); otherwise run `adb kill-server` first
-([QUICKSTART.md](docs/QUICKSTART.md#windows)).
+([QUICKSTART.md](docs/QUICKSTART.md#quickstart-windows)).
 
 ## Documentation
 
