@@ -257,27 +257,3 @@ limits on what it can and cannot show:
   in `f_accessory.c`). It cannot show the time spent after EP0 completion inside
   Android's `uhid` driver, `hid-input`, `EventHub`, `InputReader`, or the
   foreground application (`t7 - t4`).
-
-### 3. Comparing with `libmimhid` on the same phone via wireless `adb getevent -t`
-
-- **What it measures:** Relative delivery-time difference on the **same Android
-  phone** between `libaoahid` (USB cable directly to the phone, AOA 2.0 request
-  57 on EP0 -> `f_accessory` -> `uhid` -> `/dev/input/eventN`) and
-  [`libmimhid`](https://github.com/nemarpuc/libmimhid) (PC -> UART ->
-  microcontroller USB HID interrupt IN endpoint -> `usbhid` ->
-  `/dev/input/eventN`).
-- **How to measure:** Because `libaoahid` and `libmimhid` each occupy the
-  phone's USB port, run `adb` over Wi-Fi (`adb tcpip` / wireless debugging) and
-  record kernel input timestamps on the phone with
-  `adb shell getevent -lt /dev/input/eventN` while sending a paced sequence of
-  reports from the PC and logging the PC's monotonic send timestamps using the
-  same method for both libraries on the same phone.
-- **What it can and cannot show:** The PC clock and the phone's kernel clock do
-  not share an epoch, so subtracting a PC send timestamp from a phone
-  `getevent -t` timestamp does **not** measure absolute one-way latency. The
-  PC-to-phone clock offset cancels **only in a difference** between two
-  measurements taken with the same method on the same setup, and clock drift
-  plus Wi-Fi jitter limit wireless `adb` comparisons to **about a millisecond**.
-  Absolute one-way wire-to-device figures require a hardware USB protocol
-  analyzer (or a physical hardware trigger tying the host and phone to a common
-  capture clock).

@@ -18,12 +18,6 @@ with Android, and keeps the report state machines (multi-touch contacts, key
 rollover, pointer deltas) correct. A required value left zero is refused, never
 guessed.
 
-Sister library of [`libmimhid`](https://github.com/nemarpuc/libmimhid), which
-sends the same kind of input to any USB target (a PC, a console, and so on)
-through a microcontroller board, with no Android phone needed. The C ABI and
-C++ header follow the same shape, so code moves between the two with few
-changes; see [Moving between libaoahid and libmimhid](#moving-between-libaoahid-and-libmimhid).
-
 https://github.com/user-attachments/assets/f6a93ffe-34ea-438b-a09f-d6c55a1f5e23
 
 An introduction to how the library works and why it was built is
@@ -192,31 +186,6 @@ Rust example (`examples/c/multi_profile.c`, `include/aoahid.hpp`).
 <!-- profile-table:end -->
 
 What each profile derives for you and what you specify is in [PROFILES.md](docs/PROFILES.md).
-
-## Moving between libaoahid and libmimhid
-
-The two headers have the same shape: options structures that start with
-`struct_size`, one close rule, every timeout an argument, and the same profile
-factories and input calls (`aoahid_keyboard_key` is `mimhid_keyboard_key`).
-The transport differs: here a Context drives libusb (`aoahid_context_poll` or
-an internal event thread), AOA requests 51 to 57 register and feed the HIDs,
-and Bulk `Channel`s reach other interfaces; `libmimhid` drives a board over a
-serial port, uploads full USB descriptors, and carries two-way HID. Three
-things behave differently under the same names:
-
-- **`*_init`.** Here the initializers fill in working values, and
-  `AOAHID_CONTROL_TIMEOUT_MS`, `AOAHID_SEND_TIMEOUT_MS`, and
-  `AOAHID_DRAIN_TIMEOUT_MS` are working timeouts. libmimhid's `*_init` only
-  zeroes the structure and sets `struct_size`, and a required field left zero
-  is `MIMHID_ERR_UNSET_FIELD`, so code moved there must set every value itself.
-- **`AOAHID_CLOSE_PENDING` (15).** A close here can return it while a USB
-  transfer is still in flight, and the handle stays yours. libmimhid has no
-  such result (15 is unused there): its writes finish inside the call.
-- **Result 4.** Here it is `AOAHID_ERR_NOT_AOA` (the device does not speak
-  AOA); in libmimhid it is `MIMHID_ERR_PROTOCOL` (the board's firmware has
-  another version).
-
-The full comparison is in [API.md](docs/API.md#differences-from-libmimhid).
 
 ## Verification status
 

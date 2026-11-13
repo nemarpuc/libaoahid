@@ -92,7 +92,7 @@ typedef struct aoahid_channel aoahid_channel;
  * Every enumeration is an int32_t typedef with anonymous constants, so structure layout does not
  * depend on how a compiler sizes an enum. */
 
-/* A result libmimhid also has keeps the same number there. 5 is not used. */
+/* A result libmimusb also has keeps the same number there. 5 is not used. */
 typedef int32_t aoahid_result;
 enum {
     AOAHID_OK = 0,
@@ -106,7 +106,7 @@ enum {
     AOAHID_ERR_STALL = 9,       /* the device refused the request */
     AOAHID_ERR_TIMEOUT = 10,
     AOAHID_ERR_SHORT_TRANSFER = 11,      /* a transfer moved fewer bytes than asked */
-    AOAHID_ERR_DESCRIPTOR_REJECTED = 12, /* reserved: no call returns it (libmimhid does) */
+    AOAHID_ERR_DESCRIPTOR_REJECTED = 12, /* reserved: no call returns it (libmimusb does) */
     AOAHID_ERR_IO = 13,
     AOAHID_ERR_OVERFLOW = 14,  /* a size, count or limit was exceeded */
     AOAHID_CLOSE_PENDING = 15, /* see "Closing" above */

@@ -10,18 +10,6 @@ physical Android phone, see [tests/hw/README.md](../tests/hw/README.md#hardware-
 [tools/device-check/README.md](../tools/device-check/README.md#device-check), and
 [TARGET_MATRIX.md](TARGET_MATRIX.md).
 
-## Terms
-
-The two sister libraries use some of the same words for different things:
-
-| Term | In `libaoahid` | In `libmimhid` ([its VERIFICATION.md](https://github.com/nemarpuc/libmimhid/blob/main/docs/VERIFICATION.md)) |
-|---|---|---|
-| `unit` | In-process tests with no USB transport at all (`aoahid.unit` and the other gates of layer 1 below) | In-process tests with no serial port and no board |
-| `scripted` | — (no such layer) | The host library over a pseudo-terminal against a peer the test drives frame by frame |
-| `sim` | The public C ABI and `src/transport/` against the fake libusb in `tests/fake_libusb/` (`-DAOAHID_USE_FAKE_LIBUSB=ON`) | The host library over a pseudo-terminal against the real firmware core built for the build host |
-| `hw` | A real Android phone over a USB cable ([tests/hw/README.md](../tests/hw/README.md#hardware-checks)) | A physical board, a USB-UART adapter, and a target computer |
-| hardware-verified | A release whose CHANGELOG section says it ran against a real Android phone | A release whose library and firmware ran on a physical board |
-
 ## Verification layers
 
 `libaoahid` separates verification into three functional layers plus static ABI

@@ -359,7 +359,7 @@ functions, enumerations) and `clang -E -dM` (integer macros). It writes the C
 layout oracle `tests/abi/layout_oracle.c` and, for each of Python, C#, and Rust,
 the declarations (`native.py`, `Native.cs`, `aoahid-sys/src/lib.rs`) and a layout
 test. Nothing in them is written by hand, so a change to the header is a
-regeneration, not a transcription. libmimhid uses the same file (the two copies
+regeneration, not a transcription. libmimusb uses the same file (the two copies
 differ only in the copyright line).
 
 - An enumeration is the anonymous `enum` after an `int32_t` typedef. It becomes

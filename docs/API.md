@@ -259,8 +259,7 @@ means none at all ("For an unlimited timeout, use value 0",
 [`libusb_control_transfer`](https://libusb.sourceforge.io/api-1.0/group__libusb__syncio.html),
 retrieved 2026-11-10). A
 timeout is a failure deadline, not a delay: a transfer that completes earlier
-returns immediately. libmimhid follows the same rule with the same argument
-names.
+returns immediately.
 
 | Argument | Calls | Scope |
 |---|---|---|
@@ -1605,24 +1604,3 @@ aoahid_result aoahid_raw_submit(aoahid_node* node, const uint8_t* report, size_t
 **Threads:** Context domain.
 
 **Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a Node that is not Raw, a null report, a Report ID or length the Spec does not accept, or nonzero padding bits; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; `AOAHID_ERR_BUSY` while the Node's report is in flight or the pool is full; a transport error of this or an earlier transfer.
-
-## Differences from `libmimhid` {#differences-from-libmimhid}
-
-[`libmimhid`](https://github.com/nemarpuc/libmimhid) is the sister library
-that sends the same kind of input to any USB host through a microcontroller
-board on a serial port. The profile factories, the input calls, the options
-layout, the close rule and the timeout rule have the same shape
-(`aoahid_keyboard_key` is `mimhid_keyboard_key`). The table lists what differs;
-the libmimhid names are from its header, `mimhid.h`.
-
-| Area | libaoahid | libmimhid |
-| --- | --- | --- |
-| Target and transport | An Android device over USB through libusb: AOA requests 51 to 57 on endpoint 0 | Any USB host, through a board the host drives over a serial port |
-| Handles | `aoahid_context` drives libusb (`aoahid_context_poll`, or an internal event thread), with Devices, Nodes and Channels under it | No Context: `mimhid_device` is the top-level handle, with Nodes under it |
-| `*_init` | Fill in working values; `AOAHID_CONTROL_TIMEOUT_MS`, `AOAHID_SEND_TIMEOUT_MS` and `AOAHID_DRAIN_TIMEOUT_MS` are working timeouts | Zero the structure and set `struct_size` only; a required field left zero is `MIMHID_ERR_UNSET_FIELD` |
-| USB identity | The phone's own; `aoahid_accessory_start` sends only the AOA strings 0 to 5 | The caller's: `mimhid_device_config` and `mimhid_node_config` carry the USB descriptors the board presents |
-| Opening a Node | `aoahid_node_open` registers the HID at once (requests 54 and 56) within `control_timeout_ms`; `aoahid_node_close` sends request 55 | `mimhid_node_open` and `mimhid_node_close` take `mimhid_commit_timeouts` (`control_timeout_ms`, `reconnect_timeout_ms`) because the board enumerates again; `mimhid_device_batch_begin` and `mimhid_device_batch_end` group several changes |
-| Submitting | `aoahid_node_submit` queues an asynchronous transfer; its failure comes back from a later call | `mimhid_node_submit` writes to the serial port and returns once the driver has the bytes |
-| Direction | Input reports only; Bulk `aoahid_channel` reaches other interfaces such as ADB | Two-way HID: Output and Feature reports reach `event_sink`; `mimhid_node_set_feature_response`, `mimhid_device_set_control_routing` and `mimhid_device_control_reply` answer the host |
-| Closing | A close can return `AOAHID_CLOSE_PENDING` while a USB transfer is in flight; the handle stays the caller's | No pending close: writes finish inside the call |
-| Result numbers | 4 is `AOAHID_ERR_NOT_AOA`, 9 is `AOAHID_ERR_STALL`, 15 is `AOAHID_CLOSE_PENDING`; 5 is unused | 4 is `MIMHID_ERR_PROTOCOL`; 5, 9 and 15 are unused. Every other number means the same in both |

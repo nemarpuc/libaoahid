@@ -155,7 +155,7 @@ callbacks have run.
 
 ## Design decisions {#design-decisions}
 
-Each decision has the same three lines as in libmimhid's ARCHITECTURE.md.
+Each decision has the same three lines as in libmimusb's ARCHITECTURE.md.
 **Reason** quotes the code or a commit message; where neither records one, it
 says so. The version numbers in the cited commit subjects (1.0.1, 2.0.0, 4.0.5
 and so on) predate the restart of the version line at 0.1.0 (commit
@@ -175,7 +175,7 @@ never puts its own value in place of a zero.
 **Reason:** Commit `7c2ffdc` ("tuning values have no defaults") made zero
 `AOAHID_ERR_UNSET_FIELD` "instead of a library-chosen value"; commit
 `c82dc1c` moved every timeout into the arguments of the call that waits, "as
-in libmimhid"; commit `0e48856` added the initializers and constants. Why a
+in libmimusb"; commit `0e48856` added the initializers and constants. Why a
 library-chosen value was unwanted is not recorded beyond these messages.
 
 **Rejected:** Zero selecting a library-chosen value in `aoahid_device_open`,
@@ -301,7 +301,7 @@ under namespace `aoahid` and adds the option functions
 
 **Reason:** Commit `0581391`: the header "now forwards every function of
 aoahid.h unchanged". Commit `24c2092` replaced the hand-written declarations
-with the generator, shared with libmimhid. Commit `9d91bca` linked the C++
+with the generator, shared with libmimusb. Commit `9d91bca` linked the C++
 runtime statically and records no reason.
 
 **Rejected:** Typed C++ node references and `aoa::bind` (removed in
