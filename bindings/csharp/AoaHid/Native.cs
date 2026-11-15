@@ -93,6 +93,7 @@ public enum UsageSemantic : int
 
 public enum ChannelReadMode : int { Stream = 1, Request = 2 }
 
+/// <summary>The details of the calling thread's last result.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct ErrorDetail
 {
@@ -116,8 +117,12 @@ public struct ContextOptions
     public LogLevel LogLevel;
     public nint LogSink;
     public nint LogUser;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static ContextOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<ContextOptions>() };
 }
 
+/// <summary>A USB device as aoahid_discover found it.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct DeviceInfo
 {
@@ -132,6 +137,7 @@ public struct DeviceInfo
     public nint Product;
 }
 
+/// <summary>The AOA identification strings (request 52, string IDs 0 to 5): each NUL-terminated, at most 256 bytes with the NUL, or null to leave it out.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct AoaStrings
 {
@@ -143,6 +149,7 @@ public struct AoaStrings
     public nint Serial;
 }
 
+/// <summary>Limits of the target's Linux HID parser for the kernel it runs; docs/LIMITS.md names the kernel constant behind each and lists them for one revision.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct LinuxHidPolicy
 {
@@ -154,6 +161,7 @@ public struct LinuxHidPolicy
     public ulong ReportDataBits;
 }
 
+/// <summary>Every field but interface_number and validate_reports is required.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct DeviceOptions
 {
@@ -169,6 +177,9 @@ public struct DeviceOptions
     public ClaimPolicy InterfaceClaimPolicy;
     public int InterfaceNumber;
     public uint ValidateReports;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static DeviceOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<DeviceOptions>() };
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -177,8 +188,12 @@ public struct AccessoryOptions
     public uint StructSize;
     public uint Reserved;
     public AoaStrings Strings;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static AccessoryOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<AccessoryOptions>() };
 }
 
+/// <summary>Selects the first interface (alternate setting 0) with this class, subclass and protocol that has one Bulk IN and one Bulk OUT endpoint.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct ChannelOptions
 {
@@ -193,8 +208,12 @@ public struct ChannelOptions
     public uint TransferBytes;
     public uint ZeroLengthTermination;
     public ChannelReadMode ReadMode;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static ChannelOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<ChannelOptions>() };
 }
 
+/// <summary>A Node has one report in flight at a time, taken from the Device's shared pool.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct NodeOptions
 {
@@ -202,8 +221,12 @@ public struct NodeOptions
     public uint Reserved;
     public uint HasReservedSlots;
     public uint ReservedSlots;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static NodeOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<NodeOptions>() };
 }
 
+/// <summary>The four HID 1.11 physical Global items for one field.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct PhysicalProperties
 {
@@ -214,6 +237,7 @@ public struct PhysicalProperties
     public uint Unit;
 }
 
+/// <summary>One report field.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct IntegerField
 {
@@ -223,6 +247,7 @@ public struct IntegerField
     public PhysicalProperties Physical;
 }
 
+/// <summary>With enabled 1, every report starts with value (1 to 255).</summary>
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct ReportId
 {
@@ -231,6 +256,7 @@ public unsafe struct ReportId
     public fixed byte Reserved8[3];
 }
 
+/// <summary>Battery Strength (Generic Device Controls 0x06/0x20) as a second Input report in the profile's Application Collection.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct BatteryReport
 {
@@ -238,6 +264,7 @@ public struct BatteryReport
     public IntegerField Strength;
 }
 
+/// <summary>Full N-key rollover: one bit per Usage from usage_minimum (at least 0x04) to usage_maximum, plus the eight modifiers 0xE0 to 0xE7, which the range must not include.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct KeyboardOptions
 {
@@ -248,8 +275,12 @@ public struct KeyboardOptions
     public ushort UsageMaximum;
     public uint EnableBattery;
     public BatteryReport Battery;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static KeyboardOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<KeyboardOptions>() };
 }
 
+/// <summary>X, Y, wheel and pan are relative; their ranges must hold negative and positive values.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct MouseOptions
 {
@@ -265,8 +296,12 @@ public struct MouseOptions
     public IntegerField Pan;
     public uint EnableBattery;
     public BatteryReport Battery;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static MouseOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<MouseOptions>() };
 }
 
+/// <summary>One-bit controls on any HUT page: Consumer, System Control, Camera Control, Telephony, ...</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct ToggleOptions
 {
@@ -284,8 +319,12 @@ public struct ToggleOptions
     public nint ExpectedLinuxCodes;
     public uint EnableBattery;
     public BatteryReport Battery;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static ToggleOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<ToggleOptions>() };
 }
 
+/// <summary>One axis.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct GamepadAxisOption
 {
@@ -298,6 +337,7 @@ public struct GamepadAxisOption
     public nint ExpectedAndroidAxis;
 }
 
+/// <summary>At least two axes, one of them AOAHID_AXIS_X and one AOAHID_AXIS_Y, each role once.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct GamepadOptions
 {
@@ -314,8 +354,12 @@ public struct GamepadOptions
     public uint HatBitWidth;
     public uint EnableBattery;
     public BatteryReport Battery;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static GamepadOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<GamepadOptions>() };
 }
 
+/// <summary>Fixed-slot Multi-Touch under the Digitizers / Touch Screen Application Collection.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct TouchscreenOptions
 {
@@ -343,8 +387,12 @@ public struct TouchscreenOptions
     public uint EnableMultiPacketFrames;
     public uint EnableBattery;
     public BatteryReport Battery;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static TouchscreenOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<TouchscreenOptions>() };
 }
 
+/// <summary>The touchscreen report under the Digitizers / Touch Pad Application Collection, plus button_count click buttons (0 for a buttonless clickpad).</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct TouchpadOptions
 {
@@ -373,8 +421,12 @@ public struct TouchpadOptions
     public uint ButtonCount;
     public uint EnableBattery;
     public BatteryReport Battery;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static TouchpadOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<TouchpadOptions>() };
 }
 
+/// <summary>A stylus under the Digitizers / Pen Application Collection (a direct, on-screen pen).</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct PenOptions
 {
@@ -396,8 +448,12 @@ public struct PenOptions
     public uint EnableHover;
     public uint EnableBattery;
     public BatteryReport Battery;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static PenOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<PenOptions>() };
 }
 
+/// <summary>The pen report under the Digitizers / Digitizer Application Collection (an indirect tablet).</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct DigitizerOptions
 {
@@ -419,8 +475,12 @@ public struct DigitizerOptions
     public uint EnableHover;
     public uint EnableBattery;
     public BatteryReport Battery;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static DigitizerOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<DigitizerOptions>() };
 }
 
+/// <summary>An Input report a Raw Node may send: its Report ID and its exact length on the wire.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct RawReport
 {
@@ -428,6 +488,7 @@ public struct RawReport
     public uint WireLength;
 }
 
+/// <summary>A descriptor of the caller's own.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct RawOptions
 {
@@ -440,6 +501,9 @@ public struct RawOptions
     public uint AcknowledgesNoAndroidSupport;
     public uint RequiresOutput;
     public uint RequiresFeatureResponse;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static RawOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<RawOptions>() };
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -449,6 +513,7 @@ public struct ReportCapability
     public uint WireLength;
 }
 
+/// <summary>What a Spec sends.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct CapabilityManifest
 {
@@ -462,8 +527,12 @@ public struct CapabilityManifest
     public nint Reports;
     public nuint ReportCount;
     public nuint DescriptorLength;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static CapabilityManifest Init() => new() { StructSize = (uint)Marshal.SizeOf<CapabilityManifest>() };
 }
 
+/// <summary>Optional values of one touch contact.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct TouchscreenExtra
 {
@@ -482,6 +551,7 @@ public struct TouchpadExtra
     public int Azimuth;
 }
 
+/// <summary>One pen state.</summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct PenSample
 {
@@ -704,150 +774,251 @@ public static class Native
             ["AOAHID_CHANNEL_READ_REQUEST"] = 2,
         };
 
+    /// <summary>The details of the calling thread's last result.</summary>
     [DllImport(Library, EntryPoint = "aoahid_last_error", ExactSpelling = true, CallingConvention = Call)]
     public static extern nint LastError();
+    /// <summary>The name of a result constant.</summary>
     [DllImport(Library, EntryPoint = "aoahid_result_name", ExactSpelling = true, CallingConvention = Call)]
     public static extern nint ResultName(Result result);
+    /// <summary>The version of the library that is running.</summary>
     [DllImport(Library, EntryPoint = "aoahid_version", ExactSpelling = true, CallingConvention = Call)]
     public static extern uint Version();
+    /// <summary>Creates a Context.</summary>
     [DllImport(Library, EntryPoint = "aoahid_context_create", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ContextCreate(in ContextOptions options, out nint context);
+    /// <summary>Creates a Context.</summary>
     [DllImport(Library, EntryPoint = "aoahid_context_create", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ContextCreate(nint options, out nint context);
+    /// <summary>Handles libusb events in AOAHID_EVENT_CALLER_POLL mode.</summary>
     [DllImport(Library, EntryPoint = "aoahid_context_poll", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ContextPoll(nint context, uint timeoutMs);
+    /// <summary>Closes every Device and frees the Context.</summary>
     [DllImport(Library, EntryPoint = "aoahid_context_destroy", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ContextDestroy(nint context, uint controlTimeoutMs, uint drainTimeoutMs);
+    /// <summary>Retries aoahid_context_destroy until the Context is gone or the time is up.</summary>
     [DllImport(Library, EntryPoint = "aoahid_context_destroy_blocking", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ContextDestroyBlocking(nint context, uint controlTimeoutMs, uint drainTimeoutMs, uint timeoutMs);
+    /// <summary>Lists the USB devices that answer AOA request 51.</summary>
     [DllImport(Library, EntryPoint = "aoahid_discover", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result Discover(nint context, uint controlTimeoutMs, out nint discovery);
+    /// <summary>The number of entries in a snapshot.</summary>
     [DllImport(Library, EntryPoint = "aoahid_discovery_count", ExactSpelling = true, CallingConvention = Call)]
     public static extern nuint DiscoveryCount(nint discovery);
+    /// <summary>One entry of a snapshot.</summary>
     [DllImport(Library, EntryPoint = "aoahid_discovery_get", ExactSpelling = true, CallingConvention = Call)]
     public static extern nint DiscoveryGet(nint discovery, nuint index);
+    /// <summary>Frees a snapshot.</summary>
     [DllImport(Library, EntryPoint = "aoahid_discovery_destroy", ExactSpelling = true, CallingConvention = Call)]
     public static extern void DiscoveryDestroy(nint discovery);
+    /// <summary>Switches a device into accessory mode.</summary>
     [DllImport(Library, EntryPoint = "aoahid_accessory_start", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result AccessoryStart(nint context, in DeviceInfo selected, in AccessoryOptions options, uint controlTimeoutMs);
+    /// <summary>Switches a device into accessory mode.</summary>
     [DllImport(Library, EntryPoint = "aoahid_accessory_start", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result AccessoryStart(nint context, nint selected, nint options, uint controlTimeoutMs);
+    /// <summary>Opens a USB device.</summary>
     [DllImport(Library, EntryPoint = "aoahid_device_open", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DeviceOpen(nint context, in DeviceInfo selected, in DeviceOptions options, out nint device);
+    /// <summary>Opens a USB device.</summary>
     [DllImport(Library, EntryPoint = "aoahid_device_open", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DeviceOpen(nint context, nint selected, nint options, out nint device);
+    /// <summary>Closes a Device with its Nodes and Channels.</summary>
     [DllImport(Library, EntryPoint = "aoahid_device_close", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DeviceClose(nint device, uint controlTimeoutMs, uint drainTimeoutMs);
+    /// <summary>Reads the error a transfer or event left on the Device.</summary>
     [DllImport(Library, EntryPoint = "aoahid_device_latched_error", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DeviceLatchedError(nint device);
+    /// <summary>Opens a Bulk IN/OUT interface of a Device as a stream.</summary>
     [DllImport(Library, EntryPoint = "aoahid_channel_open", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ChannelOpen(nint device, in ChannelOptions options, uint drainTimeoutMs, out nint channel);
+    /// <summary>Opens a Bulk IN/OUT interface of a Device as a stream.</summary>
     [DllImport(Library, EntryPoint = "aoahid_channel_open", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ChannelOpen(nint device, nint options, uint drainTimeoutMs, out nint channel);
+    /// <summary>Closes a Channel.</summary>
     [DllImport(Library, EntryPoint = "aoahid_channel_close", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ChannelClose(nint channel, uint drainTimeoutMs);
+    /// <summary>Writes bytes to the Channel's OUT endpoint.</summary>
     [DllImport(Library, EntryPoint = "aoahid_channel_write", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ChannelWrite(nint channel, nint data, nuint length, out nuint written, uint timeoutMs);
+    /// <summary>Reads bytes from the Channel's IN endpoint.</summary>
     [DllImport(Library, EntryPoint = "aoahid_channel_read", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ChannelRead(nint channel, nint buffer, nuint capacity, out nuint received, uint timeoutMs);
+    /// <summary>Makes a keyboard Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_keyboard", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateKeyboard(in KeyboardOptions options, out nint spec);
+    /// <summary>Makes a keyboard Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_keyboard", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateKeyboard(nint options, out nint spec);
+    /// <summary>Makes a mouse Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_mouse", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateMouse(in MouseOptions options, out nint spec);
+    /// <summary>Makes a mouse Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_mouse", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateMouse(nint options, out nint spec);
+    /// <summary>Makes a Spec of one-bit controls on a HUT page.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_toggle", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateToggle(in ToggleOptions options, out nint spec);
+    /// <summary>Makes a Spec of one-bit controls on a HUT page.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_toggle", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateToggle(nint options, out nint spec);
+    /// <summary>Makes a gamepad Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_gamepad", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateGamepad(in GamepadOptions options, out nint spec);
+    /// <summary>Makes a gamepad Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_gamepad", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateGamepad(nint options, out nint spec);
+    /// <summary>Makes a touchscreen Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_touchscreen", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateTouchscreen(in TouchscreenOptions options, out nint spec);
+    /// <summary>Makes a touchscreen Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_touchscreen", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateTouchscreen(nint options, out nint spec);
+    /// <summary>Makes a touchpad Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_touchpad", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateTouchpad(in TouchpadOptions options, out nint spec);
+    /// <summary>Makes a touchpad Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_touchpad", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateTouchpad(nint options, out nint spec);
+    /// <summary>Makes a pen Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_pen", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreatePen(in PenOptions options, out nint spec);
+    /// <summary>Makes a pen Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_pen", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreatePen(nint options, out nint spec);
+    /// <summary>Makes a digitizer Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_digitizer", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateDigitizer(in DigitizerOptions options, out nint spec);
+    /// <summary>Makes a digitizer Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_digitizer", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateDigitizer(nint options, out nint spec);
+    /// <summary>Makes a Spec from the caller's own HID report descriptor.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_raw", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateRaw(in RawOptions options, out nint spec);
+    /// <summary>Makes a Spec from the caller's own HID report descriptor.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_create_raw", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecCreateRaw(nint options, out nint spec);
+    /// <summary>Adds a reference to a Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_retain", ExactSpelling = true, CallingConvention = Call)]
     public static extern void SpecRetain(nint spec);
+    /// <summary>Gives up a reference to a Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_release", ExactSpelling = true, CallingConvention = Call)]
     public static extern void SpecRelease(nint spec);
+    /// <summary>The report descriptor of a Spec.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_descriptor", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecDescriptor(nint spec, out nint bytes, out nuint length);
+    /// <summary>What a Spec sends.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_manifest", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecManifest(nint spec, ref CapabilityManifest manifest);
+    /// <summary>What a Spec sends.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_manifest", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecManifest(nint spec, nint manifest);
+    /// <summary>Registers a Spec on a Device as one AOA HID.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_open", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result NodeOpen(nint device, nint spec, in NodeOptions options, uint controlTimeoutMs, out nint node);
+    /// <summary>Registers a Spec on a Device as one AOA HID.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_open", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result NodeOpen(nint device, nint spec, nint options, uint controlTimeoutMs, out nint node);
+    /// <summary>Unregisters a Node.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_close", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result NodeClose(nint node, uint controlTimeoutMs, uint drainTimeoutMs);
+    /// <summary>The AOA HID ID of a Node.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_id", ExactSpelling = true, CallingConvention = Call)]
     public static extern ushort NodeId(nint node);
+    /// <summary>What a Node sends.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_manifest", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result NodeManifest(nint node, ref CapabilityManifest manifest);
+    /// <summary>What a Node sends.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_manifest", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result NodeManifest(nint node, nint manifest);
+    /// <summary>Queues the Node's current state as a report.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_submit", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result NodeSubmit(nint node, uint sendTimeoutMs);
+    /// <summary>Sends reports until the Node's state has been delivered.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_submit_blocking", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result NodeSubmitBlocking(nint node, uint timeoutMs);
+    /// <summary>Presses (down 1) or releases (down 0) one Keyboard page Usage, a modifier or a key of the Spec's range.</summary>
     [DllImport(Library, EntryPoint = "aoahid_keyboard_key", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result KeyboardKey(nint node, ushort usage, uint down);
+    /// <summary>Adds to the pending X and Y movement.</summary>
     [DllImport(Library, EntryPoint = "aoahid_mouse_move", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result MouseMove(nint node, int dx, int dy);
+    /// <summary>Adds to the pending wheel and pan movement, as aoahid_mouse_move does.</summary>
     [DllImport(Library, EntryPoint = "aoahid_mouse_scroll", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result MouseScroll(nint node, int wheel, int pan);
+    /// <summary>Presses (down 1) or releases (down 0) button 1 to button_count.</summary>
     [DllImport(Library, EntryPoint = "aoahid_mouse_button", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result MouseButton(nint node, uint button, uint down);
+    /// <summary>Presses (down 1) or releases (down 0) one Usage of the Spec's allow-list; any number may be pressed at once.</summary>
     [DllImport(Library, EntryPoint = "aoahid_toggle_usage", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result ToggleUsage(nint node, ushort usage, uint down);
+    /// <summary>Presses (down 1) or releases (down 0) button 1 to button_count.</summary>
     [DllImport(Library, EntryPoint = "aoahid_gamepad_button", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result GamepadButton(nint node, uint button, uint down);
+    /// <summary>Sets axes[axis_index] of the Spec to value, which must be in its logical range.</summary>
     [DllImport(Library, EntryPoint = "aoahid_gamepad_axis", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result GamepadAxis(nint node, nuint axisIndex, int value);
+    /// <summary>Sets the D-pad from four 0/1 directions.</summary>
     [DllImport(Library, EntryPoint = "aoahid_gamepad_dpad", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result GamepadDpad(nint node, uint up, uint down, uint right, uint left);
+    /// <summary>down 1 places contact_id in a free slot, or moves it if it is already down; down 0 lifts it at x, y.</summary>
     [DllImport(Library, EntryPoint = "aoahid_touchscreen_contact", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result TouchscreenContact(nint node, uint contactId, uint down, int x, int y, in TouchscreenExtra extra);
+    /// <summary>down 1 places contact_id in a free slot, or moves it if it is already down; down 0 lifts it at x, y.</summary>
     [DllImport(Library, EntryPoint = "aoahid_touchscreen_contact", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result TouchscreenContact(nint node, uint contactId, uint down, int x, int y, nint extra);
+    /// <summary>As aoahid_touchscreen_contact, for a Touchpad Node.</summary>
     [DllImport(Library, EntryPoint = "aoahid_touchpad_contact", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result TouchpadContact(nint node, uint contactId, uint down, int x, int y, in TouchpadExtra extra);
+    /// <summary>As aoahid_touchscreen_contact, for a Touchpad Node.</summary>
     [DllImport(Library, EntryPoint = "aoahid_touchpad_contact", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result TouchpadContact(nint node, uint contactId, uint down, int x, int y, nint extra);
+    /// <summary>Presses (down 1) or releases (down 0) click button 1 to button_count.</summary>
     [DllImport(Library, EntryPoint = "aoahid_touchpad_button", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result TouchpadButton(nint node, uint button, uint down);
+    /// <summary>Sets the whole pen state.</summary>
     [DllImport(Library, EntryPoint = "aoahid_pen_update", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result PenUpdate(nint node, in PenSample sample);
+    /// <summary>Sets the whole pen state.</summary>
     [DllImport(Library, EntryPoint = "aoahid_pen_update", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result PenUpdate(nint node, nint sample);
+    /// <summary>As aoahid_pen_update, for a Digitizer Node.</summary>
     [DllImport(Library, EntryPoint = "aoahid_digitizer_update", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DigitizerUpdate(nint node, in DigitizerSample sample);
+    /// <summary>As aoahid_pen_update, for a Digitizer Node.</summary>
     [DllImport(Library, EntryPoint = "aoahid_digitizer_update", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DigitizerUpdate(nint node, nint sample);
+    /// <summary>Sets the battery level of a Node whose Spec has enable_battery.</summary>
     [DllImport(Library, EntryPoint = "aoahid_battery_update", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result BatteryUpdate(nint node, int strength);
+    /// <summary>Sends one report of a Raw Spec's Node.</summary>
     [DllImport(Library, EntryPoint = "aoahid_raw_submit", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result RawSubmit(nint node, nint report, nuint length, uint sendTimeoutMs);
+}
+
+/// <summary>A call did not return Result.Ok; carries the library's details of that result.</summary>
+public sealed class AoaHidException : Exception
+{
+    public Result Code { get; }
+    public string? Field { get; }
+    public string? Reason { get; }
+
+    public AoaHidException(Result code, string? field, string? reason)
+        : base(string.IsNullOrEmpty(field) ? code.ToString() : $"{code}: {field}: {reason}")
+    {
+        Code = code;
+        Field = field;
+        Reason = reason;
+    }
+
+    /// <summary>Does nothing for Result.Ok; otherwise throws with the details of this thread's last result. Call it right after the call that returned result.</summary>
+    public static void Check(Result result)
+    {
+        if (result == Result.Ok)
+        {
+            return;
+        }
+        var detail = Marshal.PtrToStructure<ErrorDetail>(Native.LastError());
+        throw new AoaHidException(result, Marshal.PtrToStringUTF8(detail.Field),
+                                  Marshal.PtrToStringUTF8(detail.Reason));
+    }
 }

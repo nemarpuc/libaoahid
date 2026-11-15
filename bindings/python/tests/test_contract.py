@@ -12,11 +12,11 @@ from aoahid import native
 from aoahid.native import ContextOptions, DeviceOptions, KeyboardOptions
 
 
-def test_struct_size_is_not_filled_by_binding():
+def test_struct_size_is_the_only_field_the_binding_sets():
     options = KeyboardOptions()
-    assert options.struct_size == 0
-    options.struct_size = c.sizeof(options)
     assert options.struct_size == c.sizeof(KeyboardOptions)
+    assert options.reserved == 0
+    assert KeyboardOptions(struct_size=7).struct_size == 7
 
 
 def test_context_options_exposes_explicit_choice_fields():
@@ -47,7 +47,7 @@ def test_package_exports_only_the_binding_surface():
 
 
 if __name__ == "__main__":
-    test_struct_size_is_not_filled_by_binding()
+    test_struct_size_is_the_only_field_the_binding_sets()
     test_context_options_exposes_explicit_choice_fields()
     test_device_options_exposes_target_parser_policies()
     test_package_exports_only_the_binding_surface()

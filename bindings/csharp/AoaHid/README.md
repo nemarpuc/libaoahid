@@ -9,9 +9,9 @@ name `aoahid`.
 The NuGet package version and native libaoahid version must match. Complete
 native archives, dependency notices, and SPDX documents are published with the
 corresponding GitHub Release. The C header's `*_init` functions are inline and
-not part of the binary ABI, so a structure starts all zero: set its
-`StructSize` and every required field yourself. `docs/API.md` lists the values
-the C initializers use; a required field left zero is refused with
+not part of the binary ABI. The `Init()` method of a structure that has
+`StructSize` returns a zeroed structure with only `StructSize` set; set every
+required field yourself. `docs/API.md` lists the values the C initializers use; a required field left zero is refused with
 `Result.UnsetField`.
 
 ## Callback lifetime
@@ -21,3 +21,9 @@ with `Marshal.GetFunctionPointerForDelegate(sink)`. The garbage collector does
 not know that native code still uses it: keep the `LogSink` delegate instance
 referenced, for example in a field, until `ContextDestroy` has returned, or a
 later log call may run freed code and crash the process.
+
+## Failed calls
+
+`AoaHidException.Check(result)` does nothing for `Result.Ok` and otherwise throws
+with the result and the `Field` and `Reason` of the library's last error. Call
+it right after the call that returned `result`.

@@ -102,6 +102,7 @@ pub const AOAHID_CHANNEL_READ_REQUEST: i32 = 2;
 
 pub type aoahid_log_sink = Option<unsafe extern "C" fn(a: *mut c_void, b: aoahid_log_level, c: *const c_char)>;
 
+/// The details of the calling thread's last result.
 #[repr(C)]
 pub struct aoahid_error_detail {
     pub code: aoahid_result,
@@ -125,6 +126,7 @@ pub struct aoahid_context_options {
     pub log_user: *mut c_void,
 }
 
+/// A USB device as aoahid_discover found it.
 #[repr(C)]
 pub struct aoahid_device_info {
     pub bus_number: u8,
@@ -138,6 +140,7 @@ pub struct aoahid_device_info {
     pub product: *const c_char,
 }
 
+/// The AOA identification strings (request 52, string IDs 0 to 5): each NUL-terminated, at most 256 bytes with the NUL, or null to leave it out.
 #[repr(C)]
 pub struct aoahid_aoa_strings {
     pub manufacturer: *const c_char,
@@ -148,6 +151,7 @@ pub struct aoahid_aoa_strings {
     pub serial: *const c_char,
 }
 
+/// Limits of the target's Linux HID parser for the kernel it runs; docs/LIMITS.md names the kernel constant behind each and lists them for one revision.
 #[repr(C)]
 pub struct aoahid_linux_hid_policy {
     pub descriptor_bytes: u32,
@@ -158,6 +162,7 @@ pub struct aoahid_linux_hid_policy {
     pub report_data_bits: u64,
 }
 
+/// Every field but interface_number and validate_reports is required.
 #[repr(C)]
 pub struct aoahid_device_options {
     pub struct_size: u32,
@@ -181,6 +186,7 @@ pub struct aoahid_accessory_options {
     pub strings: aoahid_aoa_strings,
 }
 
+/// Selects the first interface (alternate setting 0) with this class, subclass and protocol that has one Bulk IN and one Bulk OUT endpoint.
 #[repr(C)]
 pub struct aoahid_channel_options {
     pub struct_size: u32,
@@ -196,6 +202,7 @@ pub struct aoahid_channel_options {
     pub read_mode: aoahid_channel_read_mode,
 }
 
+/// A Node has one report in flight at a time, taken from the Device's shared pool.
 #[repr(C)]
 pub struct aoahid_node_options {
     pub struct_size: u32,
@@ -204,6 +211,7 @@ pub struct aoahid_node_options {
     pub reserved_slots: u32,
 }
 
+/// The four HID 1.11 physical Global items for one field.
 #[repr(C)]
 pub struct aoahid_physical_properties {
     pub enabled: u32,
@@ -213,6 +221,7 @@ pub struct aoahid_physical_properties {
     pub unit: u32,
 }
 
+/// One report field.
 #[repr(C)]
 pub struct aoahid_integer_field {
     pub logical_minimum: i32,
@@ -221,6 +230,7 @@ pub struct aoahid_integer_field {
     pub physical: aoahid_physical_properties,
 }
 
+/// With enabled 1, every report starts with value (1 to 255).
 #[repr(C)]
 pub struct aoahid_report_id_option {
     pub enabled: u32,
@@ -228,12 +238,14 @@ pub struct aoahid_report_id_option {
     pub reserved8: [u8; 3],
 }
 
+/// Battery Strength (Generic Device Controls 0x06/0x20) as a second Input report in the profile's Application Collection.
 #[repr(C)]
 pub struct aoahid_battery_report {
     pub report_id: aoahid_report_id_option,
     pub strength: aoahid_integer_field,
 }
 
+/// Full N-key rollover: one bit per Usage from usage_minimum (at least 0x04) to usage_maximum, plus the eight modifiers 0xE0 to 0xE7, which the range must not include.
 #[repr(C)]
 pub struct aoahid_keyboard_options {
     pub struct_size: u32,
@@ -245,6 +257,7 @@ pub struct aoahid_keyboard_options {
     pub battery: aoahid_battery_report,
 }
 
+/// X, Y, wheel and pan are relative; their ranges must hold negative and positive values.
 #[repr(C)]
 pub struct aoahid_mouse_options {
     pub struct_size: u32,
@@ -261,6 +274,7 @@ pub struct aoahid_mouse_options {
     pub battery: aoahid_battery_report,
 }
 
+/// One-bit controls on any HUT page: Consumer, System Control, Camera Control, Telephony, ...
 #[repr(C)]
 pub struct aoahid_toggle_options {
     pub struct_size: u32,
@@ -279,6 +293,7 @@ pub struct aoahid_toggle_options {
     pub battery: aoahid_battery_report,
 }
 
+/// One axis.
 #[repr(C)]
 pub struct aoahid_gamepad_axis_option {
     pub role: aoahid_axis_role,
@@ -290,6 +305,7 @@ pub struct aoahid_gamepad_axis_option {
     pub expected_android_axis: *const c_char,
 }
 
+/// At least two axes, one of them AOAHID_AXIS_X and one AOAHID_AXIS_Y, each role once.
 #[repr(C)]
 pub struct aoahid_gamepad_options {
     pub struct_size: u32,
@@ -307,6 +323,7 @@ pub struct aoahid_gamepad_options {
     pub battery: aoahid_battery_report,
 }
 
+/// Fixed-slot Multi-Touch under the Digitizers / Touch Screen Application Collection.
 #[repr(C)]
 pub struct aoahid_touchscreen_options {
     pub struct_size: u32,
@@ -335,6 +352,7 @@ pub struct aoahid_touchscreen_options {
     pub battery: aoahid_battery_report,
 }
 
+/// The touchscreen report under the Digitizers / Touch Pad Application Collection, plus button_count click buttons (0 for a buttonless clickpad).
 #[repr(C)]
 pub struct aoahid_touchpad_options {
     pub struct_size: u32,
@@ -364,6 +382,7 @@ pub struct aoahid_touchpad_options {
     pub battery: aoahid_battery_report,
 }
 
+/// A stylus under the Digitizers / Pen Application Collection (a direct, on-screen pen).
 #[repr(C)]
 pub struct aoahid_pen_options {
     pub struct_size: u32,
@@ -386,6 +405,7 @@ pub struct aoahid_pen_options {
     pub battery: aoahid_battery_report,
 }
 
+/// The pen report under the Digitizers / Digitizer Application Collection (an indirect tablet).
 #[repr(C)]
 pub struct aoahid_digitizer_options {
     pub struct_size: u32,
@@ -408,12 +428,14 @@ pub struct aoahid_digitizer_options {
     pub battery: aoahid_battery_report,
 }
 
+/// An Input report a Raw Node may send: its Report ID and its exact length on the wire.
 #[repr(C)]
 pub struct aoahid_raw_report {
     pub report_id: aoahid_report_id_option,
     pub wire_length: u32,
 }
 
+/// A descriptor of the caller's own.
 #[repr(C)]
 pub struct aoahid_raw_options {
     pub struct_size: u32,
@@ -433,6 +455,7 @@ pub struct aoahid_report_capability {
     pub wire_length: u32,
 }
 
+/// What a Spec sends.
 #[repr(C)]
 pub struct aoahid_capability_manifest {
     pub struct_size: u32,
@@ -447,6 +470,7 @@ pub struct aoahid_capability_manifest {
     pub descriptor_length: usize,
 }
 
+/// Optional values of one touch contact.
 #[repr(C)]
 pub struct aoahid_touchscreen_extra {
     pub pressure: i32,
@@ -463,6 +487,7 @@ pub struct aoahid_touchpad_extra {
     pub azimuth: i32,
 }
 
+/// One pen state.
 #[repr(C)]
 pub struct aoahid_pen_sample {
     pub in_range: u32,
@@ -492,57 +517,110 @@ pub struct aoahid_digitizer_sample {
 }
 
 extern "C" {
+    /// The details of the calling thread's last result.
     pub fn aoahid_last_error() -> *const aoahid_error_detail;
+    /// The name of a result constant.
     pub fn aoahid_result_name(result: aoahid_result) -> *const c_char;
+    /// The version of the library that is running.
     pub fn aoahid_version() -> u32;
+    /// Creates a Context.
     pub fn aoahid_context_create(options: *const aoahid_context_options, out_context: *mut *mut aoahid_context) -> aoahid_result;
+    /// Handles libusb events in AOAHID_EVENT_CALLER_POLL mode.
     pub fn aoahid_context_poll(context: *mut aoahid_context, timeout_ms: u32) -> aoahid_result;
+    /// Closes every Device and frees the Context.
     pub fn aoahid_context_destroy(context: *mut aoahid_context, control_timeout_ms: u32, drain_timeout_ms: u32) -> aoahid_result;
+    /// Retries aoahid_context_destroy until the Context is gone or the time is up.
     pub fn aoahid_context_destroy_blocking(context: *mut aoahid_context, control_timeout_ms: u32, drain_timeout_ms: u32, timeout_ms: u32) -> aoahid_result;
+    /// Lists the USB devices that answer AOA request 51.
     pub fn aoahid_discover(context: *mut aoahid_context, control_timeout_ms: u32, out_discovery: *mut *mut aoahid_discovery) -> aoahid_result;
+    /// The number of entries in a snapshot.
     pub fn aoahid_discovery_count(discovery: *const aoahid_discovery) -> usize;
+    /// One entry of a snapshot.
     pub fn aoahid_discovery_get(discovery: *const aoahid_discovery, index: usize) -> *const aoahid_device_info;
+    /// Frees a snapshot.
     pub fn aoahid_discovery_destroy(discovery: *mut aoahid_discovery);
+    /// Switches a device into accessory mode.
     pub fn aoahid_accessory_start(context: *mut aoahid_context, selected: *const aoahid_device_info, options: *const aoahid_accessory_options, control_timeout_ms: u32) -> aoahid_result;
+    /// Opens a USB device.
     pub fn aoahid_device_open(context: *mut aoahid_context, selected: *const aoahid_device_info, options: *const aoahid_device_options, out_device: *mut *mut aoahid_device) -> aoahid_result;
+    /// Closes a Device with its Nodes and Channels.
     pub fn aoahid_device_close(device: *mut aoahid_device, control_timeout_ms: u32, drain_timeout_ms: u32) -> aoahid_result;
+    /// Reads the error a transfer or event left on the Device.
     pub fn aoahid_device_latched_error(device: *mut aoahid_device) -> aoahid_result;
+    /// Opens a Bulk IN/OUT interface of a Device as a stream.
     pub fn aoahid_channel_open(device: *mut aoahid_device, options: *const aoahid_channel_options, drain_timeout_ms: u32, out_channel: *mut *mut aoahid_channel) -> aoahid_result;
+    /// Closes a Channel.
     pub fn aoahid_channel_close(channel: *mut aoahid_channel, drain_timeout_ms: u32) -> aoahid_result;
+    /// Writes bytes to the Channel's OUT endpoint.
     pub fn aoahid_channel_write(channel: *mut aoahid_channel, data: *const u8, length: usize, out_written: *mut usize, timeout_ms: u32) -> aoahid_result;
+    /// Reads bytes from the Channel's IN endpoint.
     pub fn aoahid_channel_read(channel: *mut aoahid_channel, buffer: *mut u8, capacity: usize, out_received: *mut usize, timeout_ms: u32) -> aoahid_result;
+    /// Makes a keyboard Spec.
     pub fn aoahid_spec_create_keyboard(options: *const aoahid_keyboard_options, out_spec: *mut *mut aoahid_spec) -> aoahid_result;
+    /// Makes a mouse Spec.
     pub fn aoahid_spec_create_mouse(options: *const aoahid_mouse_options, out_spec: *mut *mut aoahid_spec) -> aoahid_result;
+    /// Makes a Spec of one-bit controls on a HUT page.
     pub fn aoahid_spec_create_toggle(options: *const aoahid_toggle_options, out_spec: *mut *mut aoahid_spec) -> aoahid_result;
+    /// Makes a gamepad Spec.
     pub fn aoahid_spec_create_gamepad(options: *const aoahid_gamepad_options, out_spec: *mut *mut aoahid_spec) -> aoahid_result;
+    /// Makes a touchscreen Spec.
     pub fn aoahid_spec_create_touchscreen(options: *const aoahid_touchscreen_options, out_spec: *mut *mut aoahid_spec) -> aoahid_result;
+    /// Makes a touchpad Spec.
     pub fn aoahid_spec_create_touchpad(options: *const aoahid_touchpad_options, out_spec: *mut *mut aoahid_spec) -> aoahid_result;
+    /// Makes a pen Spec.
     pub fn aoahid_spec_create_pen(options: *const aoahid_pen_options, out_spec: *mut *mut aoahid_spec) -> aoahid_result;
+    /// Makes a digitizer Spec.
     pub fn aoahid_spec_create_digitizer(options: *const aoahid_digitizer_options, out_spec: *mut *mut aoahid_spec) -> aoahid_result;
+    /// Makes a Spec from the caller's own HID report descriptor.
     pub fn aoahid_spec_create_raw(options: *const aoahid_raw_options, out_spec: *mut *mut aoahid_spec) -> aoahid_result;
+    /// Adds a reference to a Spec.
     pub fn aoahid_spec_retain(spec: *mut aoahid_spec);
+    /// Gives up a reference to a Spec.
     pub fn aoahid_spec_release(spec: *mut aoahid_spec);
+    /// The report descriptor of a Spec.
     pub fn aoahid_spec_descriptor(spec: *const aoahid_spec, bytes: *const *const u8, length: *mut usize) -> aoahid_result;
+    /// What a Spec sends.
     pub fn aoahid_spec_manifest(spec: *const aoahid_spec, manifest: *mut aoahid_capability_manifest) -> aoahid_result;
+    /// Registers a Spec on a Device as one AOA HID.
     pub fn aoahid_node_open(device: *mut aoahid_device, spec: *mut aoahid_spec, options: *const aoahid_node_options, control_timeout_ms: u32, out_node: *mut *mut aoahid_node) -> aoahid_result;
+    /// Unregisters a Node.
     pub fn aoahid_node_close(node: *mut aoahid_node, control_timeout_ms: u32, drain_timeout_ms: u32) -> aoahid_result;
+    /// The AOA HID ID of a Node.
     pub fn aoahid_node_id(node: *const aoahid_node) -> u16;
+    /// What a Node sends.
     pub fn aoahid_node_manifest(node: *const aoahid_node, manifest: *mut aoahid_capability_manifest) -> aoahid_result;
+    /// Queues the Node's current state as a report.
     pub fn aoahid_node_submit(node: *mut aoahid_node, send_timeout_ms: u32) -> aoahid_result;
+    /// Sends reports until the Node's state has been delivered.
     pub fn aoahid_node_submit_blocking(node: *mut aoahid_node, timeout_ms: u32) -> aoahid_result;
+    /// Presses (down 1) or releases (down 0) one Keyboard page Usage, a modifier or a key of the Spec's range.
     pub fn aoahid_keyboard_key(node: *mut aoahid_node, usage: u16, down: u32) -> aoahid_result;
+    /// Adds to the pending X and Y movement.
     pub fn aoahid_mouse_move(node: *mut aoahid_node, dx: i32, dy: i32) -> aoahid_result;
+    /// Adds to the pending wheel and pan movement, as aoahid_mouse_move does.
     pub fn aoahid_mouse_scroll(node: *mut aoahid_node, wheel: i32, pan: i32) -> aoahid_result;
+    /// Presses (down 1) or releases (down 0) button 1 to button_count.
     pub fn aoahid_mouse_button(node: *mut aoahid_node, button: u32, down: u32) -> aoahid_result;
+    /// Presses (down 1) or releases (down 0) one Usage of the Spec's allow-list; any number may be pressed at once.
     pub fn aoahid_toggle_usage(node: *mut aoahid_node, usage: u16, down: u32) -> aoahid_result;
+    /// Presses (down 1) or releases (down 0) button 1 to button_count.
     pub fn aoahid_gamepad_button(node: *mut aoahid_node, button: u32, down: u32) -> aoahid_result;
+    /// Sets axes[axis_index] of the Spec to value, which must be in its logical range.
     pub fn aoahid_gamepad_axis(node: *mut aoahid_node, axis_index: usize, value: i32) -> aoahid_result;
+    /// Sets the D-pad from four 0/1 directions.
     pub fn aoahid_gamepad_dpad(node: *mut aoahid_node, up: u32, down: u32, right: u32, left: u32) -> aoahid_result;
+    /// down 1 places contact_id in a free slot, or moves it if it is already down; down 0 lifts it at x, y.
     pub fn aoahid_touchscreen_contact(node: *mut aoahid_node, contact_id: u32, down: u32, x: i32, y: i32, extra: *const aoahid_touchscreen_extra) -> aoahid_result;
+    /// As aoahid_touchscreen_contact, for a Touchpad Node.
     pub fn aoahid_touchpad_contact(node: *mut aoahid_node, contact_id: u32, down: u32, x: i32, y: i32, extra: *const aoahid_touchpad_extra) -> aoahid_result;
+    /// Presses (down 1) or releases (down 0) click button 1 to button_count.
     pub fn aoahid_touchpad_button(node: *mut aoahid_node, button: u32, down: u32) -> aoahid_result;
+    /// Sets the whole pen state.
     pub fn aoahid_pen_update(node: *mut aoahid_node, sample: *const aoahid_pen_sample) -> aoahid_result;
+    /// As aoahid_pen_update, for a Digitizer Node.
     pub fn aoahid_digitizer_update(node: *mut aoahid_node, sample: *const aoahid_digitizer_sample) -> aoahid_result;
+    /// Sets the battery level of a Node whose Spec has enable_battery.
     pub fn aoahid_battery_update(node: *mut aoahid_node, strength: i32) -> aoahid_result;
+    /// Sends one report of a Raw Spec's Node.
     pub fn aoahid_raw_submit(node: *mut aoahid_node, report: *const u8, length: usize, send_timeout_ms: u32) -> aoahid_result;
 }

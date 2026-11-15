@@ -18,8 +18,10 @@ below for libmimusb; for libaoahid read "aoahid", "AOAHID" and "AoaHid" in place
     python3 tools/bindings/generate.py           rewrite the files
     python3 tools/bindings/generate.py --check   fail when a file differs from the header
 
-Only the exported functions are bound. The static inline initializers of mimusb.h are C code,
-not part of the binary ABI; a binding fills every field itself, struct_size included.
+Only the exported functions are bound, each with the first sentence of its comment in the header as
+documentation (a docstring, an XML summary, a doc comment). The static inline initializers of mimusb.h are C code,
+not part of the binary ABI. A binding sets no value for the caller: a Python structure and the
+C# Init() of one with struct_size set that field (its size) and leave the rest zero.
 """
 
 from __future__ import annotations
@@ -167,6 +169,7 @@ class Model:
     flags: list[tuple[str, int]] = field(default_factory=list)  # enumerators with no type name
     macros: list[tuple[str, int, bool]] = field(default_factory=list)  # name, value, unsigned
     funcs: list[Func] = field(default_factory=list)
+    docs: dict[str, str] = field(default_factory=dict)  # C name -> one-sentence summary
 
 
 # ---- Reading the header -----------------------------------------------------------------
@@ -184,6 +187,38 @@ def run(command: list[str]) -> str:
         raise GenerateError(f"{' '.join(command)} failed: {detail.strip()}") from error
 
 
+FIELD_LABELS = ("Ownership:", "Blocking:", "Synchronization:", "Returns:")
+DOC_RE = re.compile(
+    r"/\*(?P<body>(?:(?!\*/).)*?)\*/[ \t]*\n"
+    r"(?:typedef struct (?P<struct>\w+) \{|" + UPPER + r"API\b[^;{]*?\b" + UPPER
+    + r"CALL\s+(?P<func>\w+)\s*\()",
+    re.S,
+)
+
+
+def load_docs(header: Path) -> dict[str, str]:
+    """The first sentence of the comment before each exported function and structure."""
+    docs: dict[str, str] = {}
+    for match in DOC_RE.finditer(header.read_text(encoding="utf-8")):
+        lines = [line.strip().lstrip("*").strip() for line in match["body"].split("\n")]
+        if match["func"]:
+            lines = lines[1:]  # the first line is the function's name
+        summary: list[str] = []
+        for line in lines:
+            if line.startswith(FIELD_LABELS) or line.startswith("----"):
+                break
+            if not line and summary:
+                break
+            if line:
+                summary.append(line)
+        text = " ".join(summary)
+        sentence = re.match(r".*?[.](?=\s|$)", text)
+        name = match["func"] or match["struct"]
+        if text:
+            docs[name] = (sentence.group(0) if sentence else text).replace("*/", "* /")
+    return docs
+
+
 def load_model() -> Model:
     ast = json.loads(
         run([clang(), "-std=c11", "-Xclang", "-ast-dump=json", "-fsyntax-only", "-Iinclude",
@@ -191,6 +226,7 @@ def load_model() -> Model:
     )
     nodes = ast["inner"]
     model = Model()
+    model.docs = load_docs(ROOT / HEADER_NAME)
     complete: dict[str, Struct] = {}
     forward: list[str] = []
 
@@ -369,8 +405,9 @@ def gen_python(model: Model) -> str:
         f"# {GENERATED}",
         '"""Complete, literal ctypes declarations for the stable ``mimusb.h`` C ABI.',
         "",
-        "The binding chooses no option overrides: the caller fills ``struct_size`` and every",
-        "field. The static inline initializers of ``mimusb.h`` are C code and are not bound.",
+        "A structure with ``struct_size`` has it set to its size when created without positional",
+        "arguments; every other field starts zero and is the caller's to set. The static inline",
+        "initializers of ``mimusb.h`` are C code and are not bound.",
         '"""',
         "",
         "from __future__ import annotations",
@@ -392,10 +429,20 @@ def gen_python(model: Model) -> str:
             ret = py_return(model, obj.ret)
             out += ["", f"{type_name(obj.name)} = c.CFUNCTYPE({ret}, {args})"]
         elif kind == "struct":
-            out += ["", "", f"class {type_name(obj.name)}(c.Structure):", "    _fields_ = ["]
+            out += ["", "", f"class {type_name(obj.name)}(c.Structure):"]
+            if obj.name in model.docs:
+                out.append(f'    """{model.docs[obj.name]}"""')
+                out.append("")
+            out.append("    _fields_ = [")
             for f in obj.fields:
                 out.append(f'        ("{f.name}", {py_type(model, f.type)}),')
             out.append("    ]")
+            if any(f.name == "struct_size" for f in obj.fields):
+                out += ["",
+                        "    def __init__(self, *args: object, **kwargs: object) -> None:",
+                        "        super().__init__(*args, **kwargs)",
+                        '        if not args and "struct_size" not in kwargs:',
+                        "            self.struct_size = c.sizeof(self)"]
     out += ["", "", "ABI_STRUCTS = {"]
     for struct in model.structs.values():
         out.append(f'    "{struct.name}": {type_name(struct.name)},')
@@ -403,14 +450,38 @@ def gen_python(model: Model) -> str:
             "def load(path: Union[os.PathLike, str]) -> c.CDLL:",
             '    """Load exactly the caller-selected shared library and declare every symbol."""',
             "    library = c.CDLL(os.fspath(path))", "",
-            "    def declare(name: str, arguments: list[object], result: object) -> None:",
+            "    def declare(name: str, arguments: list[object], result: object, doc: str) -> None:",
             "        function = getattr(library, name)",
             "        function.argtypes = arguments",
-            "        function.restype = result", ""]
+            "        function.restype = result",
+            "        function.__doc__ = doc", ""]
     for func in model.funcs:
         args = ", ".join(py_type(model, p.type) for p in func.params)
-        out.append(f'    declare("{func.name}", [{args}], {py_return(model, func.ret)})')
+        doc = model.docs.get(func.name, "").replace("\\", "\\\\").replace('"', '\\"')
+        out.append(f'    declare("{func.name}", [{args}], {py_return(model, func.ret)}, "{doc}")')
     out += ["    return library", "", "",
+            "class Error(Exception):",
+            '    """A call did not return MIMUSB_OK; carries the library\'s details of that result."""',
+            "",
+            "    def __init__(self, code: int, name: str, field: str, reason: str) -> None:",
+            '        super().__init__(f"{name}: {field}: {reason}" if field else name)',
+            "        self.code = code",
+            "        self.name = name",
+            "        self.field = field",
+            "        self.reason = reason", "", "",
+            "def check(library: c.CDLL, result: int) -> int:",
+            '    """Return result when it is MIMUSB_OK, else raise Error with the details of this',
+            "    thread's last result. Call it right after the call that returned result; every",
+            '    other result, one a caller expects included, is compared by hand instead."""',
+            "    if result == MIMUSB_OK:",
+            "        return result",
+            "    detail = library.mimusb_last_error().contents",
+            "    raise Error(",
+            "        result,",
+            '        library.mimusb_result_name(result).decode("ascii"),',
+            '        (detail.field or b"").decode("utf-8", "replace"),',
+            '        (detail.reason or b"").decode("utf-8", "replace"),',
+            "    )", "", "",
             "# Keep ``from mimusb import *`` to the stable binding surface.",
             '__all__ = [name for name in globals() if name.startswith("MIMUSB_")]',
             "__all__ += ["]
@@ -422,7 +493,7 @@ def gen_python(model: Model) -> str:
             out.append(f'    "{type_name(obj)}P",')
         else:
             out.append(f'    "{type_name(obj.name)}",')
-    out += ['    "ABI_STRUCTS",', '    "load",', "]", ""]
+    out += ['    "ABI_STRUCTS",', '    "Error",', '    "check",', '    "load",', "]", ""]
     return "\n".join(out)
 
 
@@ -468,8 +539,10 @@ def gen_python_test(model: Model) -> str:
         "    failures: list[str] = []",
         "    for c_name, (cls_name, fields) in LAYOUT.items():",
         "        cls = getattr(native, cls_name)",
-        '        if "struct_size" in fields and cls().struct_size != 0:',
-        '            failures.append(f"{c_name}: the binding fills struct_size")',
+        '        if "struct_size" in fields and cls().struct_size != native.c.sizeof(cls):',
+        '            failures.append(f"{c_name}: a new structure does not have struct_size set")',
+        '        if cls(struct_size=0).struct_size != 0:',
+        '            failures.append(f"{c_name}: struct_size given as an argument is overridden")',
         "        if native.ABI_STRUCTS.get(c_name) is not cls:",
         '            failures.append(f"{c_name}: missing from ABI_STRUCTS")',
         '        if native.c.sizeof(cls) != expected[f"{c_name}.size"]:',
@@ -635,6 +708,14 @@ def has_struct_pointer(model: Model, func: Func) -> bool:
                and kind_of(model, p.type.inner.name) == "struct" for p in func.params)
 
 
+def cs_doc(model: Model, c_name: str, indent: str) -> list[str]:
+    text = model.docs.get(c_name)
+    if not text:
+        return []
+    escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return [f"{indent}/// <summary>{escaped}</summary>"]
+
+
 def gen_csharp(model: Model) -> str:
     out = [
         f"// {BANNER}",
@@ -662,10 +743,16 @@ def gen_csharp(model: Model) -> str:
     for kind, obj in model.order:
         if kind == "struct":
             unsafe = "unsafe " if has_fixed_buffer(obj) else ""
+            out += cs_doc(model, obj.name, "")
             out += ["[StructLayout(LayoutKind.Sequential)]",
                     f"public {unsafe}struct {type_name(obj.name)}", "{"]
             for f in obj.fields:
                 out += cs_field(model, f)
+            if any(f.name == "struct_size" for f in obj.fields):
+                name = type_name(obj.name)
+                out += ["",
+                        "    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>",
+                        f"    public static {name} Init() => new() {{ StructSize = (uint)Marshal.SizeOf<{name}>() }};"]
             out += ["}", ""]
     out += ["public static class Native", "{",
             '    private const string Library = "mimusb";',
@@ -694,10 +781,42 @@ def gen_csharp(model: Model) -> str:
         for raw in variants:
             taken = {q.name for q in func.params}
             params = ", ".join(cs_param(model, func, p, raw, taken) for p in func.params)
+            out += cs_doc(model, func.name, "    ")
             out.append(f'    [DllImport(Library, EntryPoint = "{func.name}", ExactSpelling = true, '
                        "CallingConvention = Call)]")
             out.append(f"    public static extern {cs_return(model, func.ret)} {short}({params});")
     out += ["}", ""]
+    out += [
+        "/// <summary>A call did not return Result.Ok; carries the library's details of that result.</summary>",
+        "public sealed class MimUsbException : Exception",
+        "{",
+        "    public Result Code { get; }",
+        "    public string? Field { get; }",
+        "    public string? Reason { get; }",
+        "",
+        "    public MimUsbException(Result code, string? field, string? reason)",
+        '        : base(string.IsNullOrEmpty(field) ? code.ToString() : $"{code}: {field}: {reason}")',
+        "    {",
+        "        Code = code;",
+        "        Field = field;",
+        "        Reason = reason;",
+        "    }",
+        "",
+        "    /// <summary>Does nothing for Result.Ok; otherwise throws with the details of this thread's last result."
+        " Call it right after the call that returned result.</summary>",
+        "    public static void Check(Result result)",
+        "    {",
+        "        if (result == Result.Ok)",
+        "        {",
+        "            return;",
+        "        }",
+        "        var detail = Marshal.PtrToStructure<ErrorDetail>(Native.LastError());",
+        "        throw new MimUsbException(result, Marshal.PtrToStringUTF8(detail.Field),",
+        "                                  Marshal.PtrToStringUTF8(detail.Reason));",
+        "    }",
+        "}",
+        "",
+    ]
     return "\n".join(out)
 
 
@@ -747,8 +866,10 @@ def gen_csharp_test(model: Model) -> str:
     for struct in model.structs.values():
         cs = type_name(struct.name)
         if any(f.name == "struct_size" for f in struct.fields):
-            out.append(f'if (new {cs}().StructSize != 0) failures.Add("{struct.name}: the binding fills '
+            out.append(f'if (new {cs}().StructSize != 0) failures.Add("{struct.name}: new() fills '
                        'struct_size");')
+            out.append(f'if ({cs}.Init().StructSize != Marshal.SizeOf<{cs}>()) failures.Add('
+                       f'"{struct.name}: Init() does not set struct_size");')
         out.append(f'Check("{struct.name}.size", Marshal.SizeOf<{cs}>());')
         for f in struct.fields:
             out.append(f'Check("{struct.name}.{f.name}", '
@@ -789,6 +910,11 @@ def rs_return(model: Model, t: T) -> str:
     return f" -> {rs_type(model, t)}"
 
 
+def rs_doc(model: Model, c_name: str, indent: str) -> list[str]:
+    text = model.docs.get(c_name)
+    return [f"{indent}/// {text}"] if text else []
+
+
 def gen_rust(model: Model) -> str:
     out = [
         f"// {BANNER}",
@@ -823,13 +949,14 @@ def gen_rust(model: Model) -> str:
             out.append(f"pub type {obj.name} = Option<unsafe extern \"C\" fn({params})"
                        f"{rs_return(model, obj.ret)}>;")
         elif kind == "struct":
-            out += ["", "#[repr(C)]", f"pub struct {obj.name} {{"]
+            out += [""] + rs_doc(model, obj.name, "") + ["#[repr(C)]", f"pub struct {obj.name} {{"]
             for f in obj.fields:
                 out.append(f"    pub {rs_ident(f.name)}: {rs_type(model, f.type)},")
             out.append("}")
     out += ["", 'extern "C" {']
     for func in model.funcs:
         params = ", ".join(f"{rs_ident(p.name)}: {rs_type(model, p.type)}" for p in func.params)
+        out += rs_doc(model, func.name, "    ")
         out.append(f"    pub fn {func.name}({params}){rs_return(model, func.ret)};")
     out += ["}", ""]
     return "\n".join(out)

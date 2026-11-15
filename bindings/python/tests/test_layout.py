@@ -139,8 +139,10 @@ def main() -> int:
     failures: list[str] = []
     for c_name, (cls_name, fields) in LAYOUT.items():
         cls = getattr(native, cls_name)
-        if "struct_size" in fields and cls().struct_size != 0:
-            failures.append(f"{c_name}: the binding fills struct_size")
+        if "struct_size" in fields and cls().struct_size != native.c.sizeof(cls):
+            failures.append(f"{c_name}: a new structure does not have struct_size set")
+        if cls(struct_size=0).struct_size != 0:
+            failures.append(f"{c_name}: struct_size given as an argument is overridden")
         if native.ABI_STRUCTS.get(c_name) is not cls:
             failures.append(f"{c_name}: missing from ABI_STRUCTS")
         if native.c.sizeof(cls) != expected[f"{c_name}.size"]:
