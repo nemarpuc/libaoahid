@@ -5,6 +5,10 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-15
+
+**Not hardware-verified.** Nothing in this release changes how the library behaves: header comments, binding helpers and examples only. No phone was used; the keyboard examples were only built by CI. The only hardware record is the `[0.1.0]` entry below.
+
 ### Changed
 
 - `include/aoahid.h`: a function comment now starts with a one-sentence summary and lists
