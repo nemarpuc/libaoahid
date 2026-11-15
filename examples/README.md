@@ -80,8 +80,15 @@ platform-specific notes.
 
 ## Python, Rust, and C# examples
 
-Each is a short enumerate-only program: `examples/python/enumerate.py`,
+Each has an enumerate-only program: `examples/python/enumerate.py`,
 `examples/csharp/Enumerate.csproj`, and the Rust one at
 `bindings/rust/aoahid-sys/examples/enumerate.rs`. The `.csproj` and
 `Cargo.toml` name the exact dependency versions they were written against. `docs/EXAMPLES.md` in this
 package explains what each example demonstrates.
+
+`examples/python/keyboard.py LIBAOAHID_PATH`, `examples/csharp/Keyboard/Keyboard.csproj` and, in a
+source checkout, `bindings/rust/aoahid-sys/examples/keyboard.rs` open the first phone found,
+register a keyboard and press the letter `a` once. Open a text field on the phone first. The Python
+and C# ones turn a failed call into an exception with the library's reason (`aoahid.check`,
+`AoaHidException.Check`); the Rust one does the same in a small function of its own. CI builds
+them; no phone is attached there, so they have not been run against one.

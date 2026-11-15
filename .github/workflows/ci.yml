@@ -387,6 +387,7 @@ jobs:
           PYTHONPATH=bindings/python \
             python examples/python/enumerate.py \
               "$PWD/build/bindings/libaoahid.so" 10
+          python -m py_compile examples/python/keyboard.py
 
       - name: Check C# layout against compiled C
         run: >-
@@ -403,6 +404,7 @@ jobs:
             --project examples/csharp/Enumerate.csproj \
             --configuration Release \
             -- 10
+          dotnet build examples/csharp/Keyboard/Keyboard.csproj --configuration Release
 
       - name: Select exact Rust toolchain
         run: rustup toolchain install 1.89.0 --profile minimal --no-self-update

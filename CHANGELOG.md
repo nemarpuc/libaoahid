@@ -17,6 +17,8 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ### Added
 
+- Examples: a minimal `keyboard` program for Python, C# and Rust that presses the letter `a` on
+  the first phone found.
 - Python: a structure that has `struct_size` is created with it set to its size (every other field
   stays zero); `aoahid.check(library, result)` raises `aoahid.Error` with the result name and the
   `field` and `reason` of the last error when a call does not return `AOAHID_OK`.
