@@ -5,6 +5,24 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+### Changed
+
+- `include/aoahid.h`: a function comment now starts with a one-sentence summary and lists
+  Ownership, Blocking and Synchronization only where they differ from the defaults stated at the
+  top of the header; Returns is unchanged.
+- `tools/check_public_contracts.py` requires the summary line and one `Returns:` field; the other
+  three fields are optional.
+- Bindings: `tools/bindings/generate.py` carries the first sentence of each function and structure
+  comment into the generated Python docstrings, C# XML summaries and Rust doc comments.
+
+### Added
+
+- Python: a structure that has `struct_size` is created with it set to its size (every other field
+  stays zero); `aoahid.check(library, result)` raises `aoahid.Error` with the result name and the
+  `field` and `reason` of the last error when a call does not return `AOAHID_OK`.
+- C#: `Init()` on every structure that has `StructSize` returns a zeroed structure with it set;
+  `AoaHidException.Check(result)` throws with the result and the details of the last error.
+
 ## [0.2.0] - 2026-11-10
 
 **Not hardware-verified.** This release changes the release packaging, the tests, the documentation and one
