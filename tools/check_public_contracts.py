@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 libaoahid contributors
-"""Require an adjacent, per-function contract for every exported C declaration."""
+"""Require an adjacent comment with a summary and a Returns: field for every exported C declaration."""
 
 from __future__ import annotations
 
@@ -17,7 +17,8 @@ EXPORT_RE = re.compile(
     r"(?P<name>aoahid_[A-Za-z0-9_]+)\s*\([^;]*?\)\s*;",
     re.MULTILINE | re.DOTALL,
 )
-REQUIRED_LABELS = ("Ownership:", "Blocking:", "Synchronization:", "Returns:")
+OPTIONAL_LABELS = ("Ownership:", "Blocking:", "Synchronization:")  # only where they differ from the defaults
+LABELS = OPTIONAL_LABELS + ("Returns:",)
 
 
 def adjacent_comment(text: str, declaration_start: int) -> str | None:
@@ -48,9 +49,14 @@ def main() -> int:
             continue
         if not comment.startswith(f"/* {name}\n"):
             failures.append(f"{name}: comment must start with the exact function name")
-        for label in REQUIRED_LABELS:
-            if comment.count(label) != 1:
-                failures.append(f"{name}: requires exactly one {label} field")
+        lines = comment.split("\n")
+        if len(lines) < 2 or not lines[1].startswith(" * ") or lines[1][3:].startswith(LABELS):
+            failures.append(f"{name}: the second line must be a summary, not a field")
+        for label in LABELS:
+            if comment.count(label) > 1:
+                failures.append(f"{name}: more than one {label} field")
+        if comment.count("Returns:") != 1:
+            failures.append(f"{name}: requires exactly one Returns: field")
         if "aoahid_result" in match.group("return_type"):
             returns = comment.split("Returns:", 1)[-1]
             if "AOAHID_OK" not in returns or "AOAHID_ERR_" not in returns:
