@@ -2,9 +2,9 @@
 
 ## Supported Versions
 
-| Version | Supported |
-| :--- | :--- |
-| 0.1.x | Yes |
+Only the [latest release](https://github.com/nemarpuc/libaoahid/releases/latest)
+receives security fixes. Before 1.0.0 a fix may come with a change of the
+minor number.
 
 ## Scope and Threat Model
 

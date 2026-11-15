@@ -67,3 +67,7 @@ is in [docs/RELEASES.md](docs/RELEASES.md#release-triggers-and-dry-runs).
   on one device and build, and goes into the release's `CHANGELOG.md` section
   before [docs/TARGET_MATRIX.md](docs/TARGET_MATRIX.md) lists it. Source review
   or passing fake-libusb tests alone is not hardware evidence.
+
+## Code of Conduct
+
+Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
