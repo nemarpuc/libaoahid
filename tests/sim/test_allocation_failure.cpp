@@ -12,6 +12,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <new>
@@ -76,7 +77,14 @@ using sim::kDrainTimeoutMs;
 using sim::kSendTimeoutMs;
 using sim::kThreadDrainTimeoutMs;
 
+// Where the current run stands, printed when a step fails unexpectedly.
+long g_run_allocation = 0;
+bool g_run_internal_thread = false;
+std::chrono::steady_clock::time_point g_run_start;
+
 void arm(const long allocation) {
+    g_run_allocation = allocation;
+    g_run_start = std::chrono::steady_clock::now();
     g_failed.store(false, std::memory_order_relaxed);
     g_countdown.store(allocation, std::memory_order_relaxed);
 }
@@ -126,8 +134,16 @@ bool step(const aoahid_result result, const char* name) {
     const bool expected = result == AOAHID_ERR_INTERNAL && sim::last_error_is(result) &&
                           g_failed.load(std::memory_order_relaxed);
     if (!expected) {
-        std::fprintf(stderr, "%s returned %s after an allocation failure\n", name,
-                     aoahid_result_name(result));
+        const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    std::chrono::steady_clock::now() - g_run_start)
+                                    .count();
+        std::fprintf(stderr,
+                     "%s returned %s after an allocation failure (mode %s, failed allocation "
+                     "%ld, injected %d, %lld ms since the run began)\n",
+                     name, aoahid_result_name(result),
+                     g_run_internal_thread ? "internal thread" : "caller poll", g_run_allocation,
+                     g_failed.load(std::memory_order_relaxed) ? 1 : 0,
+                     static_cast<long long>(elapsed_ms));
     }
     AOAHID_CHECK(expected);
     return false;
@@ -137,6 +153,7 @@ bool step(const aoahid_result result, const char* name) {
 void run_session(const aoahid_event_mode mode, const long allocation) {
     Made made{};
     const sim::Phone phone = sim::add_phone(0x2D00U, true);
+    g_run_internal_thread = mode == AOAHID_EVENT_INTERNAL_THREAD;
     arm(allocation);
     const aoahid_context_options context_options = sim::context_options(mode);
     const auto finish = [&made]() {
