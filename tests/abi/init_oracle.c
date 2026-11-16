@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 libaoahid contributors
 /* Prints, for every option structure, the bytes the static inline aoahid_*_init function leaves.
- * The foreign-binding tests compare their own initial values with these (pointer fields excepted). */
+ * The foreign-binding tests compare their own initial values with these (pointer fields excepted).
+ */
 #include "aoahid.h"
 
 #include <stdio.h>
 
-#define DUMP(name)                                                                       \
-    do {                                                                                 \
-        aoahid_##name value;                                                             \
-        const unsigned char* bytes = (const unsigned char*)&value;                       \
-        aoahid_##name##_init(&value);                                                    \
-        printf("%s=", #name);                                                            \
-        for (size_t i = 0; i < sizeof(value); ++i) printf("%02x", (unsigned)bytes[i]);   \
-        printf("\n");                                                                    \
+#define DUMP(name)                                                                                 \
+    do {                                                                                           \
+        aoahid_##name value;                                                                       \
+        const unsigned char* bytes = (const unsigned char*)&value;                                 \
+        aoahid_##name##_init(&value);                                                              \
+        printf("%s=", #name);                                                                      \
+        for (size_t i = 0; i < sizeof(value); ++i)                                                 \
+            printf("%02x", (unsigned)bytes[i]);                                                    \
+        printf("\n");                                                                              \
     } while (0)
 
 int main(void) {
@@ -43,9 +45,10 @@ int main(void) {
         for (size_t i = 0; i < gamepad.axis_count; ++i) {
             const aoahid_gamepad_axis_option* axis = &gamepad.axes[i];
             printf("gamepad_axis%zu=%d,%u,%u,%d,%d,%u,%d,%s,%s\n", i, (int)axis->role,
-                   (unsigned)axis->usage_page, (unsigned)axis->usage, (int)axis->value.logical_minimum,
-                   (int)axis->value.logical_maximum, (unsigned)axis->value.bit_width,
-                   (int)axis->neutral_value, axis->expected_linux_code, axis->expected_android_axis);
+                   (unsigned)axis->usage_page, (unsigned)axis->usage,
+                   (int)axis->value.logical_minimum, (int)axis->value.logical_maximum,
+                   (unsigned)axis->value.bit_width, (int)axis->neutral_value,
+                   axis->expected_linux_code, axis->expected_android_axis);
         }
         printf("pen_barrel=%zu,%u\n", pen.barrel_usage_count, (unsigned)pen.barrel_usages[0]);
         printf("accessory=%s,%s\n", accessory.strings.manufacturer, accessory.strings.model);

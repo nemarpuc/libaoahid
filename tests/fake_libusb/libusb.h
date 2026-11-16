@@ -361,16 +361,19 @@ typedef struct aoahid_fake_libusb_event_stats {
     size_t successful_submits;
 } aoahid_fake_libusb_event_stats;
 
-/* The two a foreign-language test of the shared library calls to give it a device; the library is
- * built with hidden symbols otherwise (tests/fake_libusb is never part of a release build). */
-#if defined(_WIN32)
-#define AOAHID_FAKE_EXPORT
-#else
+/* The two a foreign-language test of the shared library calls to give it a device. They are
+ * exported only when the build defines AOAHID_FAKE_EXPORT_TEST_API (the bindings CI job does);
+ * every other build keeps the library's exports to exactly those of aoahid.h, which
+ * tools/symbol-lint checks. */
+#if defined(AOAHID_FAKE_EXPORT_TEST_API) && !defined(_WIN32)
 #define AOAHID_FAKE_EXPORT __attribute__((visibility("default")))
+#else
+#define AOAHID_FAKE_EXPORT
 #endif
 
 AOAHID_FAKE_EXPORT void aoahid_fake_libusb_reset(void);
-AOAHID_FAKE_EXPORT int aoahid_fake_libusb_add_device(const aoahid_fake_libusb_device_config* config);
+AOAHID_FAKE_EXPORT int
+aoahid_fake_libusb_add_device(const aoahid_fake_libusb_device_config* config);
 void aoahid_fake_libusb_set_present(size_t device_index, int present);
 void aoahid_fake_libusb_set_protocol(size_t device_index, uint16_t protocol_version);
 void aoahid_fake_libusb_set_claim_result(size_t device_index, int result);

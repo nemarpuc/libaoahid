@@ -367,6 +367,8 @@ jobs:
           cmake -S . -B build/bindings -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DAOAHID_USE_FAKE_LIBUSB=ON \
+            -DCMAKE_C_FLAGS=-DAOAHID_FAKE_EXPORT_TEST_API=1 \
+            -DCMAKE_CXX_FLAGS=-DAOAHID_FAKE_EXPORT_TEST_API=1 \
             -DAOAHID_BUILD_SHARED=ON \
             -DAOAHID_BUILD_STATIC=OFF \
             -DAOAHID_BUILD_TESTS=ON \
