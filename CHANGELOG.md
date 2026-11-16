@@ -7,6 +7,12 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ### Changed
 
+- Bindings: the Python, C# and Rust bindings carry the values of the C `aoahid_*_init` functions
+  (`aoahid.initial`, the C# `Init()` methods, Rust `Default`), where they set only `struct_size`
+  before; a test per language compares them byte for byte with the compiled C initializers
+  (`tests/abi/init_oracle.c`). The C# `Init()` of the twelve structures whose C initializer fills
+  values now fills them too.
+
 - Docs: `docs/PROTOCOL.md` says the kernel passes a request 57 payload to `hid_report_raw_event`
   (it named `hid_input_report`) and that `f_accessory.c` does not use `uhid`; `docs/VERIFICATION.md`
   and `docs/LATENCY.md` no longer name `uhid`, and `docs/LATENCY.md` names
@@ -14,6 +20,12 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ### Added
 
+- Bindings: owning objects, so a program needs no hand-written release code: Python `aoahid.Session`,
+  C# `AoaSession`, Rust `Context`, `Device` and `Node`. They open a Node's Spec and release it in the
+  right order, wait 100 ms after opening Nodes (`docs/API.md` "Open sequence"), refuse a native library
+  of another version, and refuse `open_only` unless exactly one USB device is present. Short keyboard
+  examples in the three languages; the former ones are kept as `keyboard_raw.py`, `examples/csharp/KeyboardRaw`
+  and `aoahid-sys/examples/keyboard.rs`.
 - Docs: `docs/PROTOCOL.md` section "Report IDs and one HID device per Node": Report IDs in a
   descriptor, one `hid_device` per Node, why several Specs are not joined into one HID device, and
   how Android classifies and identifies the resulting `evdev` devices, each with its source commit.

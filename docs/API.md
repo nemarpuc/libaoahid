@@ -35,10 +35,13 @@ structure layout does not change when a compiler uses short enums.
 ## Initial values {#initial-values}
 
 The initializers are `static inline` functions in `aoahid.h`, so they are not
-in the binary ABI and the language bindings do not have them; a binding sets
-the same fields itself. `aoahid.hpp` adds one function per initializer that
+in the binary ABI. `aoahid.hpp` adds one function per initializer that
 returns the initialized structure (`aoahid::device_options` returns what
-`aoahid_device_options_init` fills in; see [C++ header](#c-header)).
+`aoahid_device_options_init` fills in; see [C++ header](#c-header)). The
+Python, C# and Rust bindings carry the same values (`aoahid.initial`, the
+`Init()` methods, `Default`), and a test in each compares them byte for byte
+with the compiled C initializers; the generated structures alone, such as a
+Python `ctypes` structure created without arguments, set only `struct_size`.
 
 | Initializer | What it fills in |
 |---|---|

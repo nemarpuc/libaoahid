@@ -372,7 +372,7 @@ jobs:
             -DAOAHID_BUILD_TESTS=ON \
             -DAOAHID_BUILD_EXAMPLES=OFF
           cmake --build build/bindings \
-            --target aoahid aoahid_abi_layout_oracle \
+            --target aoahid aoahid_abi_layout_oracle aoahid_abi_init_oracle \
             --parallel
 
       - name: Check the generated bindings against the header, and the Python layout
@@ -385,16 +385,25 @@ jobs:
             AOAHID_ABI_ORACLE="$PWD/build/bindings/aoahid_abi_layout_oracle" \
             python bindings/python/tests/test_layout.py
           PYTHONPATH=bindings/python \
+            AOAHID_INIT_ORACLE="$PWD/build/bindings/aoahid_abi_init_oracle" \
+            python bindings/python/tests/test_initial.py
+          PYTHONPATH=bindings/python \
+            AOAHID_FAKE_LIBRARY="$PWD/build/bindings/libaoahid.so" \
+            python bindings/python/tests/test_session.py
+          PYTHONPATH=bindings/python \
             python examples/python/enumerate.py \
               "$PWD/build/bindings/libaoahid.so" 10
-          python -m py_compile examples/python/keyboard.py
+          python -m py_compile examples/python/keyboard.py examples/python/keyboard_raw.py
 
-      - name: Check C# layout against compiled C
+      - name: Check C# layout and initial values against compiled C, and the owning objects
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/build/bindings
         run: >-
           dotnet run
           --project bindings/csharp/AoaHid.Tests/AoaHid.Tests.csproj
           --configuration Release
           -- "$PWD/build/bindings/aoahid_abi_layout_oracle"
+          "$PWD/build/bindings/aoahid_abi_init_oracle"
 
       - name: Run C# enumeration example against fake transport
         env:
@@ -405,6 +414,7 @@ jobs:
             --configuration Release \
             -- 10
           dotnet build examples/csharp/Keyboard/Keyboard.csproj --configuration Release
+          dotnet build examples/csharp/KeyboardRaw/KeyboardRaw.csproj --configuration Release
 
       - name: Select exact Rust toolchain
         run: rustup toolchain install 1.89.0 --profile minimal --no-self-update
@@ -415,6 +425,7 @@ jobs:
           AOAHID_LIB_DIR: ${{ github.workspace }}/build/bindings
           LD_LIBRARY_PATH: ${{ github.workspace }}/build/bindings
         run: |
+          export AOAHID_INIT_ORACLE="$PWD/build/bindings/aoahid_abi_init_oracle"
           cargo +1.89.0 test --manifest-path bindings/rust/Cargo.toml --workspace --all-targets
           cargo +1.89.0 run --manifest-path bindings/rust/Cargo.toml \
             --package aoahid-sys --example enumerate -- 10

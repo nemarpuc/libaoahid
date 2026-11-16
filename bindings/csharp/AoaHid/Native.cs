@@ -109,7 +109,7 @@ public struct ErrorDetail
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct ContextOptions
+public partial struct ContextOptions
 {
     public uint StructSize;
     public uint Reserved;
@@ -117,9 +117,6 @@ public struct ContextOptions
     public LogLevel LogLevel;
     public nint LogSink;
     public nint LogUser;
-
-    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static ContextOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<ContextOptions>() };
 }
 
 /// <summary>A USB device as aoahid_discover found it.</summary>
@@ -163,7 +160,7 @@ public struct LinuxHidPolicy
 
 /// <summary>Every field but interface_number and validate_reports is required.</summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct DeviceOptions
+public partial struct DeviceOptions
 {
     public uint StructSize;
     public uint Reserved;
@@ -177,25 +174,19 @@ public struct DeviceOptions
     public ClaimPolicy InterfaceClaimPolicy;
     public int InterfaceNumber;
     public uint ValidateReports;
-
-    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static DeviceOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<DeviceOptions>() };
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct AccessoryOptions
+public partial struct AccessoryOptions
 {
     public uint StructSize;
     public uint Reserved;
     public AoaStrings Strings;
-
-    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static AccessoryOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<AccessoryOptions>() };
 }
 
 /// <summary>Selects the first interface (alternate setting 0) with this class, subclass and protocol that has one Bulk IN and one Bulk OUT endpoint.</summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct ChannelOptions
+public partial struct ChannelOptions
 {
     public uint StructSize;
     public uint Reserved;
@@ -208,9 +199,6 @@ public struct ChannelOptions
     public uint TransferBytes;
     public uint ZeroLengthTermination;
     public ChannelReadMode ReadMode;
-
-    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static ChannelOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<ChannelOptions>() };
 }
 
 /// <summary>A Node has one report in flight at a time, taken from the Device's shared pool.</summary>
@@ -266,7 +254,7 @@ public struct BatteryReport
 
 /// <summary>Full N-key rollover: one bit per Usage from usage_minimum (at least 0x04) to usage_maximum, plus the eight modifiers 0xE0 to 0xE7, which the range must not include.</summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct KeyboardOptions
+public partial struct KeyboardOptions
 {
     public uint StructSize;
     public uint Reserved;
@@ -275,14 +263,11 @@ public struct KeyboardOptions
     public ushort UsageMaximum;
     public uint EnableBattery;
     public BatteryReport Battery;
-
-    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static KeyboardOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<KeyboardOptions>() };
 }
 
 /// <summary>X, Y, wheel and pan are relative; their ranges must hold negative and positive values.</summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct MouseOptions
+public partial struct MouseOptions
 {
     public uint StructSize;
     public uint Reserved;
@@ -296,14 +281,11 @@ public struct MouseOptions
     public IntegerField Pan;
     public uint EnableBattery;
     public BatteryReport Battery;
-
-    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static MouseOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<MouseOptions>() };
 }
 
 /// <summary>One-bit controls on any HUT page: Consumer, System Control, Camera Control, Telephony, ...</summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct ToggleOptions
+public partial struct ToggleOptions
 {
     public uint StructSize;
     public uint Reserved;
@@ -319,9 +301,6 @@ public struct ToggleOptions
     public nint ExpectedLinuxCodes;
     public uint EnableBattery;
     public BatteryReport Battery;
-
-    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static ToggleOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<ToggleOptions>() };
 }
 
 /// <summary>One axis.</summary>
@@ -339,7 +318,7 @@ public struct GamepadAxisOption
 
 /// <summary>At least two axes, one of them AOAHID_AXIS_X and one AOAHID_AXIS_Y, each role once.</summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct GamepadOptions
+public partial struct GamepadOptions
 {
     public uint StructSize;
     public uint Reserved;
@@ -354,14 +333,11 @@ public struct GamepadOptions
     public uint HatBitWidth;
     public uint EnableBattery;
     public BatteryReport Battery;
-
-    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static GamepadOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<GamepadOptions>() };
 }
 
 /// <summary>Fixed-slot Multi-Touch under the Digitizers / Touch Screen Application Collection.</summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct TouchscreenOptions
+public partial struct TouchscreenOptions
 {
     public uint StructSize;
     public uint Reserved;
@@ -387,14 +363,11 @@ public struct TouchscreenOptions
     public uint EnableMultiPacketFrames;
     public uint EnableBattery;
     public BatteryReport Battery;
-
-    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static TouchscreenOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<TouchscreenOptions>() };
 }
 
 /// <summary>The touchscreen report under the Digitizers / Touch Pad Application Collection, plus button_count click buttons (0 for a buttonless clickpad).</summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct TouchpadOptions
+public partial struct TouchpadOptions
 {
     public uint StructSize;
     public uint Reserved;
@@ -421,14 +394,11 @@ public struct TouchpadOptions
     public uint ButtonCount;
     public uint EnableBattery;
     public BatteryReport Battery;
-
-    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static TouchpadOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<TouchpadOptions>() };
 }
 
 /// <summary>A stylus under the Digitizers / Pen Application Collection (a direct, on-screen pen).</summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct PenOptions
+public partial struct PenOptions
 {
     public uint StructSize;
     public uint Reserved;
@@ -448,14 +418,11 @@ public struct PenOptions
     public uint EnableHover;
     public uint EnableBattery;
     public BatteryReport Battery;
-
-    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static PenOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<PenOptions>() };
 }
 
 /// <summary>The pen report under the Digitizers / Digitizer Application Collection (an indirect tablet).</summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct DigitizerOptions
+public partial struct DigitizerOptions
 {
     public uint StructSize;
     public uint Reserved;
@@ -475,9 +442,6 @@ public struct DigitizerOptions
     public uint EnableHover;
     public uint EnableBattery;
     public BatteryReport Battery;
-
-    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static DigitizerOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<DigitizerOptions>() };
 }
 
 /// <summary>An Input report a Raw Node may send: its Report ID and its exact length on the wire.</summary>

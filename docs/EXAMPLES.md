@@ -189,16 +189,18 @@ open a device below version 2 with `AOAHID_ERR_NOT_AOA`.
 
 ## Bindings
 
-- Python: call `aoahid.load(explicit_path)` and populate `ctypes.Structure`
-  fields yourself, `struct_size` included; the binding test proves it begins
-  at zero.
-- C#: populate the sequential structs, using unmanaged UTF-8 storage whose
-  lifetime covers the native call. P/Invoke uses C calling convention.
-- Rust: populate `aoahid_sys` `repr(C)` structures. The safe `aoahid` wrapper
-  crate owns specs (`KeyboardSpec`, `MouseSpec`, `ToggleSpec`, `GamepadSpec`,
-  `TouchscreenSpec`, `TouchpadSpec`, `PenSpec`, `DigitizerSpec`, `RawSpec`) and
-  provides typed node references for all nine profiles (`KeyboardNodeRef`,
-  `MouseNodeRef`, ...), but does not construct options.
+- Python: `aoahid.Session(explicit_path)` owns the Context, Device and Nodes; its options are
+  `aoahid.initial.*` (the values of the C initializers). `aoahid.load(explicit_path)` and
+  `ctypes.Structure` fields, `struct_size` included, remain for the raw calls
+  (`examples/python/keyboard_raw.py`).
+- C#: `AoaSession` owns them, and the `Init()` methods return the C initializers' values.
+  The raw form populates the sequential structs, using unmanaged UTF-8 storage whose
+  lifetime covers the native call (`examples/csharp/KeyboardRaw`). P/Invoke uses C calling convention.
+- Rust: `Context`, `Device` and `Node` own what they open, and the `aoahid_sys` option structures
+  implement `Default` with the C initializers' values. The safe `aoahid` wrapper crate also owns
+  specs (`KeyboardSpec`, `MouseSpec`, `ToggleSpec`, `GamepadSpec`, `TouchscreenSpec`, `TouchpadSpec`,
+  `PenSpec`, `DigitizerSpec`, `RawSpec`) and provides typed node references for all nine profiles
+  (`KeyboardNodeRef`, `MouseNodeRef`, ...).
 
 All bindings expose native result codes. On error, inspect the C thread-local
 detail on the same calling thread.

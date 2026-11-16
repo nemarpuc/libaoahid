@@ -87,7 +87,9 @@ Each has an enumerate-only program: `examples/python/enumerate.py`,
 package explains what each example demonstrates.
 
 `examples/python/keyboard.py LIBAOAHID_PATH`, `examples/csharp/Keyboard/Keyboard.csproj` and, in a
-source checkout, `bindings/rust/aoahid-sys/examples/keyboard.rs` open the first phone found,
+source checkout, `bindings/rust/aoahid/examples/keyboard_owned.rs` open the one phone plugged in
+(`keyboard_raw.py`, `examples/csharp/KeyboardRaw` and `bindings/rust/aoahid-sys/examples/keyboard.rs`
+are the same programs with every call and value spelled out),
 register a keyboard and press the letter `a` once. Open a text field on the phone first. The Python
 and C# ones turn a failed call into an exception with the library's reason (`aoahid.check`,
 `AoaHidException.Check`); the Rust one does the same in a small function of its own. CI builds

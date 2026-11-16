@@ -7,6 +7,8 @@
 
 use core::ffi::{c_char, c_void};
 
+mod initial;
+
 macro_rules! opaque {
     ($($name:ident),+ $(,)?) => {$(
         #[repr(C)]
@@ -209,6 +211,17 @@ pub struct aoahid_node_options {
     pub reserved: u32,
     pub has_reserved_slots: u32,
     pub reserved_slots: u32,
+}
+
+impl Default for aoahid_node_options {
+    /// Zero with `struct_size` set, as the C `*_init` does.
+    fn default() -> Self {
+        // SAFETY: every field is an integer, a pointer, an optional function pointer or an array
+        // of them, and all-zero bytes are valid for each.
+        let mut value: Self = unsafe { core::mem::zeroed() };
+        value.struct_size = core::mem::size_of::<Self>() as u32;
+        value
+    }
 }
 
 /// The four HID 1.11 physical Global items for one field.
@@ -449,6 +462,17 @@ pub struct aoahid_raw_options {
     pub requires_feature_response: u32,
 }
 
+impl Default for aoahid_raw_options {
+    /// Zero with `struct_size` set, as the C `*_init` does.
+    fn default() -> Self {
+        // SAFETY: every field is an integer, a pointer, an optional function pointer or an array
+        // of them, and all-zero bytes are valid for each.
+        let mut value: Self = unsafe { core::mem::zeroed() };
+        value.struct_size = core::mem::size_of::<Self>() as u32;
+        value
+    }
+}
+
 #[repr(C)]
 pub struct aoahid_report_capability {
     pub report_id: aoahid_report_id_option,
@@ -468,6 +492,17 @@ pub struct aoahid_capability_manifest {
     pub reports: *const aoahid_report_capability,
     pub report_count: usize,
     pub descriptor_length: usize,
+}
+
+impl Default for aoahid_capability_manifest {
+    /// Zero with `struct_size` set, as the C `*_init` does.
+    fn default() -> Self {
+        // SAFETY: every field is an integer, a pointer, an optional function pointer or an array
+        // of them, and all-zero bytes are valid for each.
+        let mut value: Self = unsafe { core::mem::zeroed() };
+        value.struct_size = core::mem::size_of::<Self>() as u32;
+        value
+    }
 }
 
 /// Optional values of one touch contact.

@@ -8,9 +8,9 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using AoaHid;
 
-if (args.Length != 1)
+if (args.Length != 2)
 {
-    Console.Error.WriteLine("usage: AoaHid.Tests PATH_TO_LAYOUT_ORACLE");
+    Console.Error.WriteLine("usage: AoaHid.Tests PATH_TO_LAYOUT_ORACLE PATH_TO_INIT_ORACLE");
     return 2;
 }
 
@@ -49,7 +49,6 @@ Check("aoahid_error_detail.report_id", (long)Marshal.OffsetOf<ErrorDetail>("Repo
 Check("aoahid_error_detail.offset", (long)Marshal.OffsetOf<ErrorDetail>("Offset"));
 Check("aoahid_error_detail.length", (long)Marshal.OffsetOf<ErrorDetail>("Length"));
 if (new ContextOptions().StructSize != 0) failures.Add("aoahid_context_options: new() fills struct_size");
-if (ContextOptions.Init().StructSize != Marshal.SizeOf<ContextOptions>()) failures.Add("aoahid_context_options: Init() does not set struct_size");
 Check("aoahid_context_options.size", Marshal.SizeOf<ContextOptions>());
 Check("aoahid_context_options.struct_size", (long)Marshal.OffsetOf<ContextOptions>("StructSize"));
 Check("aoahid_context_options.reserved", (long)Marshal.OffsetOf<ContextOptions>("Reserved"));
@@ -82,7 +81,6 @@ Check("aoahid_linux_hid_policy.report_size_bits", (long)Marshal.OffsetOf<LinuxHi
 Check("aoahid_linux_hid_policy.usages", (long)Marshal.OffsetOf<LinuxHidPolicy>("Usages"));
 Check("aoahid_linux_hid_policy.report_data_bits", (long)Marshal.OffsetOf<LinuxHidPolicy>("ReportDataBits"));
 if (new DeviceOptions().StructSize != 0) failures.Add("aoahid_device_options: new() fills struct_size");
-if (DeviceOptions.Init().StructSize != Marshal.SizeOf<DeviceOptions>()) failures.Add("aoahid_device_options: Init() does not set struct_size");
 Check("aoahid_device_options.size", Marshal.SizeOf<DeviceOptions>());
 Check("aoahid_device_options.struct_size", (long)Marshal.OffsetOf<DeviceOptions>("StructSize"));
 Check("aoahid_device_options.reserved", (long)Marshal.OffsetOf<DeviceOptions>("Reserved"));
@@ -97,13 +95,11 @@ Check("aoahid_device_options.interface_claim_policy", (long)Marshal.OffsetOf<Dev
 Check("aoahid_device_options.interface_number", (long)Marshal.OffsetOf<DeviceOptions>("InterfaceNumber"));
 Check("aoahid_device_options.validate_reports", (long)Marshal.OffsetOf<DeviceOptions>("ValidateReports"));
 if (new AccessoryOptions().StructSize != 0) failures.Add("aoahid_accessory_options: new() fills struct_size");
-if (AccessoryOptions.Init().StructSize != Marshal.SizeOf<AccessoryOptions>()) failures.Add("aoahid_accessory_options: Init() does not set struct_size");
 Check("aoahid_accessory_options.size", Marshal.SizeOf<AccessoryOptions>());
 Check("aoahid_accessory_options.struct_size", (long)Marshal.OffsetOf<AccessoryOptions>("StructSize"));
 Check("aoahid_accessory_options.reserved", (long)Marshal.OffsetOf<AccessoryOptions>("Reserved"));
 Check("aoahid_accessory_options.strings", (long)Marshal.OffsetOf<AccessoryOptions>("Strings"));
 if (new ChannelOptions().StructSize != 0) failures.Add("aoahid_channel_options: new() fills struct_size");
-if (ChannelOptions.Init().StructSize != Marshal.SizeOf<ChannelOptions>()) failures.Add("aoahid_channel_options: Init() does not set struct_size");
 Check("aoahid_channel_options.size", Marshal.SizeOf<ChannelOptions>());
 Check("aoahid_channel_options.struct_size", (long)Marshal.OffsetOf<ChannelOptions>("StructSize"));
 Check("aoahid_channel_options.reserved", (long)Marshal.OffsetOf<ChannelOptions>("Reserved"));
@@ -142,7 +138,6 @@ Check("aoahid_battery_report.size", Marshal.SizeOf<BatteryReport>());
 Check("aoahid_battery_report.report_id", (long)Marshal.OffsetOf<BatteryReport>("ReportId"));
 Check("aoahid_battery_report.strength", (long)Marshal.OffsetOf<BatteryReport>("Strength"));
 if (new KeyboardOptions().StructSize != 0) failures.Add("aoahid_keyboard_options: new() fills struct_size");
-if (KeyboardOptions.Init().StructSize != Marshal.SizeOf<KeyboardOptions>()) failures.Add("aoahid_keyboard_options: Init() does not set struct_size");
 Check("aoahid_keyboard_options.size", Marshal.SizeOf<KeyboardOptions>());
 Check("aoahid_keyboard_options.struct_size", (long)Marshal.OffsetOf<KeyboardOptions>("StructSize"));
 Check("aoahid_keyboard_options.reserved", (long)Marshal.OffsetOf<KeyboardOptions>("Reserved"));
@@ -152,7 +147,6 @@ Check("aoahid_keyboard_options.usage_maximum", (long)Marshal.OffsetOf<KeyboardOp
 Check("aoahid_keyboard_options.enable_battery", (long)Marshal.OffsetOf<KeyboardOptions>("EnableBattery"));
 Check("aoahid_keyboard_options.battery", (long)Marshal.OffsetOf<KeyboardOptions>("Battery"));
 if (new MouseOptions().StructSize != 0) failures.Add("aoahid_mouse_options: new() fills struct_size");
-if (MouseOptions.Init().StructSize != Marshal.SizeOf<MouseOptions>()) failures.Add("aoahid_mouse_options: Init() does not set struct_size");
 Check("aoahid_mouse_options.size", Marshal.SizeOf<MouseOptions>());
 Check("aoahid_mouse_options.struct_size", (long)Marshal.OffsetOf<MouseOptions>("StructSize"));
 Check("aoahid_mouse_options.reserved", (long)Marshal.OffsetOf<MouseOptions>("Reserved"));
@@ -167,7 +161,6 @@ Check("aoahid_mouse_options.pan", (long)Marshal.OffsetOf<MouseOptions>("Pan"));
 Check("aoahid_mouse_options.enable_battery", (long)Marshal.OffsetOf<MouseOptions>("EnableBattery"));
 Check("aoahid_mouse_options.battery", (long)Marshal.OffsetOf<MouseOptions>("Battery"));
 if (new ToggleOptions().StructSize != 0) failures.Add("aoahid_toggle_options: new() fills struct_size");
-if (ToggleOptions.Init().StructSize != Marshal.SizeOf<ToggleOptions>()) failures.Add("aoahid_toggle_options: Init() does not set struct_size");
 Check("aoahid_toggle_options.size", Marshal.SizeOf<ToggleOptions>());
 Check("aoahid_toggle_options.struct_size", (long)Marshal.OffsetOf<ToggleOptions>("StructSize"));
 Check("aoahid_toggle_options.reserved", (long)Marshal.OffsetOf<ToggleOptions>("Reserved"));
@@ -192,7 +185,6 @@ Check("aoahid_gamepad_axis_option.neutral_value", (long)Marshal.OffsetOf<Gamepad
 Check("aoahid_gamepad_axis_option.expected_linux_code", (long)Marshal.OffsetOf<GamepadAxisOption>("ExpectedLinuxCode"));
 Check("aoahid_gamepad_axis_option.expected_android_axis", (long)Marshal.OffsetOf<GamepadAxisOption>("ExpectedAndroidAxis"));
 if (new GamepadOptions().StructSize != 0) failures.Add("aoahid_gamepad_options: new() fills struct_size");
-if (GamepadOptions.Init().StructSize != Marshal.SizeOf<GamepadOptions>()) failures.Add("aoahid_gamepad_options: Init() does not set struct_size");
 Check("aoahid_gamepad_options.size", Marshal.SizeOf<GamepadOptions>());
 Check("aoahid_gamepad_options.struct_size", (long)Marshal.OffsetOf<GamepadOptions>("StructSize"));
 Check("aoahid_gamepad_options.reserved", (long)Marshal.OffsetOf<GamepadOptions>("Reserved"));
@@ -208,7 +200,6 @@ Check("aoahid_gamepad_options.hat_bit_width", (long)Marshal.OffsetOf<GamepadOpti
 Check("aoahid_gamepad_options.enable_battery", (long)Marshal.OffsetOf<GamepadOptions>("EnableBattery"));
 Check("aoahid_gamepad_options.battery", (long)Marshal.OffsetOf<GamepadOptions>("Battery"));
 if (new TouchscreenOptions().StructSize != 0) failures.Add("aoahid_touchscreen_options: new() fills struct_size");
-if (TouchscreenOptions.Init().StructSize != Marshal.SizeOf<TouchscreenOptions>()) failures.Add("aoahid_touchscreen_options: Init() does not set struct_size");
 Check("aoahid_touchscreen_options.size", Marshal.SizeOf<TouchscreenOptions>());
 Check("aoahid_touchscreen_options.struct_size", (long)Marshal.OffsetOf<TouchscreenOptions>("StructSize"));
 Check("aoahid_touchscreen_options.reserved", (long)Marshal.OffsetOf<TouchscreenOptions>("Reserved"));
@@ -235,7 +226,6 @@ Check("aoahid_touchscreen_options.enable_multi_packet_frames", (long)Marshal.Off
 Check("aoahid_touchscreen_options.enable_battery", (long)Marshal.OffsetOf<TouchscreenOptions>("EnableBattery"));
 Check("aoahid_touchscreen_options.battery", (long)Marshal.OffsetOf<TouchscreenOptions>("Battery"));
 if (new TouchpadOptions().StructSize != 0) failures.Add("aoahid_touchpad_options: new() fills struct_size");
-if (TouchpadOptions.Init().StructSize != Marshal.SizeOf<TouchpadOptions>()) failures.Add("aoahid_touchpad_options: Init() does not set struct_size");
 Check("aoahid_touchpad_options.size", Marshal.SizeOf<TouchpadOptions>());
 Check("aoahid_touchpad_options.struct_size", (long)Marshal.OffsetOf<TouchpadOptions>("StructSize"));
 Check("aoahid_touchpad_options.reserved", (long)Marshal.OffsetOf<TouchpadOptions>("Reserved"));
@@ -263,7 +253,6 @@ Check("aoahid_touchpad_options.button_count", (long)Marshal.OffsetOf<TouchpadOpt
 Check("aoahid_touchpad_options.enable_battery", (long)Marshal.OffsetOf<TouchpadOptions>("EnableBattery"));
 Check("aoahid_touchpad_options.battery", (long)Marshal.OffsetOf<TouchpadOptions>("Battery"));
 if (new PenOptions().StructSize != 0) failures.Add("aoahid_pen_options: new() fills struct_size");
-if (PenOptions.Init().StructSize != Marshal.SizeOf<PenOptions>()) failures.Add("aoahid_pen_options: Init() does not set struct_size");
 Check("aoahid_pen_options.size", Marshal.SizeOf<PenOptions>());
 Check("aoahid_pen_options.struct_size", (long)Marshal.OffsetOf<PenOptions>("StructSize"));
 Check("aoahid_pen_options.reserved", (long)Marshal.OffsetOf<PenOptions>("Reserved"));
@@ -284,7 +273,6 @@ Check("aoahid_pen_options.enable_hover", (long)Marshal.OffsetOf<PenOptions>("Ena
 Check("aoahid_pen_options.enable_battery", (long)Marshal.OffsetOf<PenOptions>("EnableBattery"));
 Check("aoahid_pen_options.battery", (long)Marshal.OffsetOf<PenOptions>("Battery"));
 if (new DigitizerOptions().StructSize != 0) failures.Add("aoahid_digitizer_options: new() fills struct_size");
-if (DigitizerOptions.Init().StructSize != Marshal.SizeOf<DigitizerOptions>()) failures.Add("aoahid_digitizer_options: Init() does not set struct_size");
 Check("aoahid_digitizer_options.size", Marshal.SizeOf<DigitizerOptions>());
 Check("aoahid_digitizer_options.struct_size", (long)Marshal.OffsetOf<DigitizerOptions>("StructSize"));
 Check("aoahid_digitizer_options.reserved", (long)Marshal.OffsetOf<DigitizerOptions>("Reserved"));
@@ -367,6 +355,8 @@ Check("aoahid_digitizer_sample.pressure", (long)Marshal.OffsetOf<DigitizerSample
 Check("aoahid_digitizer_sample.tilt_x", (long)Marshal.OffsetOf<DigitizerSample>("TiltX"));
 Check("aoahid_digitizer_sample.tilt_y", (long)Marshal.OffsetOf<DigitizerSample>("TiltY"));
 Check("aoahid_digitizer_sample.twist", (long)Marshal.OffsetOf<DigitizerSample>("Twist"));
+
+failures.AddRange(HandChecks.Run(args));
 
 foreach (var failure in failures)
     Console.Error.WriteLine($"layout mismatch: {failure}");

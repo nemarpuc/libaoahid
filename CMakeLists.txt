@@ -462,6 +462,20 @@ if(AOAHID_BUILD_TESTS)
           ${CMAKE_CURRENT_SOURCE_DIR}/tests/abi/check_abi_golden.py
           $<TARGET_FILE:aoahid_abi_layout_oracle>)
 
+  add_executable(aoahid_abi_init_oracle tests/abi/init_oracle.c)
+  target_include_directories(aoahid_abi_init_oracle PRIVATE include)
+  set_target_properties(aoahid_abi_init_oracle PROPERTIES
+      C_STANDARD 11
+      C_STANDARD_REQUIRED YES
+      C_EXTENSIONS NO)
+  if(MSVC)
+    target_compile_options(aoahid_abi_init_oracle PRIVATE /W4 $<$<BOOL:${AOAHID_WERROR}>:/WX> /utf-8)
+  else()
+    target_compile_options(aoahid_abi_init_oracle PRIVATE
+        -Wall -Wextra -Wpedantic $<$<BOOL:${AOAHID_WERROR}>:-Werror>)
+  endif()
+  aoahid_instrument_executable(aoahid_abi_init_oracle)
+
   add_executable(aoahid_c_abi_test tests/abi/test_c_abi.c)
   target_include_directories(aoahid_c_abi_test PRIVATE include)
   set_target_properties(aoahid_c_abi_test PROPERTIES
