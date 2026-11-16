@@ -64,8 +64,9 @@ and `include/uapi/linux/usb/f_accessory.h`. The kernel driver answers request
    `acc_complete_send_hid_event`, the kernel looks up the `acc_hid_dev` on
    `dev->hid_list` and rejects an ID whose `hid_device` has not yet been
    registered by `acc_hid_work` (returning `-EINVAL`, which stalls EP0), or
-   passes the payload to `hid_input_report(hid->hid, HID_INPUT_REPORT, ...)`
-   (commit `0e3db17d01c94263b629b089c51c7d0988308232`, retrieved 2026-08-27).
+   passes the payload to `hid_report_raw_event(hid->hid, HID_INPUT_REPORT,
+   req->buf, length, 1)` (commit `0e3db17d01c94263b629b089c51c7d0988308232`,
+   retrieved 2026-11-16). The driver does not use `uhid`.
 4. **Unregister** (55, `ACCESSORY_UNREGISTER_HID`) when done. `acc_ctrlrequest`
    calls `acc_unregister_hid(dev, w_value)`, which moves the entry to
    `dev->dead_hid_list` and schedules `acc_hid_work` to call `acc_hid_delete`
@@ -142,6 +143,39 @@ streams ([Android Input overview](https://source.android.com/docs/core/interacti
 retrieved 2026-08-27). Which kernel driver binds, and how Android classifies the
 device, depends on the descriptor and on that device's kernel and Android
 version. See [PROFILES.md](PROFILES.md) and [TARGET_MATRIX.md](TARGET_MATRIX.md).
+
+### Report IDs and one HID device per Node {#report-ids-and-one-hid-device-per-node}
+
+- **Report IDs work.** A descriptor with Report IDs is parsed by the ordinary HID core. In
+  `hid_get_report` (`drivers/hid/hid-core.c`, tag v6.12, retrieved 2026-11-16) the report number is
+  `data[0]` when `report_enum->numbered` is set, and `hid_report_raw_event` skips that byte. So the
+  payload of request 57 starts with the Report ID, and an ID the descriptor does not declare is
+  dropped with a debug message only. The Android common kernel commit above was not read for this
+  function.
+- **One HID ID is one `hid_device`.** Every Node is registered under its own HID ID, so the kernel
+  makes one `hid_device` per Node, and each can be added or removed without touching the others.
+  `acc_hid_init` sets `hid->vendor = HID_ANY_ID` and `hid->product = HID_ANY_ID` and sets no name,
+  `uniq` or `phys` (commit `0e3db17d01c94263b629b089c51c7d0988308232`, retrieved 2026-11-16).
+- **Several Specs in one HID device are not offered.** `hid_generic_probe`
+  (`drivers/hid/hid-generic.c`) sets `HID_QUIRK_INPUT_PER_APP`, and `hidinput_connect`
+  (`drivers/hid/hid-input.c`) then uses `hidinput_match_application` when the descriptor has more
+  than one Application Collection, which gives one input device per Application Collection (Android
+  common kernel commit `35556bed836f8dc07ac55f69c8d17dce3e7f0e25`, retrieved 2026-11-16). A joined
+  descriptor therefore yields separate input devices, as separate HID IDs do. This holds where
+  `hid-generic` binds; `hid-multitouch` was not read, and none of it has been run on a phone.
+- **Android classifies the `evdev` device, not the HID device.** In `EventHub::openDeviceLocked`
+  the class comes from the key, relative and absolute bits: `KEYBOARD` from keys below `BTN_MISC` or
+  from `BTN_WHEEL` up, `CURSOR` from `BTN_MOUSE` with `REL_X` and `REL_Y`, `TOUCH_MT` from
+  `ABS_MT_POSITION_X` and `_Y` ([`EventHub.cpp`](https://android.googlesource.com/platform/frameworks/native/+/4f463a6b1de9198963dc6aff74154a504ba3f8f6/services/inputflinger/reader/EventHub.cpp),
+  `frameworks/native` commit `4f463a6b1de9198963dc6aff74154a504ba3f8f6`, retrieved 2026-11-16).
+- **Every Node looks the same to the identifier.** `generateDescriptor` hashes vendor, product,
+  `uniqueId` and `nonce`, and uses the name and location only when vendor and product are both 0.
+  `assignDescriptorLocked` raises `nonce` until no connected device has the same descriptor (same
+  commit). Because every Node has the same vendor and product, the descriptor of an input device
+  depends on the order in which the devices are present. A joined descriptor does not change that.
+
+A descriptor with several Report IDs in one device is still possible with
+`aoahid_spec_create_raw`.
 
 ## Host-side caveats {#host-side-caveats}
 

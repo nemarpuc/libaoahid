@@ -5,6 +5,19 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+### Changed
+
+- Docs: `docs/PROTOCOL.md` says the kernel passes a request 57 payload to `hid_report_raw_event`
+  (it named `hid_input_report`) and that `f_accessory.c` does not use `uhid`; `docs/VERIFICATION.md`
+  and `docs/LATENCY.md` no longer name `uhid`, and `docs/LATENCY.md` names
+  `acc_complete_send_hid_event`.
+
+### Added
+
+- Docs: `docs/PROTOCOL.md` section "Report IDs and one HID device per Node": Report IDs in a
+  descriptor, one `hid_device` per Node, why several Specs are not joined into one HID device, and
+  how Android classifies and identifies the resulting `evdev` devices, each with its source commit.
+
 ## [0.2.1] - 2026-11-15
 
 **Not hardware-verified.** Nothing in this release changes how the library behaves: header comments, binding helpers and examples only. No phone was used; the keyboard examples were only built by CI. The only hardware record is the `[0.1.0]` entry below.

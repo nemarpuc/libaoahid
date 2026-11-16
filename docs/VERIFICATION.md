@@ -28,7 +28,7 @@ and packaging gates:
    and every heap-allocation failure point (`aoahid.sim-allocation-failure`).
 3. **`hw` (`tests/hw/`, `examples/c/verify/`, `tools/device-check/`).** Manual
    runs against a physical Android phone over a USB cable. Only a real phone
-   tests kernel `f_accessory` / `uhid` / `hid-input` parsing, Android
+   tests kernel `f_accessory` / `hid-core` / `hid-input` parsing, Android
    `EventHub` / `InputReader` classification and `.kl` / `.idc` rules, host OS
    USB drivers (`usbfs`, `WinUSB`, `IOKit`), and physical bus timing.
 

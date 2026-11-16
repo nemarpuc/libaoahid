@@ -253,7 +253,7 @@ limits on what it can and cannot show:
   High-Speed schedules bus traffic in 125 µs microframes (and Full-Speed in
   1 ms frames) ([USB 2.0 specification §5.6–5.8](https://www.usb.org/document-library/usb-20-specification)).
 - **What it can and cannot show:** Captures host `libusb` + OS USB driver +
-  wire control transfer + `f_accessory` EP0 completion (`acc_complete_set_hid_event`
+  wire control transfer + `f_accessory` EP0 completion (`acc_complete_send_hid_event`
   in `f_accessory.c`). It cannot show the time spent after EP0 completion inside
-  Android's `uhid` driver, `hid-input`, `EventHub`, `InputReader`, or the
+  the kernel's `hid_report_raw_event`, `hid-input`, `EventHub`, `InputReader`, or the
   foreground application (`t7 - t4`).
