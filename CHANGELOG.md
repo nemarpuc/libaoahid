@@ -5,6 +5,10 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-17
+
+**Not hardware-verified.** The C library, its ABI and its behavior are those of 0.2.1; this release changes the language bindings, tests, documentation and examples. The owning objects (`Session`, `AoaSession`, `Context`/`Device`/`Node`) were run only against the fake libusb transport; no phone was used.
+
 ### Changed
 
 - Bindings: the Python, C# and Rust bindings carry the values of the C `aoahid_*_init` functions

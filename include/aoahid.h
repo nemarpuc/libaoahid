@@ -84,7 +84,7 @@ extern "C" {
 
 #define AOAHID_VERSION_MAJOR 0
 #define AOAHID_VERSION_MINOR 2
-#define AOAHID_VERSION_PATCH 1
+#define AOAHID_VERSION_PATCH 2
 
 typedef struct aoahid_context aoahid_context;
 typedef struct aoahid_discovery aoahid_discovery;
