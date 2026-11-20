@@ -41,7 +41,7 @@ Order: the Context mutex is taken before the transport spinlock
 it). Nothing takes them the other way round.
 
 Profile calls need no lock: a mutator returns `AOAHID_ERR_BUSY` while
-`transfer_inflight` is set (`usable` in `src/profiles/state.cpp`), so the
+`transfer_inflight` is set (`usable` in `src/profiles/state_support.hpp`), so the
 event thread and the application never write Node state at the same time.
 
 ## Event thread
@@ -191,7 +191,7 @@ Behavior to know before changing it:
 
 ## Descriptor generation
 
-`build_generated_spec` (`src/profiles/spec.cpp`) runs the same emit function
+`build_generated_spec` (`src/profiles/spec_support.hpp`) runs the same emit function
 twice: once counting into null storage, once writing into a buffer of exactly
 that size. The count is capped at 65535 bytes, the 16-bit AOA length
 (`kAoaDescriptorWireMaximum`).
@@ -203,7 +203,7 @@ that size. The count is capped at 65535 bytes, the 16-bit AOA length
   field and its `FieldLayout` entry (semantic, bit offset, width, range). It
   first pads to the next byte boundary when the field would otherwise touch a
   fifth byte.
-- `pad_report` (`src/profiles/spec.cpp`) pads to a byte boundary at the fixed
+- `pad_report` (`src/profiles/spec_support.hpp`) pads to a byte boundary at the fixed
   points listed in [LIMITS.md](LIMITS.md).
 - `validate_generated` (`src/hid/validator.cpp`) parses the result again and
   checks it against the layout.
@@ -211,7 +211,7 @@ that size. The count is capped at 65535 bytes, the 16-bit AOA length
   parser (usages, fields per report, report bits). `aoahid_node_open` compares
   it with the Device's `linux_hid` (`aoahid_linux_hid_policy`) values.
 
-`store_bits` (`src/profiles/state.cpp`) writes a value little-endian at its
+`store_bits` (`src/profiles/state_support.hpp`) writes a value little-endian at its
 layout offset; values outside the logical range are rejected, except the null
 value of a Null State field.
 
@@ -254,7 +254,7 @@ first-out is not recorded.
 
 ### Byte-wise serialization and a plain spinlock
 
-**Decision:** `store_bits` (`src/profiles/state.cpp`) packs and checks report
+**Decision:** `store_bits` (`src/profiles/state_support.hpp`) packs and checks report
 fields a byte at a time. `StateGuard` (`src/transport/transport.cpp`) is a
 plain `std::atomic_flag` `test_and_set` loop around the pool and counter
 updates.

@@ -145,7 +145,21 @@ set(AOAHID_SOURCES
     src/hid/descriptor_builder.cpp
     src/hid/validator.cpp
     src/profiles/spec.cpp
+    src/profiles/spec_gamepad.cpp
+    src/profiles/spec_keyboard.cpp
+    src/profiles/spec_mouse.cpp
+    src/profiles/spec_pen.cpp
+    src/profiles/spec_raw.cpp
+    src/profiles/spec_toggle.cpp
+    src/profiles/spec_touch.cpp
     src/profiles/state.cpp
+    src/profiles/state_battery.cpp
+    src/profiles/state_gamepad.cpp
+    src/profiles/state_keyboard.cpp
+    src/profiles/state_mouse.cpp
+    src/profiles/state_pen.cpp
+    src/profiles/state_toggle.cpp
+    src/profiles/state_touch.cpp
     src/transport/channel.cpp
     src/transport/discovery.cpp
     src/transport/port.cpp
