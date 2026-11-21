@@ -5,6 +5,8 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-21
+
 **Not hardware-verified.** The new registration behavior was tested only against the fake libusb backend; no phone was used. The ABI changes incompatibly (the library is below 1.0.0).
 
 ### Added
