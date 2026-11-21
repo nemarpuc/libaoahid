@@ -62,10 +62,14 @@ int main() {
     const aoahid_result created = aoahid::spec_create_touchscreen(&touch, &spec_raw);
     const aoahid::SpecPtr spec{spec_raw};
 
-    const auto node_config = aoahid::node_options();
+    auto placement = aoahid::node_placement();
+    placement.registration = 1U;
+    auto timeouts = aoahid::commit_timeouts();
+    timeouts.control_timeout_ms = k_control_timeout_ms;
+    timeouts.drain_timeout_ms = k_drain_timeout_ms;
     aoahid_node* node = nullptr;
-    if (created != AOAHID_OK || aoahid::node_open(device, spec.get(), &node_config,
-                                                  k_control_timeout_ms, &node) != AOAHID_OK) {
+    if (created != AOAHID_OK ||
+        aoahid::node_open(device, spec.get(), &placement, &timeouts, &node) != AOAHID_OK) {
         std::fprintf(stderr, "setup failed: %s\n", aoahid::last_error()->reason);
         (void)aoahid::device_close(device, k_control_timeout_ms, k_drain_timeout_ms);
         (void)aoahid::context_destroy(context, k_control_timeout_ms, k_drain_timeout_ms);

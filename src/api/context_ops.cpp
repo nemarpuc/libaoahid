@@ -444,21 +444,31 @@ aoahid_result allocate_hid_id(aoahid_device* device, std::uint16_t* hid_id) noex
     return AOAHID_OK;
 }
 
-aoahid_result check_reservation(const aoahid_device* device,
-                                const aoahid_node_options& options) noexcept {
-    const bool no_reservation = options.has_reserved_slots == 0U && options.reserved_slots == 0U;
-    if (options.reserved != 0U || (!no_reservation && options.has_reserved_slots != 1U) ||
-        options.reserved_slots > 1U) {
-        set_error(AOAHID_ERR_UNSET_FIELD, "node.reserved_slots",
-                  "Reserve nothing with 0/0, or one slot with has_reserved_slots 1 and "
-                  "reserved_slots 0 or 1.");
+aoahid_result check_commit_timeouts(const aoahid_commit_timeouts* timeouts) noexcept {
+    if (timeouts == nullptr ||
+        !valid_struct(timeouts, timeouts->struct_size,
+                      static_cast<std::uint32_t>(sizeof(*timeouts)), "commit_timeouts")) {
+        return AOAHID_ERR_PARAM;
+    }
+    if (!timeout_is_set(timeouts->control_timeout_ms, "control_timeout_ms") ||
+        !timeout_is_set(timeouts->drain_timeout_ms, "drain_timeout_ms")) {
         return AOAHID_ERR_UNSET_FIELD;
     }
-    std::uint64_t reserved = options.reserved_slots;
+    return AOAHID_OK;
+}
+
+aoahid_result check_reservation(const aoahid_device* device,
+                                const aoahid_node_placement& placement) noexcept {
+    if (placement.reserved != 0U || placement.reserve_slot > 1U) {
+        set_error(AOAHID_ERR_UNSET_FIELD, "node.reserve_slot",
+                  "reserved must be zero and reserve_slot 0 or 1.");
+        return AOAHID_ERR_UNSET_FIELD;
+    }
+    std::uint64_t reserved = placement.reserve_slot;
     for (const auto* sibling : device->nodes)
         reserved += sibling->reserved_slots;
     if (reserved >= device->config.pool_slots) {
-        set_error(AOAHID_ERR_PARAM, "node.reserved_slots",
+        set_error(AOAHID_ERR_PARAM, "node.reserve_slot",
                   "The reservations of all Nodes must leave at least one shared pool slot.");
         return AOAHID_ERR_PARAM;
     }
@@ -467,9 +477,10 @@ aoahid_result check_reservation(const aoahid_device* device,
 
 // Every limit is checked before request 54, so a Spec the target would refuse never registers.
 // A refused limit reports the Device's value in offset and the Spec's in length.
-aoahid_result check_spec_fits_device(const aoahid_device* device,
-                                     const aoahid_spec* spec) noexcept {
-    if (spec->descriptor.empty() || spec->descriptor.size() > device->aoa_descriptor_policy_bytes) {
+aoahid_result check_descriptor_fits_device(const aoahid_device* device,
+                                           const std::size_t descriptor_bytes,
+                                           const aoa::hid::DescriptorRequirements& needs) noexcept {
+    if (descriptor_bytes == 0U || descriptor_bytes > device->aoa_descriptor_policy_bytes) {
         set_error(AOAHID_ERR_OVERFLOW, "spec.descriptor.aoa_wire_policy",
                   "The descriptor exceeds aoa_descriptor_wire_policy_bytes.");
         return AOAHID_ERR_OVERFLOW;
@@ -481,10 +492,9 @@ aoahid_result check_spec_fits_device(const aoahid_device* device,
         std::uint64_t needed;
     };
     const aoahid_linux_hid_policy& linux_hid = device->linux_hid;
-    const aoa::hid::DescriptorRequirements& needs = spec->requirements;
     const std::array<Limit, 6> limits{{
         {"spec.descriptor.linux_policy", "The descriptor exceeds linux_hid.descriptor_bytes.",
-         linux_hid.descriptor_bytes, spec->descriptor.size()},
+         linux_hid.descriptor_bytes, descriptor_bytes},
         {"spec.requirements.maximum_fields_per_report",
          "A report has more fields than linux_hid.fields_per_report.", linux_hid.fields_per_report,
          needs.maximum_fields_per_report},
@@ -507,6 +517,16 @@ aoahid_result check_spec_fits_device(const aoahid_device* device,
                       saturate_u32(limit.allowed), saturate_u32(limit.needed));
             return AOAHID_ERR_OVERFLOW;
         }
+    }
+    return AOAHID_OK;
+}
+
+aoahid_result check_spec_fits_device(const aoahid_device* device,
+                                     const aoahid_spec* spec) noexcept {
+    const aoahid_result descriptor =
+        check_descriptor_fits_device(device, spec->descriptor.size(), spec->requirements);
+    if (descriptor != AOAHID_OK) {
+        return descriptor;
     }
     for (const auto& report : spec->report_capabilities) {
         if (report.wire_length > device->config.maximum_report_bytes ||

@@ -13,7 +13,7 @@
 #include <thread>
 
 using aoa::detail::DeferredErrorInput;
-using aoa::detail::close_live_node_until;
+using aoa::detail::drain_node_for_close;
 using aoa::detail::current_deferred_error;
 using aoa::detail::finish_transport_result;
 using aoa::detail::make_deferred_error;
@@ -131,27 +131,39 @@ aoa::detail::DeferredError destroy_drained_device(aoahid_device* device) noexcep
                                "device.close", "Terminal transfer callbacks have not drained."});
     }
 
+    // One request 55 for each HID ID the phone has, owed or applied, however many Nodes share it.
+    if (device->transport->present()) {
+        for (const auto& registration : device->registrations) {
+            for (const std::uint16_t hid_id :
+                 {registration->owed_hid_id, registration->applied_hid_id}) {
+                if (hid_id == 0U) {
+                    continue;
+                }
+                const aoahid_result unregister =
+                    device->transport->unregister_hid(hid_id, device->close_control_timeout_ms);
+                if (unregister != AOAHID_OK && unregister != AOAHID_ERR_NO_DEVICE) {
+                    remember_current_close_error(device, unregister, "node.unregister",
+                                                 "AOA request 55 failed during Device teardown.",
+                                                 nullptr, 55);
+                }
+            }
+        }
+    }
     while (!device->nodes.empty()) {
         aoahid_node* node = device->nodes.back();
         device->nodes.pop_back();
         node->closed = true;
         remember_terminal_completion(device, node);
-        if (device->transport->present()) {
-            const aoahid_result unregister =
-                device->transport->unregister_hid(node->hid_id, device->close_control_timeout_ms);
-            if (unregister != AOAHID_OK && unregister != AOAHID_ERR_NO_DEVICE) {
-                remember_current_close_error(device, unregister, "node.unregister",
-                                             "AOA request 55 failed during Device teardown.", node,
-                                             55);
-            }
-        }
         const aoahid_result clear_reservation =
             device->transport->clear_reservation(node->reservation);
         remember_current_close_error(
             device, clear_reservation, "node.reserved_slots",
             "A transfer-pool reservation could not be released during Device teardown.", node);
+        node->registration = nullptr;
         release_node_storage(node);
     }
+    device->registrations.clear();
+    device->stale_order.clear();
 
     for (aoahid_channel* channel : device->channels) {
         release_channel_storage(channel);
@@ -210,11 +222,11 @@ aoahid_result device_close_impl(aoahid_device* device, bool* consumed,
     const auto deadline = std::chrono::steady_clock::now() +
                           std::chrono::milliseconds(device->close_drain_timeout_ms);
     try {
-        while (!device->nodes.empty()) {
-            aoahid_node* closing_node = device->nodes.back();
-            const aoahid_result result =
-                close_live_node_until(closing_node, deadline, control_timeout_ms);
-            // The pending Node and the ones not closed yet go to the graveyard with the Device.
+        // The Nodes' neutral reports go out here; their registrations are unregistered once each
+        // when the Device is destroyed. A Node whose report is still in flight, and the ones not
+        // drained yet, stay for the graveyard.
+        for (auto node = device->nodes.rbegin(); node != device->nodes.rend(); ++node) {
+            const aoahid_result result = drain_node_for_close(*node, deadline);
             if (result == AOAHID_CLOSE_PENDING)
                 break;
             remember_current_close_error(device, result, "node.close",

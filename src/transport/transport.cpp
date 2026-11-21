@@ -115,7 +115,6 @@ struct Device::Impl {
 
     struct Reservation {
         Impl* owner{};
-        std::uint16_t hid_id{};
         std::size_t capacity{};
         std::size_t in_use{};
     };
@@ -571,48 +570,40 @@ aoahid_result Device::unregister_hid(const std::uint16_t hid_id,
     return result;
 }
 
-aoahid_result Device::set_reservation(const std::uint16_t hid_id, const std::size_t count,
-                                      ReservationToken* out) {
+aoahid_result Device::set_reservation(const std::size_t count, ReservationToken* out) {
     reset_error();
     if (out == nullptr) {
-        record_error(AOAHID_ERR_PARAM, 0, 0, hid_id);
+        record_error(AOAHID_ERR_PARAM);
         return AOAHID_ERR_PARAM;
     }
     *out = ReservationToken{};
-    if (impl_ == nullptr || hid_id == 0U) {
-        record_error(AOAHID_ERR_PARAM, 0, 0, hid_id);
+    if (impl_ == nullptr) {
+        record_error(AOAHID_ERR_PARAM);
         return AOAHID_ERR_PARAM;
     }
     auto reservation = std::unique_ptr<Impl::Reservation>(new (std::nothrow) Impl::Reservation());
     if (reservation == nullptr) {
-        record_error(AOAHID_ERR_INTERNAL, LIBUSB_ERROR_NO_MEM, 0, hid_id);
+        record_error(AOAHID_ERR_INTERNAL, LIBUSB_ERROR_NO_MEM);
         return AOAHID_ERR_INTERNAL;
     }
     const Impl::StateGuard guard(*impl_);
     if (!impl_->present) {
-        record_error(AOAHID_ERR_NO_DEVICE, LIBUSB_ERROR_NO_DEVICE, 0, hid_id);
+        record_error(AOAHID_ERR_NO_DEVICE, LIBUSB_ERROR_NO_DEVICE);
         return AOAHID_ERR_NO_DEVICE;
     }
     if (impl_->closing) {
-        record_error(AOAHID_ERR_IO, LIBUSB_TRANSFER_CANCELLED, 0, hid_id);
+        record_error(AOAHID_ERR_IO, LIBUSB_TRANSFER_CANCELLED);
         return AOAHID_ERR_IO;
     }
 
-    const bool duplicate =
-        std::any_of(impl_->reservations.begin(), impl_->reservations.end(),
-                    [hid_id](const std::unique_ptr<Impl::Reservation>& existing) {
-                        return existing != nullptr && existing->hid_id == hid_id;
-                    });
-    if (duplicate ||
-        (count > 0U && (count >= impl_->slots.size() ||
-                        impl_->reserved_capacity_total >= impl_->slots.size() - count))) {
-        record_error(AOAHID_ERR_PARAM, 0, 0, hid_id, 0U,
+    if (count > 0U && (count >= impl_->slots.size() ||
+                       impl_->reserved_capacity_total >= impl_->slots.size() - count)) {
+        record_error(AOAHID_ERR_PARAM, 0, 0, 0U, 0U,
                      static_cast<std::uint32_t>(
                          std::min<std::size_t>(count, std::numeric_limits<std::uint32_t>::max())));
         return AOAHID_ERR_PARAM;
     }
     reservation->owner = impl_;
-    reservation->hid_id = hid_id;
     reservation->capacity = count;
     Impl::Reservation* token = reservation.get();
     impl_->reservations.push_back(std::move(reservation));
@@ -641,7 +632,7 @@ aoahid_result Device::clear_reservation(const ReservationToken token) noexcept {
     }
     reservation = found->get();
     if (reservation->in_use != 0U) {
-        record_error(AOAHID_ERR_BUSY, 0, 0, reservation->hid_id);
+        record_error(AOAHID_ERR_BUSY);
         return AOAHID_ERR_BUSY;
     }
     impl_->reserved_capacity_total -= reservation->capacity;
@@ -673,7 +664,7 @@ aoahid_result Device::acquire(const std::uint16_t hid_id, const ReservationToken
     const Impl::StateGuard guard(*impl_);
     auto* own_reservation = static_cast<Impl::Reservation*>(reservation.value);
     if (own_reservation != nullptr &&
-        (own_reservation->owner != impl_ || own_reservation->hid_id != hid_id)) {
+        own_reservation->owner != impl_) {
         record_error(AOAHID_ERR_PARAM, 0, accessory_send_hid_event, hid_id, 0U,
                      static_cast<std::uint32_t>(report_length));
         return AOAHID_ERR_PARAM;

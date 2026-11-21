@@ -30,10 +30,10 @@ int main(void) {
         aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         return verify_fail("touchscreen spec create", result);
     }
-
-    const aoahid_node_options node_options = {(uint32_t)sizeof(aoahid_node_options), 0U, 1U, 0U};
+    const aoahid_node_placement node_placement = verify_placement(1U);
+    const aoahid_commit_timeouts node_timeouts = verify_timeouts();
     aoahid_node* node = NULL;
-    result = aoahid_node_open(device, spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS, &node);
+    result = aoahid_node_open(device, spec, &node_placement, &node_timeouts, &node);
     aoahid_spec_release(spec);
     if (result != AOAHID_OK) {
         aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
@@ -54,14 +54,14 @@ int main(void) {
 
         result = aoahid_touchscreen_contact(node, 0U, 1U, start_x, y, NULL);
         if (result != AOAHID_OK) {
-            aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+            aoahid_node_close(node, &node_timeouts);
             aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
             aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
             return verify_fail("touch down", result);
         }
         result = verify_submit(node);
         if (result != AOAHID_OK) {
-            aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+            aoahid_node_close(node, &node_timeouts);
             aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
             aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
             return verify_fail("submit touch down", result);
@@ -71,14 +71,14 @@ int main(void) {
             const int32_t x = start_x + (int32_t)((int64_t)(end_x - start_x) * i / steps);
             result = aoahid_touchscreen_contact(node, 0U, 1U, x, y, NULL);
             if (result != AOAHID_OK) {
-                aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+                aoahid_node_close(node, &node_timeouts);
                 aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
                 aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
                 return verify_fail("touch move", result);
             }
             result = verify_submit(node);
             if (result != AOAHID_OK) {
-                aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+                aoahid_node_close(node, &node_timeouts);
                 aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
                 aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
                 return verify_fail("submit touch move", result);
@@ -88,14 +88,14 @@ int main(void) {
 
         result = aoahid_touchscreen_contact(node, 0U, 0U, end_x, y, NULL);
         if (result != AOAHID_OK) {
-            aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+            aoahid_node_close(node, &node_timeouts);
             aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
             aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
             return verify_fail("touch up", result);
         }
         result = verify_submit(node);
         if (result != AOAHID_OK) {
-            aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+            aoahid_node_close(node, &node_timeouts);
             aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
             aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
             return verify_fail("submit touch up", result);
@@ -104,7 +104,7 @@ int main(void) {
     }
 
     printf("done. Expected result: 5 left-right drags visible on screen.\n");
-    aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    aoahid_node_close(node, &node_timeouts);
     aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     return 0;

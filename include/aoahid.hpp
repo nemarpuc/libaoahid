@@ -141,14 +141,25 @@ inline void spec_release(aoahid_spec* spec) noexcept { aoahid_spec_release(spec)
     return aoahid_spec_manifest(spec, manifest);
 }
 [[nodiscard]] inline aoahid_result node_open(aoahid_device* device, aoahid_spec* spec,
-                                             const aoahid_node_options* options,
-                                             uint32_t control_timeout_ms,
+                                             const aoahid_node_placement* placement,
+                                             const aoahid_commit_timeouts* timeouts,
                                              aoahid_node** out_node) noexcept {
-    return aoahid_node_open(device, spec, options, control_timeout_ms, out_node);
+    return aoahid_node_open(device, spec, placement, timeouts, out_node);
 }
-[[nodiscard]] inline aoahid_result node_close(aoahid_node* node, uint32_t control_timeout_ms,
-                                              uint32_t drain_timeout_ms) noexcept {
-    return aoahid_node_close(node, control_timeout_ms, drain_timeout_ms);
+[[nodiscard]] inline aoahid_result node_close(aoahid_node* node,
+                                              const aoahid_commit_timeouts* timeouts) noexcept {
+    return aoahid_node_close(node, timeouts);
+}
+[[nodiscard]] inline aoahid_result device_batch_begin(aoahid_device* device) noexcept {
+    return aoahid_device_batch_begin(device);
+}
+[[nodiscard]] inline aoahid_result device_batch_end(aoahid_device* device,
+                                                    const aoahid_commit_timeouts* timeouts) noexcept {
+    return aoahid_device_batch_end(device, timeouts);
+}
+[[nodiscard]] inline aoahid_result device_commit(aoahid_device* device,
+                                                 const aoahid_commit_timeouts* timeouts) noexcept {
+    return aoahid_device_commit(device, timeouts);
 }
 [[nodiscard]] inline uint16_t node_id(const aoahid_node* node) noexcept {
     return aoahid_node_id(node);
@@ -249,9 +260,14 @@ digitizer_update(aoahid_node* node, const aoahid_digitizer_sample* sample) noexc
     aoahid_channel_options_init(&value);
     return value;
 }
-[[nodiscard]] inline aoahid_node_options node_options() noexcept {
-    aoahid_node_options value;
-    aoahid_node_options_init(&value);
+[[nodiscard]] inline aoahid_node_placement node_placement() noexcept {
+    aoahid_node_placement value;
+    aoahid_node_placement_init(&value);
+    return value;
+}
+[[nodiscard]] inline aoahid_commit_timeouts commit_timeouts() noexcept {
+    aoahid_commit_timeouts value;
+    aoahid_commit_timeouts_init(&value);
     return value;
 }
 [[nodiscard]] inline aoahid_keyboard_options keyboard_options() noexcept {

@@ -48,7 +48,7 @@ void test_caller_poll_hot_path_is_lock_and_allocation_free() {
     AOAHID_CHECK(after.waits_started == before.waits_started);
     AOAHID_CHECK(hot_allocations == 0U);
 
-    AOAHID_CHECK(aoahid_node_close(node, kControlTimeoutMs, session_drain_timeout_ms) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, session_drain_timeout_ms)) == AOAHID_OK);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
                  AOAHID_OK);
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, session_drain_timeout_ms) ==

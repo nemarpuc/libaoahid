@@ -18,6 +18,7 @@
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -111,6 +112,19 @@ struct DeferredError {
     std::uint16_t report_id{};
     std::uint16_t node_id{};
     bool pending{};
+};
+
+/* One AOA HID registration of a Device: the Nodes that share one HID ID, in open order, and what
+ * the phone has for them. Nodes with the same number in aoahid_node_placement share it. */
+struct Registration {
+    std::uint32_t number{};
+    /* The HID ID the phone has now, or 0 when it has none. */
+    std::uint16_t applied_hid_id{};
+    /* A request 55 for this ID failed, so the phone may still have it: send it again first. */
+    std::uint16_t owed_hid_id{};
+    /* The members differ from what the phone has: a batch, or a failed step, left work to do. */
+    bool stale{};
+    std::vector<struct ::aoahid_node*> members;
 };
 
 using SpecConfig = std::variant<std::monostate, KeyboardConfig, MouseConfig, ConsumerConfig,
@@ -345,6 +359,10 @@ struct aoahid_device {
     std::uint16_t product_id{};
     std::vector<struct aoahid_node*> nodes;
     std::vector<struct aoahid_channel*> channels;
+    // Registrations by caller number, and the stale ones in the order they first changed.
+    std::vector<std::unique_ptr<aoa::detail::Registration>> registrations;
+    std::vector<aoa::detail::Registration*> stale_order;
+    bool in_batch{};
     // The library's Node numbers: from 1, never reused while the Device is open.
     std::uint16_t next_node_id{1U};
     std::atomic<bool> closing{false};
@@ -369,7 +387,9 @@ struct aoahid_node {
     aoahid_spec* spec{};
     aoa::detail::NodeState state;
     std::uint16_t node_id{};
+    // The HID ID of the Node's registration while the phone has it, else 0 (staged or unapplied).
     std::uint16_t hid_id{};
+    aoa::detail::Registration* registration{};
     std::uint32_t reserved_slots{};
     aoa::transport::ReservationToken reservation{};
     std::atomic<bool> transfer_inflight{false};

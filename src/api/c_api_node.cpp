@@ -6,11 +6,16 @@
 
 #include "api/support.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <new>
 
-using aoa::detail::allocate_hid_id;
+using aoa::detail::apply_registration;
+using aoa::detail::check_commit_timeouts;
+using aoa::detail::check_registration;
+using aoa::detail::find_registration;
+using aoa::detail::forget_empty_registrations;
 using aoa::detail::check_reservation;
 using aoa::detail::check_spec_fits_device;
 using aoa::detail::close_live_node_until;
@@ -23,8 +28,8 @@ using aoa::detail::timeout_is_set;
 extern "C" {
 
 aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* spec,
-                                           const aoahid_node_options* options,
-                                           const std::uint32_t control_timeout_ms,
+                                           const aoahid_node_placement* placement,
+                                           const aoahid_commit_timeouts* timeouts,
                                            aoahid_node** out_node) try {
     AOAHID_SERIALIZED(aoa::detail::serialization_context(device), "aoahid_node_open");
     aoa::detail::clear_error();
@@ -33,9 +38,6 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
         return AOAHID_ERR_PARAM;
     }
     *out_node = nullptr;
-    if (!timeout_is_set(control_timeout_ms, "control_timeout_ms")) {
-        return AOAHID_ERR_UNSET_FIELD;
-    }
     if (device == nullptr || device->transport == nullptr || spec == nullptr) {
         set_error(AOAHID_ERR_PARAM, "node.open", "A live Device and immutable Spec are required.");
         return AOAHID_ERR_PARAM;
@@ -45,102 +47,152 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
                   "The Device handle was consumed by close and cannot open a Node.");
         return AOAHID_ERR_PARAM;
     }
+    const aoahid_result checked_timeouts = check_commit_timeouts(timeouts);
+    if (checked_timeouts != AOAHID_OK)
+        return checked_timeouts;
     const aoahid_result deferred = preflight_context(device->context);
     if (deferred != AOAHID_OK)
         return deferred;
-    if (options == nullptr ||
-        !aoa::detail::valid_struct(options, options->struct_size,
-                                   static_cast<std::uint32_t>(sizeof(*options)), "node_options")) {
+    if (placement == nullptr ||
+        !aoa::detail::valid_struct(placement, placement->struct_size,
+                                   static_cast<std::uint32_t>(sizeof(*placement)),
+                                   "node_placement")) {
         return AOAHID_ERR_PARAM;
     }
-    const aoahid_result reservation = check_reservation(device, *options);
+    if (placement->registration == 0U) {
+        set_error(AOAHID_ERR_UNSET_FIELD, "node.registration",
+                  "A nonzero registration number is required.");
+        return AOAHID_ERR_UNSET_FIELD;
+    }
+    const aoahid_result reservation = check_reservation(device, *placement);
     if (reservation != AOAHID_OK)
         return reservation;
     const aoahid_result fits = check_spec_fits_device(device, spec);
     if (fits != AOAHID_OK)
         return fits;
+    if (device->next_node_id == 0U) {
+        set_error(AOAHID_ERR_OVERFLOW, "node.id", "The Device has no Node number left.");
+        return AOAHID_ERR_OVERFLOW;
+    }
+
+    // Everything that can allocate happens before the first request. After Android accepts a
+    // registration, publishing the Node into these pre-reserved vectors cannot allocate or orphan
+    // it.
+    aoa::detail::Registration* registration = find_registration(device, placement->registration);
+    const bool new_registration = registration == nullptr;
+    if (new_registration) {
+        auto created = std::make_unique<aoa::detail::Registration>();
+        created->number = placement->registration;
+        registration = created.get();
+        device->registrations.push_back(std::move(created));
+    }
+    const bool was_stale = registration->stale;
+    const std::uint16_t previous_hid_id = registration->applied_hid_id;
+
     auto node = std::unique_ptr<aoahid_node>(new (std::nothrow) aoahid_node());
     if (node == nullptr) {
         set_error(AOAHID_ERR_INTERNAL, "node", "Memory allocation for the Node failed.");
+        forget_empty_registrations(device);
         return AOAHID_ERR_INTERNAL;
     }
     bool retained = false;
     bool reservation_installed = false;
+    bool joined = false;
+    const auto undo = [&]() noexcept {
+        if (joined) {
+            auto& members = registration->members;
+            members.erase(std::remove(members.begin(), members.end(), node.get()), members.end());
+            joined = false;
+        }
+        if (reservation_installed) {
+            static_cast<void>(device->transport->clear_reservation(node->reservation));
+            reservation_installed = false;
+        }
+        if (retained) {
+            static_cast<void>(aoa::detail::release_spec(spec));
+            retained = false;
+        }
+        forget_empty_registrations(device);
+    };
     try {
         node->device = device;
         node->spec = spec;
+        node->registration = registration;
         node->active_completion_mutex =
             device->context->options.event_mode == AOAHID_EVENT_INTERNAL_THREAD
                 ? &node->completion_mutex
                 : nullptr;
-        if (device->next_node_id == 0U) {
-            set_error(AOAHID_ERR_OVERFLOW, "node.id", "The Device has no Node number left.");
-            return AOAHID_ERR_OVERFLOW;
-        }
-        const aoahid_result allocated = allocate_hid_id(device, &node->hid_id);
-        if (allocated != AOAHID_OK) {
-            return allocated;
-        }
-        node->reserved_slots = options->reserved_slots;
+        node->reserved_slots = placement->reserve_slot;
         const aoahid_result initialized = initialize_node_state(node.get());
         if (initialized != AOAHID_OK) {
+            undo();
             return initialized;
         }
-        // Complete every potentially allocating host-side operation before
-        // request 54. After Android accepts a registration, publishing the
-        // Node into this pre-reserved vector cannot allocate or orphan it.
         device->nodes.reserve(device->nodes.size() + 1U);
+        registration->members.reserve(registration->members.size() + 1U);
+        device->stale_order.reserve(device->stale_order.size() + 1U);
         if (!aoa::detail::retain_spec(spec)) {
             set_error(AOAHID_ERR_OVERFLOW, "spec.references",
                       "The Spec reference count cannot be incremented for this Node.");
+            undo();
             return AOAHID_ERR_OVERFLOW;
         }
         retained = true;
-        const aoahid_result reserved_slots = device->transport->set_reservation(
-            node->hid_id, node->reserved_slots, &node->reservation);
+        const aoahid_result reserved_slots =
+            device->transport->set_reservation(node->reserved_slots, &node->reservation);
         if (reserved_slots != AOAHID_OK) {
             static_cast<void>(finish_transport_result(
-                reserved_slots, "node.reserved_slots",
+                reserved_slots, "node.reserve_slot",
                 "The requested transfer-pool reservation could not be installed.", node.get()));
-            static_cast<void>(aoa::detail::release_spec(spec));
-            retained = false;
+            undo();
             return reserved_slots;
         }
         reservation_installed = true;
+        registration->members.push_back(node.get());
+        joined = true;
+        // The checks that need no I/O, so a staged Node is refused now and not at batch end.
+        const aoahid_result allowed = check_registration(device, registration);
+        if (allowed != AOAHID_OK) {
+            undo();
+            return allowed;
+        }
     } catch (...) {
-        if (reservation_installed) {
-            static_cast<void>(device->transport->clear_reservation(node->reservation));
-        }
-        if (retained) {
-            static_cast<void>(aoa::detail::release_spec(spec));
-        }
+        undo();
         throw;
     }
 
-    const aoahid_result registered = device->transport->register_hid(
-        node->hid_id, spec->descriptor.data(), spec->descriptor.size(), control_timeout_ms);
-    if (registered != AOAHID_OK) {
-        aoa::detail::log_event(
-            device->context, AOAHID_LOG_ERROR, "node_register", device, node.get(),
-            aoa::detail::LogEventStatus{registered, 0, 54, 0U,
-                                        static_cast<std::uint32_t>(spec->descriptor.size())});
-        static_cast<void>(finish_transport_result(
-            registered, "node.register", "AOA HID registration or descriptor transfer failed.",
-            node.get(), 54, 0U, static_cast<std::uint32_t>(spec->descriptor.size())));
-        static_cast<void>(device->transport->clear_reservation(node->reservation));
-        static_cast<void>(aoa::detail::release_spec(spec));
-        return registered;
+    if (device->in_batch) {
+        aoa::detail::mark_stale(device, registration);
+    } else {
+        const aoahid_result applied = apply_registration(device, registration, *timeouts);
+        if (applied != AOAHID_OK) {
+            // Keep the error of the step that failed while the registration is put back.
+            const aoa::detail::DeferredError failure =
+                aoa::detail::current_deferred_error(applied, "node.open", "A registration step failed.");
+            registration->members.erase(std::remove(registration->members.begin(),
+                                                    registration->members.end(), node.get()),
+                                        registration->members.end());
+            joined = false;
+            if (!registration->members.empty() && registration->applied_hid_id != previous_hid_id) {
+                // The old HID device went away with the failed step: register the old Nodes again.
+                static_cast<void>(apply_registration(device, registration, *timeouts));
+            } else {
+                registration->stale = was_stale;
+                if (!was_stale) {
+                    auto& order = device->stale_order;
+                    order.erase(std::remove(order.begin(), order.end(), registration), order.end());
+                }
+            }
+            undo();
+            return aoa::detail::publish_deferred_error(failure);
+        }
     }
 
-    // Capacity was established before request 54 and the element is a raw
-    // pointer, so this publication performs neither allocation nor user code.
+    // Capacity was established above and the elements are raw pointers, so this publication
+    // performs neither allocation nor user code.
     node->node_id = device->next_node_id++;
     device->nodes.push_back(node.get());
     *out_node = node.release();
-    aoa::detail::log_event(
-        device->context, AOAHID_LOG_INFO, "node_register", device, *out_node,
-        aoa::detail::LogEventStatus{AOAHID_OK, 0, 54, 0U,
-                                    static_cast<std::uint32_t>(spec->descriptor.size())});
     aoa::detail::clear_error();
     return AOAHID_OK;
 }
@@ -169,14 +221,12 @@ aoahid_result AOAHID_CALL aoahid_node_manifest(const aoahid_node* node,
 AOAHID_C_RESULT_CATCH("node.manifest")
 
 aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node,
-                                            const std::uint32_t control_timeout_ms,
-                                            const std::uint32_t drain_timeout_ms) try {
+                                            const aoahid_commit_timeouts* timeouts) try {
     AOAHID_SERIALIZED(aoa::detail::serialization_context(node), "aoahid_node_close");
     aoa::detail::clear_error();
-    if (!timeout_is_set(control_timeout_ms, "control_timeout_ms") ||
-        !timeout_is_set(drain_timeout_ms, "drain_timeout_ms")) {
-        return AOAHID_ERR_UNSET_FIELD;
-    }
+    const aoahid_result checked_timeouts = check_commit_timeouts(timeouts);
+    if (checked_timeouts != AOAHID_OK)
+        return checked_timeouts;
     if (node == nullptr || node->closed || node->device == nullptr ||
         node->device->transport == nullptr ||
         node->device->closing.load(std::memory_order_acquire)) {
@@ -185,8 +235,8 @@ aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node,
         return AOAHID_ERR_PARAM;
     }
     const auto deadline =
-        std::chrono::steady_clock::now() + std::chrono::milliseconds(drain_timeout_ms);
-    return close_live_node_until(node, deadline, control_timeout_ms);
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(timeouts->drain_timeout_ms);
+    return close_live_node_until(node, deadline, *timeouts);
 }
 AOAHID_C_RESULT_CATCH("node.close")
 

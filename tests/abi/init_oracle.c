@@ -23,7 +23,8 @@ int main(void) {
     DUMP(device_options);
     DUMP(accessory_options);
     DUMP(channel_options);
-    DUMP(node_options);
+    DUMP(node_placement);
+    DUMP(commit_timeouts);
     DUMP(keyboard_options);
     DUMP(mouse_options);
     DUMP(toggle_options);

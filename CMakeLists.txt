@@ -142,9 +142,11 @@ set(AOAHID_SOURCES
     src/api/device_ops.cpp
     src/api/error_detail.cpp
     src/api/node_ops.cpp
+    src/api/registration_ops.cpp
     src/hid/item_writer.cpp
     src/hid/descriptor_builder.cpp
     src/hid/validator.cpp
+    src/profiles/hid_layer.cpp
     src/profiles/neutral.cpp
     src/profiles/spec.cpp
     src/profiles/spec_gamepad.cpp
@@ -537,6 +539,7 @@ if(AOAHID_BUILD_TESTS)
       tests/unit/test_profiles_battery.cpp
       tests/unit/test_spec_options.cpp
       tests/unit/test_raw_validator.cpp
+      tests/unit/test_hid_layer.cpp
       tests/sim/allocation_probe.cpp
       tests/sim/test_transport.cpp
       tests/sim/test_transport_runtime.cpp
@@ -548,6 +551,7 @@ if(AOAHID_BUILD_TESTS)
       tests/sim/test_touch_battery.cpp
       tests/sim/test_submit.cpp
       tests/sim/test_node_close.cpp
+      tests/sim/test_registration.cpp
       tests/sim/test_hot_path.cpp
       tests/sim/test_context_destroy.cpp
       tests/sim/test_identity.cpp
@@ -565,8 +569,8 @@ if(AOAHID_BUILD_TESTS)
   aoahid_instrument_executable(aoahid_tests)
   # One executable, two layers: the unit suites need no USB backend, the sim
   # suites drive the transport against the fake libusb.
-  add_test(NAME aoahid.unit COMMAND aoahid_tests item_writer profiles spec_options raw_descriptor)
-  add_test(NAME aoahid.sim COMMAND aoahid_tests transport identity api_arguments report_state transport_failures)
+  add_test(NAME aoahid.unit COMMAND aoahid_tests item_writer profiles spec_options raw_descriptor hid_layer)
+  add_test(NAME aoahid.sim COMMAND aoahid_tests transport identity api_arguments report_state transport_failures registration)
 
   add_executable(aoahid_sim_internal_thread
       tests/sim/test_internal_thread.cpp

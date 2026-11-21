@@ -63,11 +63,10 @@ int main(void) {
         aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
         return verify_fail("keyboard spec create", result);
     }
-
-    aoahid_node_options node_options;
-    aoahid_node_options_init(&node_options);
+    const aoahid_node_placement node_placement = verify_placement(1U);
+    const aoahid_commit_timeouts node_timeouts = verify_timeouts();
     aoahid_node* node = NULL;
-    result = aoahid_node_open(device, spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS, &node);
+    result = aoahid_node_open(device, spec, &node_placement, &node_timeouts, &node);
     aoahid_spec_release(spec);
     if (result != AOAHID_OK) {
         aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
@@ -83,7 +82,7 @@ int main(void) {
     for (int round = 0; round < 3; ++round) {
         for (const char* p = message; *p != '\0'; ++p) {
             if (type_char(node, *p) != 0) {
-                aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+                aoahid_node_close(node, &node_timeouts);
                 aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
                 aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
                 return 1;
@@ -92,7 +91,7 @@ int main(void) {
     }
 
     printf("done. Expected result: \"%s\" typed 3 times.\n", "hello from libaoahid");
-    aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+    aoahid_node_close(node, &node_timeouts);
     aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     return 0;

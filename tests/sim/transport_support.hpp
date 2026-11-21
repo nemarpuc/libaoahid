@@ -124,6 +124,12 @@ inline std::vector<aoahid_fake_libusb_control_record> controls_for(const std::ui
     return records;
 }
 
+// The HID ID of the latest request 54 the fake phone has seen: what the phone calls the HID device.
+inline std::uint16_t last_registered_hid_id() {
+    const auto records = controls_for(54U);
+    return records.empty() ? std::uint16_t{0} : records.back().value;
+}
+
 inline aoahid_fake_libusb_event_stats event_stats() {
     aoahid_fake_libusb_event_stats stats{};
     AOAHID_CHECK(aoahid_fake_libusb_get_event_stats(&stats) == LIBUSB_SUCCESS);
@@ -306,8 +312,8 @@ inline void open_public_raw_session(aoahid_context** context, aoahid_device** de
                                          0U};
     aoahid_spec* spec = nullptr;
     AOAHID_CHECK(aoahid_spec_create_raw(&raw_options, &spec) == AOAHID_OK);
-    const aoahid_node_options node_options{sizeof(aoahid_node_options), 0U, 1U, 0U};
-    AOAHID_CHECK(aoahid_node_open(*device, spec, &node_options, kControlTimeoutMs, node) ==
+    const std::uint32_t node_options = 0U;
+    AOAHID_CHECK(aoahid_node_open(*device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), node) ==
                  AOAHID_OK);
     // The node's retained reference must keep the spec alive through a late
     // callback even after the caller drops its own reference.
@@ -337,8 +343,8 @@ inline void open_public_keyboard_session(aoahid_context** context, aoahid_device
     keyboard.usage_maximum = 0x65U;
     aoahid_spec* spec = nullptr;
     AOAHID_CHECK(aoahid_spec_create_keyboard(&keyboard, &spec) == AOAHID_OK);
-    const aoahid_node_options node_options{sizeof(aoahid_node_options), 0U, 1U, 0U};
-    AOAHID_CHECK(aoahid_node_open(*device, spec, &node_options, kControlTimeoutMs, node) ==
+    const std::uint32_t node_options = 0U;
+    AOAHID_CHECK(aoahid_node_open(*device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), node) ==
                  AOAHID_OK);
     aoahid_spec_release(spec);
 }
@@ -399,8 +405,8 @@ inline void open_public_touch_session(aoahid_context** context, aoahid_device** 
     }
     aoahid_spec* spec = nullptr;
     AOAHID_CHECK(aoahid_spec_create_touchscreen(&touch, &spec) == AOAHID_OK);
-    const aoahid_node_options node_options{sizeof(aoahid_node_options), 0U, 1U, 0U};
-    AOAHID_CHECK(aoahid_node_open(*device, spec, &node_options, kControlTimeoutMs, node) ==
+    const std::uint32_t node_options = 0U;
+    AOAHID_CHECK(aoahid_node_open(*device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), node) ==
                  AOAHID_OK);
     aoahid_spec_release(spec);
 

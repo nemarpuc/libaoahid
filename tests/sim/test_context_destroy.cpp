@@ -12,7 +12,7 @@ void test_context_destroy_aggregates_unregister_error() {
     aoahid_device* device = nullptr;
     aoahid_node* node = nullptr;
     open_public_raw_session(&context, &device, &node);
-    const std::uint16_t hid_id = aoahid_node_id(node);
+    const std::uint16_t hid_id = last_registered_hid_id();
     aoahid_fake_libusb_queue_control_result(LIBUSB_ERROR_PIPE);
 
     // This terminal error consumes Context: teardown completed and the exact
@@ -21,7 +21,7 @@ void test_context_destroy_aggregates_unregister_error() {
                  AOAHID_ERR_STALL);
     AOAHID_CHECK(aoahid_last_error()->transport_status == LIBUSB_ERROR_PIPE);
     AOAHID_CHECK(aoahid_last_error()->aoa_request == 55);
-    AOAHID_CHECK(aoahid_last_error()->node_id == hid_id);
+    AOAHID_CHECK(aoahid_last_error()->hid_id == hid_id);
     // The failed unregister consumed the Node, so teardown does not send request 55 again.
     AOAHID_CHECK(controls_for(55U).size() == 1U);
     aoahid_fake_libusb_reset();
@@ -59,7 +59,7 @@ void test_graveyard_publishes_unregister_and_cancel_errors() {
     aoahid_device* device = nullptr;
     aoahid_node* node = nullptr;
     open_public_raw_session(&context, &device, &node);
-    const std::uint16_t unregister_hid_id = aoahid_node_id(node);
+    const std::uint16_t unregister_hid_id = last_registered_hid_id();
     submit_delayed_public_report(node);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
                  AOAHID_OK);
@@ -67,13 +67,13 @@ void test_graveyard_publishes_unregister_and_cancel_errors() {
     AOAHID_CHECK(aoahid_context_poll(context, 0U) == AOAHID_ERR_STALL);
     AOAHID_CHECK(aoahid_last_error()->transport_status == LIBUSB_ERROR_PIPE);
     AOAHID_CHECK(aoahid_last_error()->aoa_request == 55);
-    AOAHID_CHECK(aoahid_last_error()->node_id == unregister_hid_id);
+    AOAHID_CHECK(aoahid_last_error()->hid_id == unregister_hid_id);
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, session_drain_timeout_ms) ==
                  AOAHID_OK);
 
     aoahid_fake_libusb_reset();
     open_public_raw_session(&context, &device, &node);
-    const std::uint16_t cancel_node_id = aoahid_node_id(node);
+    const std::uint16_t cancel_node_id = last_registered_hid_id();
     const std::array<std::uint8_t, 2U> report{1U, 1U};
     aoahid_fake_libusb_queue_async_completion(LIBUSB_TRANSFER_COMPLETED,
                                               static_cast<int>(report.size()), 1'000U);

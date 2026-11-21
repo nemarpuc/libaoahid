@@ -42,6 +42,22 @@ static void verify_sleep_ms(int milliseconds) {
 
 /* Prints the field/reason from the calling thread's last error and returns 1,
  * so every failure path in a verify program can just `return verify_fail(...)`. */
+/* One Node per registration: each Node is its own HID device on the phone. */
+static aoahid_node_placement verify_placement(uint32_t registration) {
+    aoahid_node_placement placement;
+    aoahid_node_placement_init(&placement);
+    placement.registration = registration;
+    return placement;
+}
+
+static aoahid_commit_timeouts verify_timeouts(void) {
+    aoahid_commit_timeouts timeouts;
+    aoahid_commit_timeouts_init(&timeouts);
+    timeouts.control_timeout_ms = AOAHID_CONTROL_TIMEOUT_MS;
+    timeouts.drain_timeout_ms = AOAHID_DRAIN_TIMEOUT_MS;
+    return timeouts;
+}
+
 static int verify_fail(const char* what, aoahid_result result) {
     /* Read before aoahid_result_name(), a public call that replaces the record;
      * argument evaluation order would otherwise decide which one is printed. */

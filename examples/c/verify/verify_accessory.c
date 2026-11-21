@@ -116,11 +116,11 @@ int main(int argc, char** argv) {
     aoahid_keyboard_options_init(&keyboard);
     aoahid_spec* spec = NULL;
     result = aoahid_spec_create_keyboard(&keyboard, &spec);
+    const aoahid_commit_timeouts node_timeouts = verify_timeouts();
     aoahid_node* node = NULL;
     if (result == AOAHID_OK) {
-        aoahid_node_options node_options;
-        aoahid_node_options_init(&node_options);
-        result = aoahid_node_open(device, spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS, &node);
+        const aoahid_node_placement node_placement = verify_placement(1U);
+        result = aoahid_node_open(device, spec, &node_placement, &node_timeouts, &node);
         aoahid_spec_release(spec);
     }
     int exit_code = 0;
@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
     }
 
     if (node != NULL)
-        (void)aoahid_node_close(node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+        (void)aoahid_node_close(node, &node_timeouts);
     (void)aoahid_device_close(device, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     (void)aoahid_context_destroy(context, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
     return exit_code;

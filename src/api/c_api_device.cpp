@@ -14,6 +14,8 @@
 #include <new>
 #include <utility>
 
+using aoa::detail::check_commit_timeouts;
+using aoa::detail::commit_device;
 using aoa::detail::completion_reason;
 using aoa::detail::copy_candidate;
 using aoa::detail::copy_config;
@@ -273,6 +275,64 @@ aoahid_result AOAHID_CALL aoahid_device_close(aoahid_device* device,
     return device_close_impl(device, &consumed, control_timeout_ms, drain_timeout_ms);
 }
 AOAHID_C_RESULT_CATCH("device.close")
+
+aoahid_result AOAHID_CALL aoahid_device_batch_begin(aoahid_device* device) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(device), "aoahid_device_batch_begin");
+    aoa::detail::clear_error();
+    if (device == nullptr || device->transport == nullptr ||
+        device->closing.load(std::memory_order_acquire)) {
+        set_error(AOAHID_ERR_PARAM, "device.batch_begin", "A live, open Device handle is required.");
+        return AOAHID_ERR_PARAM;
+    }
+    if (device->in_batch) {
+        set_error(AOAHID_ERR_BUSY, "device.batch_begin", "A batch is already open on the Device.");
+        return AOAHID_ERR_BUSY;
+    }
+    device->in_batch = true;
+    return AOAHID_OK;
+}
+AOAHID_C_RESULT_CATCH("device.batch_begin")
+
+aoahid_result AOAHID_CALL aoahid_device_batch_end(aoahid_device* device,
+                                                  const aoahid_commit_timeouts* timeouts) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(device), "aoahid_device_batch_end");
+    aoa::detail::clear_error();
+    if (device == nullptr || device->transport == nullptr ||
+        device->closing.load(std::memory_order_acquire)) {
+        set_error(AOAHID_ERR_PARAM, "device.batch_end", "A live, open Device handle is required.");
+        return AOAHID_ERR_PARAM;
+    }
+    const aoahid_result checked = check_commit_timeouts(timeouts);
+    if (checked != AOAHID_OK)
+        return checked;
+    if (!device->in_batch) {
+        set_error(AOAHID_ERR_BUSY, "device.batch_end", "No batch is open on the Device.");
+        return AOAHID_ERR_BUSY;
+    }
+    device->in_batch = false;
+    return commit_device(device, *timeouts);
+}
+AOAHID_C_RESULT_CATCH("device.batch_end")
+
+aoahid_result AOAHID_CALL aoahid_device_commit(aoahid_device* device,
+                                               const aoahid_commit_timeouts* timeouts) try {
+    AOAHID_SERIALIZED(aoa::detail::serialization_context(device), "aoahid_device_commit");
+    aoa::detail::clear_error();
+    if (device == nullptr || device->transport == nullptr ||
+        device->closing.load(std::memory_order_acquire)) {
+        set_error(AOAHID_ERR_PARAM, "device.commit", "A live, open Device handle is required.");
+        return AOAHID_ERR_PARAM;
+    }
+    const aoahid_result checked = check_commit_timeouts(timeouts);
+    if (checked != AOAHID_OK)
+        return checked;
+    const aoahid_result deferred = preflight_context(device->context);
+    if (deferred != AOAHID_OK)
+        return deferred;
+    device->in_batch = false;
+    return commit_device(device, *timeouts);
+}
+AOAHID_C_RESULT_CATCH("device.commit")
 
 aoahid_result AOAHID_CALL aoahid_device_latched_error(aoahid_device* device) try {
     AOAHID_SERIALIZED(aoa::detail::serialization_context(device), "aoahid_device_latched_error");

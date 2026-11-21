@@ -256,6 +256,7 @@ int main(void) {
     aoahid_spec* touch_spec = NULL;
     aoahid_spec* keyboard_spec = NULL;
     aoahid_spec* mouse_spec = NULL;
+    const aoahid_commit_timeouts node_timeouts = verify_timeouts();
     aoahid_node* touch_node = NULL;
     aoahid_node* keyboard_node = NULL;
     aoahid_node* mouse_node = NULL;
@@ -279,22 +280,20 @@ int main(void) {
     }
 
     {
-        const aoahid_node_options node_options = {(uint32_t)sizeof(aoahid_node_options), 0U, 1U,
-                                                  0U};
-        result = aoahid_node_open(device, touch_spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS,
-                                  &touch_node);
+        const aoahid_node_placement touch_placement = verify_placement(1U);
+        const aoahid_node_placement keyboard_placement = verify_placement(2U);
+        const aoahid_node_placement mouse_placement = verify_placement(3U);
+        result = aoahid_node_open(device, touch_spec, &touch_placement, &node_timeouts, &touch_node);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("touchscreen node open", result);
             goto cleanup;
         }
-        result = aoahid_node_open(device, keyboard_spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS,
-                                  &keyboard_node);
+        result = aoahid_node_open(device, keyboard_spec, &keyboard_placement, &node_timeouts, &keyboard_node);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("keyboard node open", result);
             goto cleanup;
         }
-        result = aoahid_node_open(device, mouse_spec, &node_options, AOAHID_CONTROL_TIMEOUT_MS,
-                                  &mouse_node);
+        result = aoahid_node_open(device, mouse_spec, &mouse_placement, &node_timeouts, &mouse_node);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("mouse node open", result);
             goto cleanup;
@@ -325,11 +324,11 @@ int main(void) {
 
 cleanup:
     if (touch_node != NULL)
-        aoahid_node_close(touch_node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+        aoahid_node_close(touch_node, &node_timeouts);
     if (keyboard_node != NULL)
-        aoahid_node_close(keyboard_node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+        aoahid_node_close(keyboard_node, &node_timeouts);
     if (mouse_node != NULL)
-        aoahid_node_close(mouse_node, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+        aoahid_node_close(mouse_node, &node_timeouts);
     if (touch_spec != NULL)
         aoahid_spec_release(touch_spec);
     if (keyboard_spec != NULL)

@@ -135,12 +135,21 @@ class ChannelOptions(c.Structure):
     ]
 
 
-class NodeOptions(c.Structure):
+class NodePlacement(c.Structure):
     _fields_ = [
         ("struct_size", U32),
         ("reserved", U32),
-        ("has_reserved_slots", U32),
-        ("reserved_slots", U32),
+        ("registration", U32),
+        ("reserve_slot", U32),
+    ]
+
+
+class CommitTimeouts(c.Structure):
+    _fields_ = [
+        ("struct_size", U32),
+        ("reserved", U32),
+        ("control_timeout_ms", U32),
+        ("drain_timeout_ms", U32),
     ]
 
 
@@ -457,7 +466,8 @@ GOLDEN_STRUCTS = {
     "aoahid_device_options": DeviceOptions,
     "aoahid_accessory_options": AccessoryOptions,
     "aoahid_channel_options": ChannelOptions,
-    "aoahid_node_options": NodeOptions,
+    "aoahid_node_placement": NodePlacement,
+    "aoahid_commit_timeouts": CommitTimeouts,
     "aoahid_physical_properties": PhysicalProperties,
     "aoahid_integer_field": IntegerField,
     "aoahid_report_id_option": ReportIdOption,

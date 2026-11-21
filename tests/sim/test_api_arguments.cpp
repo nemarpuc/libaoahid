@@ -372,33 +372,50 @@ void test_node_arguments() {
     aoahid_spec* raw = sim::make_raw_spec();
     sim::Session session{};
     AOAHID_CHECK(session.open(nullptr));
-    const aoahid_node_options options = sim::node_options();
+    const std::uint32_t options = sim::node_options();
     aoahid_node* node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, &options, kControlTimeoutMs, nullptr) ==
+    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, separate_placement(options), commit_timeouts_of(kControlTimeoutMs, 20U), nullptr) ==
                      AOAHID_ERR_PARAM &&
                  field_is("out_node"));
-    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, &options, 0U, &node) ==
+    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, separate_placement(options), commit_timeouts_of(0U, 20U), &node) ==
                  AOAHID_ERR_UNSET_FIELD);
-    AOAHID_CHECK(aoahid_node_open(nullptr, keyboard, &options, kControlTimeoutMs, &node) ==
+    AOAHID_CHECK(aoahid_node_open(nullptr, keyboard, separate_placement(options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
                  AOAHID_ERR_PARAM);
-    AOAHID_CHECK(aoahid_node_open(session.device, nullptr, &options, kControlTimeoutMs, &node) ==
+    AOAHID_CHECK(aoahid_node_open(session.device, nullptr, separate_placement(options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
                  AOAHID_ERR_PARAM);
-    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, nullptr, kControlTimeoutMs, &node) ==
+    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, nullptr, commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
                  AOAHID_ERR_PARAM);
-    aoahid_node_options wrong_size = options;
+    aoahid_node_placement wrong_size = *separate_placement(options);
     wrong_size.struct_size = 4U;
-    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, &wrong_size, kControlTimeoutMs,
-                                  &node) == AOAHID_ERR_PARAM &&
-                 field_is("node_options"));
+    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, &wrong_size,
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
+                     AOAHID_ERR_PARAM &&
+                 field_is("node_placement"));
+    aoahid_node_placement no_registration = *separate_placement(options);
+    no_registration.registration = 0U;
+    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, &no_registration,
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
+                     AOAHID_ERR_UNSET_FIELD &&
+                 field_is("node.registration"));
+    aoahid_node_placement bad_reserve = *separate_placement(2U);
+    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, &bad_reserve,
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
+                     AOAHID_ERR_UNSET_FIELD &&
+                 field_is("node.reserve_slot"));
+    aoahid_commit_timeouts wrong_timeouts = *commit_timeouts_of(kControlTimeoutMs, 20U);
+    wrong_timeouts.struct_size = 4U;
+    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, separate_placement(options),
+                                  &wrong_timeouts, &node) == AOAHID_ERR_PARAM &&
+                 field_is("commit_timeouts"));
     AOAHID_CHECK(aoahid_fake_libusb_control_count() == 0U);
 
     // A rejected request 54 opens no Node and leaves no reservation behind.
     aoahid_fake_libusb_queue_control_result(LIBUSB_ERROR_PIPE);
-    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, &options, kControlTimeoutMs, &node) ==
+    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, separate_placement(options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
                      AOAHID_ERR_STALL &&
                  node == nullptr && aoahid_last_error()->aoa_request == 54);
 
-    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, &options, kControlTimeoutMs, &node) ==
+    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, separate_placement(options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
                  AOAHID_OK);
     AOAHID_CHECK(aoahid_node_id(nullptr) == 0U && last_error_is(AOAHID_ERR_PARAM));
     AOAHID_CHECK(aoahid_node_id(node) != 0U);
@@ -409,10 +426,10 @@ void test_node_arguments() {
     AOAHID_CHECK(aoahid_node_manifest(node, &manifest) == AOAHID_OK &&
                  manifest.profile_kind == AOAHID_PROFILE_KEYBOARD &&
                  manifest.input_supported == 1U);
-    AOAHID_CHECK(aoahid_node_close(nullptr, kControlTimeoutMs, kDrainTimeoutMs) ==
+    AOAHID_CHECK(aoahid_node_close(nullptr, commit_timeouts_of(kControlTimeoutMs, kDrainTimeoutMs)) ==
                  AOAHID_ERR_PARAM);
-    AOAHID_CHECK(aoahid_node_close(node, 0U, kDrainTimeoutMs) == AOAHID_ERR_UNSET_FIELD);
-    AOAHID_CHECK(aoahid_node_close(node, kControlTimeoutMs, 0U) == AOAHID_ERR_UNSET_FIELD);
+    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(0U, kDrainTimeoutMs)) == AOAHID_ERR_UNSET_FIELD);
+    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, 0U)) == AOAHID_ERR_UNSET_FIELD);
 
     // Submitting: a raw Node has no generated report, and a Node takes one report at a time.
     AOAHID_CHECK(aoahid_node_submit(nullptr, kSendTimeoutMs) == AOAHID_ERR_PARAM);
@@ -420,7 +437,7 @@ void test_node_arguments() {
     AOAHID_CHECK(aoahid_node_submit_blocking(nullptr, kSendTimeoutMs) == AOAHID_ERR_PARAM &&
                  field_is("node.submit_blocking"));
     aoahid_node* raw_node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(session.device, raw, &options, kControlTimeoutMs, &raw_node) ==
+    AOAHID_CHECK(aoahid_node_open(session.device, raw, separate_placement(options), commit_timeouts_of(kControlTimeoutMs, 20U), &raw_node) ==
                  AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit(raw_node, kSendTimeoutMs) == AOAHID_ERR_UNSUPPORTED &&
                  field_is("node.submit"));
@@ -607,8 +624,8 @@ void test_closed_device_handle_is_refused() {
                  field_is("device.close"));
     AOAHID_CHECK(aoahid_device_latched_error(parked) == AOAHID_ERR_PARAM);
     aoahid_node* node = nullptr;
-    const aoahid_node_options node_config = sim::node_options();
-    AOAHID_CHECK(aoahid_node_open(parked, raw, &node_config, kControlTimeoutMs, &node) ==
+    const std::uint32_t node_config = sim::node_options();
+    AOAHID_CHECK(aoahid_node_open(parked, raw, separate_placement(node_config), commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
                      AOAHID_ERR_PARAM &&
                  field_is("device"));
     AOAHID_CHECK(aoahid_channel_open(parked, &options, kDrainTimeoutMs, &channel) ==

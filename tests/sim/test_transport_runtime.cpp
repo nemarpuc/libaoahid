@@ -77,8 +77,8 @@ void test_registration_reservations_and_async_results() {
     aoa::transport::ReservationToken reservation7{};
     aoa::transport::ReservationToken reservation8{};
     aoa::transport::ReservationToken reservation9{};
-    AOAHID_CHECK(device->set_reservation(7U, 1U, &reservation7) == AOAHID_OK);
-    AOAHID_CHECK(device->set_reservation(8U, 1U, &reservation8) == AOAHID_OK);
+    AOAHID_CHECK(device->set_reservation(1U, &reservation7) == AOAHID_OK);
+    AOAHID_CHECK(device->set_reservation(1U, &reservation8) == AOAHID_OK);
     CompletionState first{};
     CompletionState second{};
     CompletionState shared{};
@@ -101,9 +101,9 @@ void test_registration_reservations_and_async_results() {
     AOAHID_CHECK(device->clear_reservation(reservation7) == AOAHID_OK);
     AOAHID_CHECK(device->clear_reservation(reservation8) == AOAHID_OK);
 
-    AOAHID_CHECK(device->set_reservation(7U, 0U, &reservation7) == AOAHID_OK);
-    AOAHID_CHECK(device->set_reservation(8U, 2U, &reservation8) == AOAHID_OK);
-    AOAHID_CHECK(device->set_reservation(9U, 1U, &reservation9) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(device->set_reservation(0U, &reservation7) == AOAHID_OK);
+    AOAHID_CHECK(device->set_reservation(2U, &reservation8) == AOAHID_OK);
+    AOAHID_CHECK(device->set_reservation(1U, &reservation9) == AOAHID_ERR_PARAM);
     AOAHID_CHECK(device->clear_reservation(reservation7) == AOAHID_OK);
     AOAHID_CHECK(device->clear_reservation(reservation8) == AOAHID_OK);
 

@@ -105,6 +105,9 @@ aoa::transport::DeviceConfig copy_config(const aoahid_device_options& options,
 
 bool timeout_is_set(std::uint32_t value, const char* field) noexcept;
 
+// A non-null, correctly sized aoahid_commit_timeouts with both waits set.
+aoahid_result check_commit_timeouts(const aoahid_commit_timeouts* timeouts) noexcept;
+
 void refresh_discovery_views(aoahid_discovery* discovery) noexcept;
 
 void park_in_graveyard(aoahid_context* context, aoahid_device* device) noexcept;
@@ -121,7 +124,12 @@ std::size_t find_or_create_hid_id_domain(aoahid_context* context,
 aoahid_result allocate_hid_id(aoahid_device* device, std::uint16_t* hid_id) noexcept;
 
 aoahid_result check_reservation(const aoahid_device* device,
-                                const aoahid_node_options& options) noexcept;
+                                const aoahid_node_placement& placement) noexcept;
+
+// The limits of the Device that a descriptor of this size and these requirements must meet. A
+// joined descriptor is checked with it as a single Spec's is.
+aoahid_result check_descriptor_fits_device(const aoahid_device* device, std::size_t descriptor_bytes,
+                                           const aoa::hid::DescriptorRequirements& needs) noexcept;
 
 aoahid_result check_spec_fits_device(const aoahid_device* device, const aoahid_spec* spec) noexcept;
 
@@ -147,9 +155,40 @@ aoahid_result poll_until_idle(aoahid_node* node, std::uint32_t timeout_ms,
 
 std::uint32_t remaining_milliseconds(std::chrono::steady_clock::time_point deadline) noexcept;
 
+// The part of closing that leaves the Node's registration alone: finishes a started touch frame and
+// sends the neutral report. AOAHID_CLOSE_PENDING while a report of the Node is still in flight at
+// the deadline (the error detail says so); otherwise the first error of a step, which does not stop
+// the next. Device teardown uses it for each Node and unregisters each registration once.
+aoahid_result drain_node_for_close(aoahid_node* node,
+                                   std::chrono::steady_clock::time_point deadline) noexcept;
+
 aoahid_result close_live_node_until(aoahid_node* node,
                                     std::chrono::steady_clock::time_point deadline,
-                                    std::uint32_t control_timeout_ms);
+                                    const aoahid_commit_timeouts& timeouts);
+
+// ---- registration_ops.cpp: making the phone's HID devices match the open Nodes ----
+
+Registration* find_registration(aoahid_device* device, std::uint32_t number) noexcept;
+
+// Records that the registration's members differ from what the phone has. May allocate.
+void mark_stale(aoahid_device* device, Registration* registration);
+
+// The checks of a registration that need no I/O: its Specs may share a HID ID, and the joined
+// descriptor fits the Device's policies. Sets the error detail on a refusal.
+aoahid_result check_registration(const aoahid_device* device,
+                                 const Registration* registration);
+
+// Makes the phone's HID ID match the registration's members (the steps are in the file's header).
+// A refusal or a failed step leaves it stale; the error detail names the step.
+aoahid_result apply_registration(aoahid_device* device, Registration* registration,
+                                 const aoahid_commit_timeouts& timeouts);
+
+// Applies every stale registration in the order of its first change; the first error is returned
+// and a failed registration does not stop the next one.
+aoahid_result commit_device(aoahid_device* device, const aoahid_commit_timeouts& timeouts);
+
+// Drops registrations with no member and nothing on the phone.
+void forget_empty_registrations(aoahid_device* device) noexcept;
 
 // ---- device_ops.cpp: Device teardown, Node storage and the first-error latch of a close ----
 

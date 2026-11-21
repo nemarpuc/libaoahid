@@ -4,6 +4,8 @@
  * it is test-only and never enters the library ABI. */
 #pragma once
 
+#include "node_helpers.hpp"
+
 #include <cstddef>
 #include <cstdio>
 
@@ -30,3 +32,5 @@ void test_spec_options();
 void test_report_state();
 void test_transport_failures();
 void test_raw_descriptor();
+void test_hid_layer();
+void test_registration();

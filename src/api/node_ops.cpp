@@ -204,12 +204,8 @@ remaining_milliseconds(const std::chrono::steady_clock::time_point deadline) noe
                : static_cast<std::uint32_t>(remaining);
 }
 
-// The Node stays live only while a transfer of it is in flight, because the transfer's callback
-// still points at it: that case returns AOAHID_CLOSE_PENDING. Every other result means the Node is
-// gone. A step that fails does not stop the ones after it, and the first failure is returned.
-aoahid_result close_live_node_until(aoahid_node* node,
-                                    const std::chrono::steady_clock::time_point deadline,
-                                    const std::uint32_t control_timeout_ms) {
+aoahid_result drain_node_for_close(aoahid_node* node,
+                                   const std::chrono::steady_clock::time_point deadline) noexcept {
     aoahid_device* device = node->device;
     aoa::detail::DeferredError failure{};
     // Every step records its own error detail, which is kept for the first failure.
@@ -239,7 +235,8 @@ aoahid_result close_live_node_until(aoahid_node* node,
     keep_first(consume_completion(node, "node.completion"));
     node->battery_dirty = false;
 
-    if (device->transport->present()) {
+    // A Node the phone does not have (staged, or its registration unapplied) has nobody to tell.
+    if (device->transport->present() && node->hid_id != 0U) {
         make_neutral(node);
         if (node->dirty) {
             const std::uint32_t remaining = remaining_milliseconds(deadline);
@@ -253,25 +250,59 @@ aoahid_result close_live_node_until(aoahid_node* node,
             if (still_in_flight())
                 return AOAHID_CLOSE_PENDING;
         }
-        const aoahid_result unregister =
-            device->transport->unregister_hid(node->hid_id, control_timeout_ms);
-        if (unregister != AOAHID_ERR_NO_DEVICE) {
-            keep_first(finish_transport_result(unregister, "node.unregister",
-                                               "AOA request 55 failed while closing the Node.",
-                                               node, 55));
-        }
     }
+    return failure.pending ? publish_deferred_error(failure) : AOAHID_OK;
+}
+
+// The Node stays live only while a transfer of it is in flight, because the transfer's callback
+// still points at it: that case returns AOAHID_CLOSE_PENDING. Every other result means the Node is
+// gone. A step that fails does not stop the ones after it, and the first failure is returned.
+aoahid_result close_live_node_until(aoahid_node* node,
+                                    const std::chrono::steady_clock::time_point deadline,
+                                    const aoahid_commit_timeouts& timeouts) {
+    aoahid_device* device = node->device;
+    aoa::detail::Registration* registration = node->registration;
+    aoa::detail::DeferredError failure{};
+    const auto keep_first = [&](const aoahid_result result) {
+        if (result != AOAHID_OK && !failure.pending)
+            failure = current_deferred_error(result, "node.close", "A close step failed.", node);
+    };
+
+    const aoahid_result drained = drain_node_for_close(node, deadline);
+    if (drained == AOAHID_CLOSE_PENDING)
+        return AOAHID_CLOSE_PENDING;
+    keep_first(drained);
     if (device->transport->clear_reservation(node->reservation) != AOAHID_OK) {
         set_error(AOAHID_CLOSE_PENDING, "node.reserved_slots",
                   "The Node's reserved transfer slot is still in use.", 0, 57, node->hid_id);
+        aoa::detail::set_error_node(node->node_id);
         return AOAHID_CLOSE_PENDING;
     }
 
+    // The Node leaves its registration. The phone's HID device still has its application until
+    // the registration is applied: now, or at the end of a batch.
     auto& nodes = device->nodes;
     nodes.erase(std::remove(nodes.begin(), nodes.end(), node), nodes.end());
+    if (registration != nullptr) {
+        auto& members = registration->members;
+        members.erase(std::remove(members.begin(), members.end(), node), members.end());
+        node->registration = nullptr;
+        try {
+            aoa::detail::mark_stale(device, registration);
+        } catch (...) {
+            // The registration keeps its applied state and is not queued: the next close, commit
+            // or batch end applies it again. The error is the allocation failure.
+            registration->stale = true;
+            keep_first(AOAHID_ERR_INTERNAL);
+        }
+        if (!device->in_batch) {
+            keep_first(aoa::detail::apply_registration(device, registration, timeouts));
+            aoa::detail::forget_empty_registrations(device);
+        }
+    }
     aoa::detail::log_event(device->context, AOAHID_LOG_INFO, "node_close", device, node,
                            aoa::detail::LogEventStatus{failure.transport.result, 0, 55});
-    release_node_storage(node);
+    aoa::detail::release_node_storage(node);
     return publish_deferred_error(failure);
 }
 

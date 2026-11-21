@@ -167,7 +167,7 @@ class Device final {
                                std::size_t descriptor_length,
                                std::uint32_t control_timeout_ms) noexcept;
     aoahid_result unregister_hid(std::uint16_t hid_id, std::uint32_t control_timeout_ms) noexcept;
-    aoahid_result set_reservation(std::uint16_t hid_id, std::size_t count, ReservationToken* out);
+    aoahid_result set_reservation(std::size_t count, ReservationToken* out);
     aoahid_result clear_reservation(ReservationToken token) noexcept;
     aoahid_result acquire(std::uint16_t hid_id, ReservationToken reservation,
                           std::size_t report_length, void* user, Completion completion,

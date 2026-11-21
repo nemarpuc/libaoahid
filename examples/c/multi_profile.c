@@ -151,12 +151,21 @@ static aoahid_device_options device_options(void) {
     return options;
 }
 
-static aoahid_node_options node_options(void) {
-    aoahid_node_options options;
-    aoahid_node_options_init(&options);
-    options.has_reserved_slots = 1U;
-    options.reserved_slots = k_reserved_slots_per_node;
-    return options;
+/* Each Node is its own registration, so the phone has one HID device for each. */
+static aoahid_node_placement node_placement(uint32_t registration) {
+    aoahid_node_placement placement;
+    aoahid_node_placement_init(&placement);
+    placement.registration = registration;
+    placement.reserve_slot = k_reserved_slots_per_node;
+    return placement;
+}
+
+static aoahid_commit_timeouts commit_timeouts(void) {
+    aoahid_commit_timeouts timeouts;
+    aoahid_commit_timeouts_init(&timeouts);
+    timeouts.control_timeout_ms = k_control_timeout_ms;
+    timeouts.drain_timeout_ms = k_close_drain_timeout_ms;
+    return timeouts;
 }
 
 static aoahid_result create_specs(specs* result) {
@@ -269,17 +278,20 @@ static aoahid_result open_session(aoahid_context* context, const aoahid_device_i
         return AOAHID_ERR_NOT_AOA;
     }
     const aoahid_device_options open_options = device_options();
-    const aoahid_node_options nodes = node_options();
+    const aoahid_node_placement keyboard_placement = node_placement(1U);
+    const aoahid_node_placement mouse_placement = node_placement(2U);
+    const aoahid_node_placement touch_placement = node_placement(3U);
+    const aoahid_commit_timeouts timeouts = commit_timeouts();
     aoahid_result status = aoahid_device_open(context, info, &open_options, &value->device);
     if (status == AOAHID_OK)
-        status = aoahid_node_open(value->device, definitions->keyboard, &nodes,
-                                  k_control_timeout_ms, &value->keyboard);
+        status = aoahid_node_open(value->device, definitions->keyboard, &keyboard_placement,
+                                  &timeouts, &value->keyboard);
     if (status == AOAHID_OK)
-        status = aoahid_node_open(value->device, definitions->mouse, &nodes, k_control_timeout_ms,
+        status = aoahid_node_open(value->device, definitions->mouse, &mouse_placement, &timeouts,
                                   &value->mouse);
     if (status == AOAHID_OK)
-        status = aoahid_node_open(value->device, definitions->touchscreen, &nodes,
-                                  k_control_timeout_ms, &value->touchscreen);
+        status = aoahid_node_open(value->device, definitions->touchscreen, &touch_placement,
+                                  &timeouts, &value->touchscreen);
     if (status != AOAHID_OK) {
         /* Copy/report TLS diagnostics before cleanup makes another public call. */
         (void)failed(status, value->device == NULL ? "device open" : "profile registration");
@@ -312,8 +324,8 @@ static aoahid_result close_device(session* value) {
 
 static aoahid_result close_touchscreen(aoahid_context* context, session* value) {
     while (value->touchscreen != NULL) {
-        const aoahid_result status =
-            aoahid_node_close(value->touchscreen, k_control_timeout_ms, k_close_drain_timeout_ms);
+        const aoahid_commit_timeouts timeouts = commit_timeouts();
+        const aoahid_result status = aoahid_node_close(value->touchscreen, &timeouts);
         if (status != AOAHID_CLOSE_PENDING) {
             /* Any other result consumed the Node; an error says what failed on the way out. */
             value->touchscreen = NULL;

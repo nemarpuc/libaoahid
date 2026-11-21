@@ -189,17 +189,17 @@ void run_session(const aoahid_event_mode mode, const long allocation) {
     if (!step(aoahid_device_open(made.context, &phone.info, &device_options, &device),
               "device_open"))
         return finish();
-    const aoahid_node_options node_options = sim::node_options();
+    const std::uint32_t node_options = sim::node_options();
     aoahid_node* keyboard = nullptr;
-    if (!step(aoahid_node_open(device, made.keyboard, &node_options, kControlTimeoutMs, &keyboard),
+    if (!step(aoahid_node_open(device, made.keyboard, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &keyboard),
               "keyboard node_open"))
         return finish();
     aoahid_node* raw = nullptr;
-    if (!step(aoahid_node_open(device, made.raw, &node_options, kControlTimeoutMs, &raw),
+    if (!step(aoahid_node_open(device, made.raw, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &raw),
               "raw node_open"))
         return finish();
     aoahid_node* mouse = nullptr;
-    if (!step(aoahid_node_open(device, made.mouse, &node_options, kControlTimeoutMs, &mouse),
+    if (!step(aoahid_node_open(device, made.mouse, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &mouse),
               "mouse node_open"))
         return finish();
 
@@ -235,7 +235,7 @@ void run_session(const aoahid_event_mode mode, const long allocation) {
     if (!step(aoahid_channel_close(channel, kThreadDrainTimeoutMs), "channel_close"))
         return finish();
 
-    if (!step(aoahid_node_close(raw, kControlTimeoutMs, kThreadDrainTimeoutMs), "node_close"))
+    if (!step(aoahid_node_close(raw, commit_timeouts_of(kControlTimeoutMs, kThreadDrainTimeoutMs)), "node_close"))
         return finish();
     if (!step(aoahid_device_close(device, kControlTimeoutMs, kThreadDrainTimeoutMs),
               "device_close"))
