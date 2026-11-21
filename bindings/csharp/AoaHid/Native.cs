@@ -104,6 +104,8 @@ public struct ErrorDetail
     public int AoaRequest;
     public ushort NodeId;
     public ushort ReportId;
+    public ushort HidId;
+    public ushort Reserved16;
     public uint Offset;
     public uint Length;
 }
@@ -885,7 +887,7 @@ public static class Native
     /// <summary>Unregisters a Node.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_close", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result NodeClose(nint node, uint controlTimeoutMs, uint drainTimeoutMs);
-    /// <summary>The AOA HID ID of a Node.</summary>
+    /// <summary>The library's number of a Node.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_id", ExactSpelling = true, CallingConvention = Call)]
     public static extern ushort NodeId(nint node);
     /// <summary>What a Node sends.</summary>

@@ -5,6 +5,7 @@
 #include "aoahid.h"
 #include "fake_libusb/libusb.h"
 #include "test.hpp"
+#include "transport_support.hpp"
 
 #include <array>
 #include <cstdint>
@@ -180,7 +181,7 @@ void test_physical_identity_hid_id_domains() {
     AOAHID_CHECK(registration_error->field != nullptr && registration_error->reason != nullptr);
     AOAHID_CHECK(registration_error->transport_status == LIBUSB_ERROR_PIPE);
     AOAHID_CHECK(registration_error->aoa_request == 54);
-    AOAHID_CHECK(registration_error->node_id == 1U);
+    AOAHID_CHECK(registration_error->hid_id == 1U);
     AOAHID_CHECK(registration_error->offset == 0U);
     AOAHID_CHECK(registration_error->length == 21U);
 
@@ -191,8 +192,12 @@ void test_physical_identity_hid_id_domains() {
     AOAHID_CHECK(aoahid_last_error()->code == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_open(second_device, spec, &node_options, kControlTimeoutMs,
                                   &second_node) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_id(first_node) == 2U);
+    // Node numbers count on each Device; the AOA HID IDs count in the physical domain.
+    AOAHID_CHECK(aoahid_node_id(first_node) == 1U);
     AOAHID_CHECK(aoahid_node_id(second_node) == 1U);
+    const auto registrations = transport_sim::controls_for(54U);
+    AOAHID_CHECK(registrations.size() == 3U);
+    AOAHID_CHECK(registrations[1].value == 2U && registrations[2].value == 1U);
 
     AOAHID_CHECK(aoahid_node_close(first_node, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
     AOAHID_CHECK(aoahid_device_close(first_device, kControlTimeoutMs, kDrainTimeoutMs) ==
@@ -201,7 +206,9 @@ void test_physical_identity_hid_id_domains() {
     first_node = nullptr;
     AOAHID_CHECK(aoahid_node_open(first_device, spec, &node_options, kControlTimeoutMs,
                                   &first_node) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_id(first_node) == 3U);
+    AOAHID_CHECK(aoahid_node_id(first_node) == 1U);
+    const auto reopened = transport_sim::controls_for(54U);
+    AOAHID_CHECK(reopened.size() == 4U && reopened[3].value == 3U);
 
     AOAHID_CHECK(aoahid_node_close(first_node, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_close(second_node, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);

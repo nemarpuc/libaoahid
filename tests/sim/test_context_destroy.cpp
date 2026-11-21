@@ -73,7 +73,7 @@ void test_graveyard_publishes_unregister_and_cancel_errors() {
 
     aoahid_fake_libusb_reset();
     open_public_raw_session(&context, &device, &node);
-    const std::uint16_t cancel_hid_id = aoahid_node_id(node);
+    const std::uint16_t cancel_node_id = aoahid_node_id(node);
     const std::array<std::uint8_t, 2U> report{1U, 1U};
     aoahid_fake_libusb_queue_async_completion(LIBUSB_TRANSFER_COMPLETED,
                                               static_cast<int>(report.size()), 1'000U);
@@ -86,7 +86,7 @@ void test_graveyard_publishes_unregister_and_cancel_errors() {
     AOAHID_CHECK(aoahid_context_poll(context, 0U) == AOAHID_ERR_BUSY);
     AOAHID_CHECK(aoahid_last_error()->transport_status == LIBUSB_ERROR_BUSY);
     AOAHID_CHECK(aoahid_last_error()->aoa_request == 57);
-    AOAHID_CHECK(aoahid_last_error()->node_id == cancel_hid_id);
+    AOAHID_CHECK(aoahid_last_error()->hid_id != 0U && cancel_node_id == 1U);
     AOAHID_CHECK(aoahid_last_error()->length == report.size());
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, session_drain_timeout_ms) ==
                  AOAHID_OK);

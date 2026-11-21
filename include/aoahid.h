@@ -228,8 +228,10 @@ typedef struct aoahid_error_detail {
     const char* reason;       /* one English sentence */
     int32_t transport_status; /* the libusb status of a USB failure */
     int32_t aoa_request;      /* the AOA request involved (51 to 57) */
-    uint16_t node_id;         /* the AOA HID ID of the Node involved */
+    uint16_t node_id;         /* the library's number of the Node involved (aoahid_node_id) */
     uint16_t report_id;
+    uint16_t hid_id;          /* the AOA HID ID involved (the wValue of requests 54 to 57) */
+    uint16_t reserved16;      /* zero */
     uint32_t offset;
     uint32_t length;
 } aoahid_error_detail;
@@ -1228,9 +1230,10 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_node_close(aoahid_node* node,
                                                        uint32_t drain_timeout_ms);
 
 /* aoahid_node_id
- * The AOA HID ID of a Node.
- * Returns: The Node's AOA HID ID (nonzero) with AOAHID_OK recorded, or 0 with AOAHID_ERR_PARAM
- * recorded for a null or closed Node. */
+ * The library's number for a Node: from 1, unique on its Device, never reused while the Device is
+ * open. It is not the AOA HID ID, which aoahid_error_detail.hid_id reports.
+ * Returns: The number (nonzero) with AOAHID_OK recorded, or 0 with AOAHID_ERR_PARAM recorded for a
+ * null or closed Node. */
 AOAHID_API uint16_t AOAHID_CALL aoahid_node_id(const aoahid_node* node);
 
 /* aoahid_node_manifest

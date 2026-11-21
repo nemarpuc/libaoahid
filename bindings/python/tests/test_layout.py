@@ -25,7 +25,7 @@ def oracle() -> dict[str, int]:
 
 
 LAYOUT = {
-    "aoahid_error_detail": ("ErrorDetail", ["code", "field", "reason", "transport_status", "aoa_request", "node_id", "report_id", "offset", "length"]),
+    "aoahid_error_detail": ("ErrorDetail", ["code", "field", "reason", "transport_status", "aoa_request", "node_id", "report_id", "hid_id", "reserved16", "offset", "length"]),
     "aoahid_context_options": ("ContextOptions", ["struct_size", "reserved", "event_mode", "log_level", "log_sink", "log_user"]),
     "aoahid_device_info": ("DeviceInfo", ["bus_number", "device_address", "port_path", "port_path_length", "vendor_id", "product_id", "protocol_version", "serial", "product"]),
     "aoahid_aoa_strings": ("AoaStrings", ["manufacturer", "model", "description", "version", "uri", "serial"]),

@@ -15,7 +15,7 @@
 #include <system_error>
 
 namespace {
-thread_local aoahid_error_detail g_error{AOAHID_OK, nullptr, "No error.", 0, 0, 0, 0, 0, 0};
+thread_local aoahid_error_detail g_error{AOAHID_OK, nullptr, "No error.", 0, 0, 0, 0, 0, 0, 0, 0};
 
 class LogLine final {
   public:
@@ -62,12 +62,17 @@ void set_error(const aoahid_result result, const char* field, const char* reason
                const std::uint32_t offset, const std::uint32_t length) noexcept {
     g_error = aoahid_error_detail{
         result,        field,       reason == nullptr ? "An unspecified error occurred." : reason,
-        native_status, aoa_request, hid_id,
-        report_id,     offset,      length};
+        native_status, aoa_request, 0U,
+        report_id,     hid_id,      0U,
+        offset,        length};
+}
+
+void set_error_node(const std::uint16_t node_id) noexcept {
+    g_error.node_id = node_id;
 }
 
 void clear_error() noexcept {
-    g_error = aoahid_error_detail{AOAHID_OK, nullptr, "No error.", 0, 0, 0, 0, 0, 0};
+    g_error = aoahid_error_detail{AOAHID_OK, nullptr, "No error.", 0, 0, 0, 0, 0, 0, 0, 0};
 }
 
 aoahid_result finish_result(const aoahid_result result, const char* field, const char* reason,
@@ -176,6 +181,8 @@ void log_event(const aoahid_context* context, const aoahid_log_level level, cons
     }
     if (node != nullptr) {
         append_key(line, "node_id");
+        line.append_integer(node->node_id);
+        append_key(line, "hid_id");
         line.append_integer(node->hid_id);
         if (node->spec != nullptr && node->spec->layout.has_report_id) {
             append_key(line, "report_id");

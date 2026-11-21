@@ -228,6 +228,7 @@ aoahid_result AOAHID_CALL aoahid_raw_submit(aoahid_node* node, const std::uint8_
                   "Unused trailing Input-report bits must be zero.", 0, 57, node->hid_id,
                   accepted->report_id.enabled == 1U ? accepted->report_id.value : 0U,
                   static_cast<std::uint32_t>(length - 1U), 1U);
+        aoa::detail::set_error_node(node->node_id);
         return AOAHID_ERR_PARAM;
     }
     aoa::transport::PreparedTransfer prepared{};

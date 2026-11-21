@@ -73,6 +73,10 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
             device->context->options.event_mode == AOAHID_EVENT_INTERNAL_THREAD
                 ? &node->completion_mutex
                 : nullptr;
+        if (device->next_node_id == 0U) {
+            set_error(AOAHID_ERR_OVERFLOW, "node.id", "The Device has no Node number left.");
+            return AOAHID_ERR_OVERFLOW;
+        }
         const aoahid_result allocated = allocate_hid_id(device, &node->hid_id);
         if (allocated != AOAHID_OK) {
             return allocated;
@@ -130,6 +134,7 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
 
     // Capacity was established before request 54 and the element is a raw
     // pointer, so this publication performs neither allocation nor user code.
+    node->node_id = device->next_node_id++;
     device->nodes.push_back(node.get());
     *out_node = node.release();
     aoa::detail::log_event(
@@ -148,7 +153,7 @@ std::uint16_t AOAHID_CALL aoahid_node_id(const aoahid_node* node) try {
                   "The Node handle is null or closed; zero is the failure sentinel.");
         return 0U;
     }
-    return node->hid_id;
+    return node->node_id;
 }
 AOAHID_C_VALUE_CATCH("node.id", 0U)
 

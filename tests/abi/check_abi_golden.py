@@ -40,6 +40,8 @@ class ErrorDetail(c.Structure):
         ("aoa_request", I32),
         ("node_id", U16),
         ("report_id", U16),
+        ("hid_id", U16),
+        ("reserved16", U16),
         ("offset", U32),
         ("length", U32),
     ]

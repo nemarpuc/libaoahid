@@ -103,6 +103,9 @@ aoahid_result finish_transport_result(const aoahid_result result, const char* fi
               hid_id, transport_report_id,
               transport_error.offset != 0U ? transport_error.offset : fallback_offset,
               transport_error.length != 0U ? transport_error.length : fallback_length);
+    if (node != nullptr) {
+        aoa::detail::set_error_node(node->node_id);
+    }
     return result;
 }
 
@@ -112,6 +115,7 @@ aoa::detail::DeferredError make_deferred_error(DeferredErrorInput input) noexcep
     error.field = input.field;
     error.reason = input.reason;
     error.report_id = input.report_id;
+    error.node_id = input.node_id;
     error.pending = input.transport.result != AOAHID_OK;
     return error;
 }
@@ -125,10 +129,11 @@ aoa::detail::DeferredError current_deferred_error(const aoahid_result result, co
     if (detail != nullptr && detail->code == result) {
         return make_deferred_error(DeferredErrorInput{
             aoa::transport::ErrorInfo{result, detail->transport_status, detail->aoa_request,
-                                      detail->node_id, detail->offset, detail->length,
+                                      detail->hid_id, detail->offset, detail->length,
                                       detail->report_id},
             detail->field == nullptr ? field : detail->field,
-            detail->reason == nullptr ? reason : detail->reason, detail->report_id});
+            detail->reason == nullptr ? reason : detail->reason, detail->report_id,
+            detail->node_id});
     }
 
     aoa::transport::ErrorInfo transport_error = aoa::transport::last_error();
@@ -149,7 +154,8 @@ aoa::detail::DeferredError current_deferred_error(const aoahid_result result, co
             transport_error.length != 0U ? transport_error.length : fallback_length,
             transport_error.aoa_request == 57 ? transport_error.report_id : report_id(node)},
         field, reason,
-        transport_error.aoa_request == 57 ? transport_error.report_id : report_id(node)});
+        transport_error.aoa_request == 57 ? transport_error.report_id : report_id(node),
+        node == nullptr ? std::uint16_t{0U} : node->node_id});
 }
 
 aoahid_result publish_deferred_error(const aoa::detail::DeferredError& error) noexcept {
@@ -161,6 +167,7 @@ aoahid_result publish_deferred_error(const aoa::detail::DeferredError& error) no
               error.reason == nullptr ? "A deferred Context operation failed." : error.reason,
               error.transport.native_status, error.transport.aoa_request, error.transport.hid_id,
               error.report_id, error.transport.offset, error.transport.length);
+    aoa::detail::set_error_node(error.node_id);
     return error.transport.result;
 }
 

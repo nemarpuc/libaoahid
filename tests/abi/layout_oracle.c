@@ -94,6 +94,8 @@ int main(void) {
     OFFSET(aoahid_error_detail, aoa_request);
     OFFSET(aoahid_error_detail, node_id);
     OFFSET(aoahid_error_detail, report_id);
+    OFFSET(aoahid_error_detail, hid_id);
+    OFFSET(aoahid_error_detail, reserved16);
     OFFSET(aoahid_error_detail, offset);
     OFFSET(aoahid_error_detail, length);
     SIZE(aoahid_context_options);

@@ -114,6 +114,8 @@ pub struct aoahid_error_detail {
     pub aoa_request: i32,
     pub node_id: u16,
     pub report_id: u16,
+    pub hid_id: u16,
+    pub reserved16: u16,
     pub offset: u32,
     pub length: u32,
 }

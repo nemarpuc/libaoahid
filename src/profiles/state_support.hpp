@@ -51,6 +51,7 @@ inline aoahid_result link_available(const aoahid_node* node, const char* field) 
     set_error(AOAHID_ERR_NO_DEVICE, field, "The device is gone; its node state is frozen.",
               error.native_status, error.aoa_request, node->hid_id, failed_report_id, error.offset,
               error.length);
+    aoa::detail::set_error_node(node->node_id);
     return AOAHID_ERR_NO_DEVICE;
 }
 

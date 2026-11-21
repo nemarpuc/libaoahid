@@ -109,6 +109,7 @@ struct DeferredError {
     const char* field{};
     const char* reason{};
     std::uint16_t report_id{};
+    std::uint16_t node_id{};
     bool pending{};
 };
 
@@ -205,6 +206,8 @@ void set_error(aoahid_result result, const char* field, const char* reason,
                std::uint16_t hid_id = 0, std::uint16_t report_id = 0, std::uint32_t offset = 0,
                std::uint32_t length = 0) noexcept;
 void clear_error() noexcept;
+/* Records which Node the last error concerns (aoahid_error_detail.node_id). */
+void set_error_node(std::uint16_t node_id) noexcept;
 aoahid_result finish_result(aoahid_result result, const char* field, const char* reason,
                             std::int32_t native_status = 0, std::int32_t aoa_request = 0,
                             std::uint16_t hid_id = 0, std::uint16_t report_id = 0,
@@ -342,6 +345,8 @@ struct aoahid_device {
     std::uint16_t product_id{};
     std::vector<struct aoahid_node*> nodes;
     std::vector<struct aoahid_channel*> channels;
+    // The library's Node numbers: from 1, never reused while the Device is open.
+    std::uint16_t next_node_id{1U};
     std::atomic<bool> closing{false};
     aoahid_result close_result{AOAHID_OK};
     aoa::detail::DeferredError close_error;
@@ -363,6 +368,7 @@ struct aoahid_node {
     aoahid_device* device{};
     aoahid_spec* spec{};
     aoa::detail::NodeState state;
+    std::uint16_t node_id{};
     std::uint16_t hid_id{};
     std::uint32_t reserved_slots{};
     aoa::transport::ReservationToken reservation{};

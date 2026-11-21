@@ -46,6 +46,8 @@ Check("aoahid_error_detail.transport_status", (long)Marshal.OffsetOf<ErrorDetail
 Check("aoahid_error_detail.aoa_request", (long)Marshal.OffsetOf<ErrorDetail>("AoaRequest"));
 Check("aoahid_error_detail.node_id", (long)Marshal.OffsetOf<ErrorDetail>("NodeId"));
 Check("aoahid_error_detail.report_id", (long)Marshal.OffsetOf<ErrorDetail>("ReportId"));
+Check("aoahid_error_detail.hid_id", (long)Marshal.OffsetOf<ErrorDetail>("HidId"));
+Check("aoahid_error_detail.reserved16", (long)Marshal.OffsetOf<ErrorDetail>("Reserved16"));
 Check("aoahid_error_detail.offset", (long)Marshal.OffsetOf<ErrorDetail>("Offset"));
 Check("aoahid_error_detail.length", (long)Marshal.OffsetOf<ErrorDetail>("Length"));
 if (new ContextOptions().StructSize != 0) failures.Add("aoahid_context_options: new() fills struct_size");

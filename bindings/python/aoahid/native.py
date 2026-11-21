@@ -133,6 +133,8 @@ class ErrorDetail(c.Structure):
         ("aoa_request", c.c_int32),
         ("node_id", c.c_uint16),
         ("report_id", c.c_uint16),
+        ("hid_id", c.c_uint16),
+        ("reserved16", c.c_uint16),
         ("offset", c.c_uint32),
         ("length", c.c_uint32),
     ]
@@ -744,7 +746,7 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
     declare("aoahid_spec_manifest", [SpecP, c.POINTER(CapabilityManifest)], c.c_int32, "What a Spec sends.")
     declare("aoahid_node_open", [DeviceP, SpecP, c.POINTER(NodeOptions), c.c_uint32, c.POINTER(NodeP)], c.c_int32, "Registers a Spec on a Device as one AOA HID.")
     declare("aoahid_node_close", [NodeP, c.c_uint32, c.c_uint32], c.c_int32, "Unregisters a Node.")
-    declare("aoahid_node_id", [NodeP], c.c_uint16, "The AOA HID ID of a Node.")
+    declare("aoahid_node_id", [NodeP], c.c_uint16, "The library's number of a Node.")
     declare("aoahid_node_manifest", [NodeP, c.POINTER(CapabilityManifest)], c.c_int32, "What a Node sends.")
     declare("aoahid_node_submit", [NodeP, c.c_uint32], c.c_int32, "Queues the Node's current state as a report.")
     declare("aoahid_node_submit_blocking", [NodeP, c.c_uint32], c.c_int32, "Sends reports until the Node's state has been delivered.")

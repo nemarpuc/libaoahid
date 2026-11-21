@@ -12,6 +12,71 @@ using namespace aoa::state_build;
 
 namespace aoa::detail {
 
+aoahid_result initialize_node_state(aoahid_node* node) {
+    switch (node->spec->kind) {
+    case AOAHID_PROFILE_KEYBOARD: {
+        const auto* spec = std::get_if<aoa::detail::KeyboardConfig>(&node->spec->config);
+        aoa::detail::KeyboardState value{};
+        const std::size_t key_count =
+            static_cast<std::size_t>(spec->options.usage_maximum - spec->options.usage_minimum) +
+            1U;
+        value.key_transitions.resize(key_count);
+        value.pressed_bitmap.resize(key_count);
+        node->state = std::move(value);
+        break;
+    }
+    case AOAHID_PROFILE_MOUSE: {
+        const auto* spec = std::get_if<aoa::detail::MouseConfig>(&node->spec->config);
+        aoa::detail::MouseState value{};
+        value.buttons.resize(spec->options.button_count);
+        value.button_transitions.resize(spec->options.button_count);
+        node->state = std::move(value);
+        break;
+    }
+    case AOAHID_PROFILE_TOGGLE: {
+        const auto* spec = std::get_if<aoa::detail::ConsumerConfig>(&node->spec->config);
+        aoa::detail::ConsumerState value{};
+        value.pressed.resize(spec->allowed_usages.size());
+        value.transitions.resize(spec->allowed_usages.size());
+        node->state = std::move(value);
+        break;
+    }
+    case AOAHID_PROFILE_GAMEPAD: {
+        const auto* spec = std::get_if<aoa::detail::GamepadConfig>(&node->spec->config);
+        aoa::detail::GamepadState value{};
+        value.axes.reserve(spec->axes.size());
+        for (const auto& axis : spec->axes)
+            value.axes.push_back(axis.axis.neutral_value);
+        value.buttons.resize(spec->options.button_count);
+        value.button_transitions.resize(spec->options.button_count);
+        node->state = std::move(value);
+        break;
+    }
+    case AOAHID_PROFILE_TOUCHSCREEN:
+    case AOAHID_PROFILE_TOUCHPAD: {
+        const auto* spec = std::get_if<aoa::detail::TouchConfig>(&node->spec->config);
+        aoa::detail::TouchState value{};
+        value.buttons.resize(spec->fields.button_count);
+        value.button_transitions.resize(spec->fields.button_count);
+        node->state = std::move(value);
+        break;
+    }
+    case AOAHID_PROFILE_PEN:
+    case AOAHID_PROFILE_DIGITIZER:
+        node->state = aoa::detail::PenState{};
+        break;
+    case AOAHID_PROFILE_RAW:
+        node->state = aoa::detail::RawState{};
+        node->dirty = false;
+        break;
+    default:
+        set_error(AOAHID_ERR_INTERNAL, "spec.kind",
+                  "A validated ProfileSpec contained an unknown profile kind.");
+        return AOAHID_ERR_INTERNAL;
+    }
+    return AOAHID_OK;
+}
+
 aoahid_result validate_serialized_report(const aoahid_spec* spec, const std::uint8_t* report,
                                          const std::size_t report_length) noexcept {
     if (spec == nullptr) {

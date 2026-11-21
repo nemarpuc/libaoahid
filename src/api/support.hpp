@@ -66,6 +66,7 @@ struct DeferredErrorInput {
     const char* field{};
     const char* reason{};
     std::uint16_t report_id{};
+    std::uint16_t node_id{};
 };
 
 DeferredError make_deferred_error(DeferredErrorInput input) noexcept;
@@ -134,6 +135,11 @@ aoahid_result consume_completion(aoahid_node* node, const char* field) noexcept;
 
 aoahid_result initialize_node_state(aoahid_node* node);
 
+// ---- profiles/neutral.cpp ----
+
+// Puts the Node's state at rest and marks it dirty when a neutral report must still be sent.
+void make_neutral(aoahid_node* node) noexcept;
+
 bool has_non_neutral_state(const aoahid_node* node) noexcept;
 
 aoahid_result poll_until_idle(aoahid_node* node, std::uint32_t timeout_ms,
@@ -144,6 +150,20 @@ std::uint32_t remaining_milliseconds(std::chrono::steady_clock::time_point deadl
 aoahid_result close_live_node_until(aoahid_node* node,
                                     std::chrono::steady_clock::time_point deadline,
                                     std::uint32_t control_timeout_ms);
+
+// ---- device_ops.cpp: Device teardown, Node storage and the first-error latch of a close ----
+
+void remember_close_error(aoahid_device* device, const DeferredError& error) noexcept;
+
+void remember_current_close_error(aoahid_device* device, aoahid_result result, const char* field,
+                                  const char* reason, const aoahid_node* node = nullptr,
+                                  std::int32_t fallback_request = 0,
+                                  std::uint32_t fallback_offset = 0U,
+                                  std::uint32_t fallback_length = 0U) noexcept;
+
+void release_node_storage(aoahid_node* node) noexcept;
+
+void remember_terminal_completion(aoahid_device* device, aoahid_node* node) noexcept;
 
 bool graph_drained(const aoahid_device* device) noexcept;
 

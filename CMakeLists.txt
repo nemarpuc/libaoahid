@@ -139,11 +139,13 @@ set(AOAHID_SOURCES
     src/api/c_api_node.cpp
     src/api/c_api_send.cpp
     src/api/context_ops.cpp
+    src/api/device_ops.cpp
     src/api/error_detail.cpp
     src/api/node_ops.cpp
     src/hid/item_writer.cpp
     src/hid/descriptor_builder.cpp
     src/hid/validator.cpp
+    src/profiles/neutral.cpp
     src/profiles/spec.cpp
     src/profiles/spec_gamepad.cpp
     src/profiles/spec_keyboard.cpp

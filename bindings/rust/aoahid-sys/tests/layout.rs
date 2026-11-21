@@ -91,6 +91,8 @@ fn rust_layout() -> BTreeMap<String, i64> {
     map.insert("aoahid_error_detail.aoa_request".to_owned(), offset_of!(aoahid_error_detail, aoa_request) as i64);
     map.insert("aoahid_error_detail.node_id".to_owned(), offset_of!(aoahid_error_detail, node_id) as i64);
     map.insert("aoahid_error_detail.report_id".to_owned(), offset_of!(aoahid_error_detail, report_id) as i64);
+    map.insert("aoahid_error_detail.hid_id".to_owned(), offset_of!(aoahid_error_detail, hid_id) as i64);
+    map.insert("aoahid_error_detail.reserved16".to_owned(), offset_of!(aoahid_error_detail, reserved16) as i64);
     map.insert("aoahid_error_detail.offset".to_owned(), offset_of!(aoahid_error_detail, offset) as i64);
     map.insert("aoahid_error_detail.length".to_owned(), offset_of!(aoahid_error_detail, length) as i64);
     map.insert("aoahid_context_options.size".to_owned(), size_of::<aoahid_context_options>() as i64);
