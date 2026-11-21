@@ -14,7 +14,7 @@ keyboard.Tap(0x04);                             // key down, send, key up, send
 ```
 
 - **Raw layer.** `Native` chooses nothing. The generated `Init()` of a structure the C initializer
-  fills only with `struct_size` (for example `NodeOptions`) returns a zeroed structure with
+  fills only with `struct_size` (for example `NodePlacement`) returns a zeroed structure with
   `StructSize` set.
 - **Initial values.** `Init()` of `ContextOptions`, `DeviceOptions`, `AccessoryOptions`,
   `ChannelOptions` and the profile options returns the values of the C `aoahid_*_init` function of

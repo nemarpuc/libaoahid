@@ -155,7 +155,8 @@ internal static class HandChecks
                 At<AccessoryOptions>("Strings") + At<AoaStrings>("Manufacturer"),
                 At<AccessoryOptions>("Strings") + At<AoaStrings>("Model"));
         Compare("channel_options", ChannelOptions.Init());
-        Compare("node_options", NodeOptions.Init());
+        Compare("node_placement", NodePlacement.Init());
+        Compare("commit_timeouts", CommitTimeouts.Init());
         Compare("keyboard_options", KeyboardOptions.Init());
         Compare("mouse_options", MouseOptions.Init());
         Compare("toggle_options", ToggleOptions.Init(), At<ToggleOptions>("AllowedUsages"),

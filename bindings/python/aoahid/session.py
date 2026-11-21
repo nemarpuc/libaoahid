@@ -9,6 +9,7 @@ Every object has ``.raw`` (the ctypes handle) so a program can drop to the raw c
 
 from __future__ import annotations
 
+import contextlib
 import ctypes as c
 import time
 from typing import Callable, Optional, cast
@@ -115,12 +116,34 @@ class Device(_Owner):
     def __init__(self, session: Session, info, options: n.DeviceOptions) -> None:
         super().__init__()
         self.session = session
+        self._registrations = 0
         self.raw = n.DeviceP()
         session._check(session.library.aoahid_device_open(session.raw, info, c.byref(options),
                                                           c.byref(self.raw)))
 
-    def node(self, kind: str, options=None, *, settle: float = SETTLE_SECONDS) -> "Node":
-        """Open a Node of ``kind`` (a key of ``NODE_KINDS``), then wait ``settle`` seconds."""
+    def _timeouts(self) -> n.CommitTimeouts:
+        return initial.commit_timeouts(control_timeout_ms=self.session.timeout_ms)
+
+    @contextlib.contextmanager
+    def batch(self):
+        """Stage Node opens and closes; they reach the phone together when the block ends."""
+        library = self.session.library
+        self.session._check(library.aoahid_device_batch_begin(self.raw))
+        try:
+            yield self
+        finally:
+            self.session._check(library.aoahid_device_batch_end(self.raw, c.byref(self._timeouts())))
+
+    def node(self, kind: str, options=None, *, registration: Optional[int] = None,
+             settle: float = SETTLE_SECONDS) -> "Node":
+        """Open a Node of ``kind`` (a key of ``NODE_KINDS``), then wait ``settle`` seconds.
+
+        Nodes given the same ``registration`` number share one HID device on the phone (each
+        needs its own Report ID). Without one, the Node is a HID device of its own.
+        """
+        if registration is None:
+            self._registrations += 1
+            registration = self._registrations
         make, create, cls = NODE_KINDS[kind]
         options = options if options is not None else make()
         library = self.session.library
@@ -128,9 +151,9 @@ class Device(_Owner):
         self.session._check(getattr(library, create)(c.byref(options), c.byref(spec)))
         try:
             raw = n.NodeP()
-            node_options = initial.node_options()
-            self.session._check(library.aoahid_node_open(self.raw, spec, c.byref(node_options),
-                                                         self.session.timeout_ms, c.byref(raw)))
+            placement = initial.node_placement(registration=registration)
+            self.session._check(library.aoahid_node_open(self.raw, spec, c.byref(placement),
+                                                         c.byref(self._timeouts()), c.byref(raw)))
         finally:
             library.aoahid_spec_release(spec)  # the Node keeps its own reference
         node = cls(self, raw)
@@ -172,8 +195,7 @@ class Node:
 
     def close(self) -> None:
         if self.raw:
-            self._library.aoahid_node_close(self.raw, self.device.session.timeout_ms,
-                                            n.AOAHID_DRAIN_TIMEOUT_MS)
+            self._library.aoahid_node_close(self.raw, c.byref(self.device._timeouts()))
             self.raw = None
 
 

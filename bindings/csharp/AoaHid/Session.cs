@@ -16,6 +16,15 @@ public sealed class AoaSession : IDisposable
     /// <summary>docs/API.md "Open sequence" step 5: Android gives no sign when it has registered the HID, so leave a short gap; the README waits 100 ms.</summary>
     public static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(100);
 
+    /// <summary>The waits of a Node open or close: the library's control and drain times.</summary>
+    internal static CommitTimeouts Timeouts()
+    {
+        var timeouts = CommitTimeouts.Init();
+        timeouts.ControlTimeoutMs = Native.AOAHID_CONTROL_TIMEOUT_MS;
+        timeouts.DrainTimeoutMs = Native.AOAHID_DRAIN_TIMEOUT_MS;
+        return timeouts;
+    }
+
     private readonly List<AoaDevice> _devices = new();
     private nint _context;
     private nint _discovery;
@@ -102,6 +111,7 @@ public sealed class AoaDevice : IDisposable
 {
     private readonly List<AoaNode> _nodes = new();
     private nint _device;
+    private uint _registrations; // the last registration number given out
 
     internal AoaDevice(AoaSession session, nint device)
     {
@@ -118,8 +128,11 @@ public sealed class AoaDevice : IDisposable
         AoaHidException.Check(result);
         try
         {
-            var nodeOptions = NodeOptions.Init();
-            AoaHidException.Check(Native.NodeOpen(_device, spec, in nodeOptions, Native.AOAHID_CONTROL_TIMEOUT_MS, out var raw));
+            // Each Node is a HID device of its own on the phone.
+            var placement = NodePlacement.Init();
+            placement.Registration = ++_registrations;
+            var timeouts = AoaSession.Timeouts();
+            AoaHidException.Check(Native.NodeOpen(_device, spec, in placement, in timeouts, out var raw));
             var node = make(raw);
             _nodes.Add(node);
             Thread.Sleep(settle ?? AoaSession.Settle);
@@ -218,7 +231,8 @@ public abstract class AoaNode : IDisposable
     {
         if (_node != 0)
         {
-            Native.NodeClose(_node, Native.AOAHID_CONTROL_TIMEOUT_MS, Native.AOAHID_DRAIN_TIMEOUT_MS);
+            var timeouts = AoaSession.Timeouts();
+            Native.NodeClose(_node, in timeouts);
             _node = 0;
         }
     }

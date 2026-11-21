@@ -65,7 +65,8 @@ fn default_equals_the_c_initializers() {
     check!("pen_options", aoahid_pen_options, [offset_of!(aoahid_pen_options, barrel_usages)]);
     check!("digitizer_options", aoahid_digitizer_options, [offset_of!(aoahid_digitizer_options, barrel_usages)]);
     // The zero-only initializers.
-    check!("node_options", aoahid_node_options, []);
+    check!("node_placement", aoahid_node_placement, []);
+    check!("commit_timeouts", aoahid_commit_timeouts, []);
     check!("raw_options", aoahid_raw_options, []);
 
     let gamepad = aoahid_gamepad_options::default();

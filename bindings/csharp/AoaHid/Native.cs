@@ -203,17 +203,30 @@ public partial struct ChannelOptions
     public ChannelReadMode ReadMode;
 }
 
-/// <summary>A Node has one report in flight at a time, taken from the Device's shared pool.</summary>
+/// <summary>Where a Node goes (aoahid_node_open).</summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct NodeOptions
+public struct NodePlacement
 {
     public uint StructSize;
     public uint Reserved;
-    public uint HasReservedSlots;
-    public uint ReservedSlots;
+    public uint Registration;
+    public uint ReserveSlot;
 
     /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
-    public static NodeOptions Init() => new() { StructSize = (uint)Marshal.SizeOf<NodeOptions>() };
+    public static NodePlacement Init() => new() { StructSize = (uint)Marshal.SizeOf<NodePlacement>() };
+}
+
+/// <summary>How long a change of registrations may wait.</summary>
+[StructLayout(LayoutKind.Sequential)]
+public struct CommitTimeouts
+{
+    public uint StructSize;
+    public uint Reserved;
+    public uint ControlTimeoutMs;
+    public uint DrainTimeoutMs;
+
+    /// <summary>A zeroed structure with StructSize set, as the C *_init does.</summary>
+    public static CommitTimeouts Init() => new() { StructSize = (uint)Marshal.SizeOf<CommitTimeouts>() };
 }
 
 /// <summary>The four HID 1.11 physical Global items for one field.</summary>
@@ -638,7 +651,8 @@ public static class Native
             ["aoahid_device_options"] = typeof(DeviceOptions),
             ["aoahid_accessory_options"] = typeof(AccessoryOptions),
             ["aoahid_channel_options"] = typeof(ChannelOptions),
-            ["aoahid_node_options"] = typeof(NodeOptions),
+            ["aoahid_node_placement"] = typeof(NodePlacement),
+            ["aoahid_commit_timeouts"] = typeof(CommitTimeouts),
             ["aoahid_physical_properties"] = typeof(PhysicalProperties),
             ["aoahid_integer_field"] = typeof(IntegerField),
             ["aoahid_report_id_option"] = typeof(ReportId),
@@ -791,6 +805,21 @@ public static class Native
     /// <summary>Closes a Device with its Nodes and Channels.</summary>
     [DllImport(Library, EntryPoint = "aoahid_device_close", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DeviceClose(nint device, uint controlTimeoutMs, uint drainTimeoutMs);
+    /// <summary>Starts gathering changes.</summary>
+    [DllImport(Library, EntryPoint = "aoahid_device_batch_begin", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result DeviceBatchBegin(nint device);
+    /// <summary>Applies the staged changes: each changed registration once, in the order of its first change.</summary>
+    [DllImport(Library, EntryPoint = "aoahid_device_batch_end", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result DeviceBatchEnd(nint device, in CommitTimeouts timeouts);
+    /// <summary>Applies the staged changes: each changed registration once, in the order of its first change.</summary>
+    [DllImport(Library, EntryPoint = "aoahid_device_batch_end", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result DeviceBatchEnd(nint device, nint timeouts);
+    /// <summary>Registers again every registration whose members differ from what the phone has, as after a failed open, close or batch.</summary>
+    [DllImport(Library, EntryPoint = "aoahid_device_commit", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result DeviceCommit(nint device, in CommitTimeouts timeouts);
+    /// <summary>Registers again every registration whose members differ from what the phone has, as after a failed open, close or batch.</summary>
+    [DllImport(Library, EntryPoint = "aoahid_device_commit", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result DeviceCommit(nint device, nint timeouts);
     /// <summary>Reads the error a transfer or event left on the Device.</summary>
     [DllImport(Library, EntryPoint = "aoahid_device_latched_error", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result DeviceLatchedError(nint device);
@@ -878,16 +907,19 @@ public static class Native
     /// <summary>What a Spec sends.</summary>
     [DllImport(Library, EntryPoint = "aoahid_spec_manifest", ExactSpelling = true, CallingConvention = Call)]
     public static extern Result SpecManifest(nint spec, nint manifest);
-    /// <summary>Registers a Spec on a Device as one AOA HID.</summary>
+    /// <summary>Opens a Node of spec at placement.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_open", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result NodeOpen(nint device, nint spec, in NodeOptions options, uint controlTimeoutMs, out nint node);
-    /// <summary>Registers a Spec on a Device as one AOA HID.</summary>
+    public static extern Result NodeOpen(nint device, nint spec, in NodePlacement placement, in CommitTimeouts timeouts, out nint node);
+    /// <summary>Opens a Node of spec at placement.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_open", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result NodeOpen(nint device, nint spec, nint options, uint controlTimeoutMs, out nint node);
-    /// <summary>Unregisters a Node.</summary>
+    public static extern Result NodeOpen(nint device, nint spec, nint placement, nint timeouts, out nint node);
+    /// <summary>Closes a Node.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_close", ExactSpelling = true, CallingConvention = Call)]
-    public static extern Result NodeClose(nint node, uint controlTimeoutMs, uint drainTimeoutMs);
-    /// <summary>The library's number of a Node.</summary>
+    public static extern Result NodeClose(nint node, in CommitTimeouts timeouts);
+    /// <summary>Closes a Node.</summary>
+    [DllImport(Library, EntryPoint = "aoahid_node_close", ExactSpelling = true, CallingConvention = Call)]
+    public static extern Result NodeClose(nint node, nint timeouts);
+    /// <summary>The library's number for a Node: from 1, unique on its Device, never reused while the Device is open.</summary>
     [DllImport(Library, EntryPoint = "aoahid_node_id", ExactSpelling = true, CallingConvention = Call)]
     public static extern ushort NodeId(nint node);
     /// <summary>What a Node sends.</summary>

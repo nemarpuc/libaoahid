@@ -28,7 +28,8 @@ from aoahid.native import (
     DeviceP,
     DiscoveryP,
     KeyboardOptions,
-    NodeOptions,
+    CommitTimeouts,
+    NodePlacement,
     NodeP,
     SpecP,
     load,
@@ -68,7 +69,8 @@ def main() -> int:
     keyboard.usage_minimum = 0x04
     keyboard.usage_maximum = 0xDD
 
-    node_options = NodeOptions()  # no reserved transfer slot
+    placement = NodePlacement(registration=1)  # its own HID device, no reserved transfer slot
+    timeouts = CommitTimeouts(control_timeout_ms=TIMEOUT_MS, drain_timeout_ms=TIMEOUT_MS)
 
     context = ContextP()
     discovery = DiscoveryP()
@@ -85,8 +87,8 @@ def main() -> int:
         check(library, library.aoahid_device_open(context, info, c.byref(device_options),
                                                   c.byref(device)))
         check(library, library.aoahid_spec_create_keyboard(c.byref(keyboard), c.byref(spec)))
-        check(library, library.aoahid_node_open(device, spec, c.byref(node_options),
-                                                TIMEOUT_MS, c.byref(node)))
+        check(library, library.aoahid_node_open(device, spec, c.byref(placement),
+                                                c.byref(timeouts), c.byref(node)))
         # Android registers the HID without telling the host; a report sent at once may be lost.
         time.sleep(1)
         for down in (1, 0):
@@ -102,7 +104,7 @@ def main() -> int:
         if spec:
             library.aoahid_spec_release(spec)
         if node:
-            library.aoahid_node_close(node, TIMEOUT_MS, TIMEOUT_MS)
+            library.aoahid_node_close(node, c.byref(timeouts))
         if device:
             library.aoahid_device_close(device, TIMEOUT_MS, TIMEOUT_MS)
         if context:

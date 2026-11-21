@@ -70,7 +70,11 @@ fn main() {
     keyboard.usage_minimum = 0x04;
     keyboard.usage_maximum = 0xDD;
 
-    let node_options = init!(aoahid_node_options); // no reserved transfer slot
+    let mut placement = init!(aoahid_node_placement); // no reserved transfer slot
+    placement.registration = 1; // its own HID device
+    let mut timeouts = init!(aoahid_commit_timeouts);
+    timeouts.control_timeout_ms = TIMEOUT_MS;
+    timeouts.drain_timeout_ms = TIMEOUT_MS;
 
     let mut context = ptr::null_mut();
     let mut discovery = ptr::null_mut();
@@ -86,7 +90,7 @@ fn main() {
         let info = aoahid_discovery_get(discovery, 0);
         check(aoahid_device_open(context, info, &device_options, &mut device))?;
         check(aoahid_spec_create_keyboard(&keyboard, &mut spec))?;
-        check(aoahid_node_open(device, spec, &node_options, TIMEOUT_MS, &mut node))?;
+        check(aoahid_node_open(device, spec, &placement, &timeouts, &mut node))?;
         // Android registers the HID without telling the host; a report sent at once may be lost.
         thread::sleep(Duration::from_secs(1));
         for down in [1, 0] {
@@ -104,7 +108,7 @@ fn main() {
             aoahid_spec_release(spec);
         }
         if !node.is_null() {
-            aoahid_node_close(node, TIMEOUT_MS, TIMEOUT_MS);
+            aoahid_node_close(node, &timeouts);
         }
         if !device.is_null() {
             aoahid_device_close(device, TIMEOUT_MS, TIMEOUT_MS);

@@ -258,14 +258,30 @@ class ChannelOptions(c.Structure):
             self.struct_size = c.sizeof(self)
 
 
-class NodeOptions(c.Structure):
-    """A Node has one report in flight at a time, taken from the Device's shared pool."""
+class NodePlacement(c.Structure):
+    """Where a Node goes (aoahid_node_open)."""
 
     _fields_ = [
         ("struct_size", c.c_uint32),
         ("reserved", c.c_uint32),
-        ("has_reserved_slots", c.c_uint32),
-        ("reserved_slots", c.c_uint32),
+        ("registration", c.c_uint32),
+        ("reserve_slot", c.c_uint32),
+    ]
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        if not args and "struct_size" not in kwargs:
+            self.struct_size = c.sizeof(self)
+
+
+class CommitTimeouts(c.Structure):
+    """How long a change of registrations may wait."""
+
+    _fields_ = [
+        ("struct_size", c.c_uint32),
+        ("reserved", c.c_uint32),
+        ("control_timeout_ms", c.c_uint32),
+        ("drain_timeout_ms", c.c_uint32),
     ]
 
     def __init__(self, *args: object, **kwargs: object) -> None:
@@ -677,7 +693,8 @@ ABI_STRUCTS = {
     "aoahid_device_options": DeviceOptions,
     "aoahid_accessory_options": AccessoryOptions,
     "aoahid_channel_options": ChannelOptions,
-    "aoahid_node_options": NodeOptions,
+    "aoahid_node_placement": NodePlacement,
+    "aoahid_commit_timeouts": CommitTimeouts,
     "aoahid_physical_properties": PhysicalProperties,
     "aoahid_integer_field": IntegerField,
     "aoahid_report_id_option": ReportId,
@@ -726,6 +743,9 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
     declare("aoahid_accessory_start", [ContextP, c.POINTER(DeviceInfo), c.POINTER(AccessoryOptions), c.c_uint32], c.c_int32, "Switches a device into accessory mode.")
     declare("aoahid_device_open", [ContextP, c.POINTER(DeviceInfo), c.POINTER(DeviceOptions), c.POINTER(DeviceP)], c.c_int32, "Opens a USB device.")
     declare("aoahid_device_close", [DeviceP, c.c_uint32, c.c_uint32], c.c_int32, "Closes a Device with its Nodes and Channels.")
+    declare("aoahid_device_batch_begin", [DeviceP], c.c_int32, "Starts gathering changes.")
+    declare("aoahid_device_batch_end", [DeviceP, c.POINTER(CommitTimeouts)], c.c_int32, "Applies the staged changes: each changed registration once, in the order of its first change.")
+    declare("aoahid_device_commit", [DeviceP, c.POINTER(CommitTimeouts)], c.c_int32, "Registers again every registration whose members differ from what the phone has, as after a failed open, close or batch.")
     declare("aoahid_device_latched_error", [DeviceP], c.c_int32, "Reads the error a transfer or event left on the Device.")
     declare("aoahid_channel_open", [DeviceP, c.POINTER(ChannelOptions), c.c_uint32, c.POINTER(ChannelP)], c.c_int32, "Opens a Bulk IN/OUT interface of a Device as a stream.")
     declare("aoahid_channel_close", [ChannelP, c.c_uint32], c.c_int32, "Closes a Channel.")
@@ -744,9 +764,9 @@ def load(path: Union[os.PathLike, str]) -> c.CDLL:
     declare("aoahid_spec_release", [SpecP], None, "Gives up a reference to a Spec.")
     declare("aoahid_spec_descriptor", [SpecP, c.POINTER(c.POINTER(c.c_uint8)), c.POINTER(c.c_size_t)], c.c_int32, "The report descriptor of a Spec.")
     declare("aoahid_spec_manifest", [SpecP, c.POINTER(CapabilityManifest)], c.c_int32, "What a Spec sends.")
-    declare("aoahid_node_open", [DeviceP, SpecP, c.POINTER(NodeOptions), c.c_uint32, c.POINTER(NodeP)], c.c_int32, "Registers a Spec on a Device as one AOA HID.")
-    declare("aoahid_node_close", [NodeP, c.c_uint32, c.c_uint32], c.c_int32, "Unregisters a Node.")
-    declare("aoahid_node_id", [NodeP], c.c_uint16, "The library's number of a Node.")
+    declare("aoahid_node_open", [DeviceP, SpecP, c.POINTER(NodePlacement), c.POINTER(CommitTimeouts), c.POINTER(NodeP)], c.c_int32, "Opens a Node of spec at placement.")
+    declare("aoahid_node_close", [NodeP, c.POINTER(CommitTimeouts)], c.c_int32, "Closes a Node.")
+    declare("aoahid_node_id", [NodeP], c.c_uint16, "The library's number for a Node: from 1, unique on its Device, never reused while the Device is open.")
     declare("aoahid_node_manifest", [NodeP, c.POINTER(CapabilityManifest)], c.c_int32, "What a Node sends.")
     declare("aoahid_node_submit", [NodeP, c.c_uint32], c.c_int32, "Queues the Node's current state as a report.")
     declare("aoahid_node_submit_blocking", [NodeP, c.c_uint32], c.c_int32, "Sends reports until the Node's state has been delivered.")
@@ -818,7 +838,8 @@ __all__ += [
     "DeviceOptions",
     "AccessoryOptions",
     "ChannelOptions",
-    "NodeOptions",
+    "NodePlacement",
+    "CommitTimeouts",
     "PhysicalProperties",
     "IntegerField",
     "ReportId",

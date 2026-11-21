@@ -40,7 +40,11 @@ try
     keyboard.UsageMinimum = 0x04;
     keyboard.UsageMaximum = 0xDD;
 
-    var nodeOptions = NodeOptions.Init(); // no reserved transfer slot
+    var placement = NodePlacement.Init(); // no reserved transfer slot
+    placement.Registration = 1; // its own HID device
+    var timeouts = CommitTimeouts.Init();
+    timeouts.ControlTimeoutMs = TimeoutMs;
+    timeouts.DrainTimeoutMs = TimeoutMs;
 
     AoaHidException.Check(Native.ContextCreate(in contextOptions, out context));
     AoaHidException.Check(Native.Discover(context, TimeoutMs, out discovery));
@@ -52,7 +56,7 @@ try
     var info = Marshal.PtrToStructure<DeviceInfo>(Native.DiscoveryGet(discovery, 0));
     AoaHidException.Check(Native.DeviceOpen(context, in info, in deviceOptions, out device));
     AoaHidException.Check(Native.SpecCreateKeyboard(in keyboard, out spec));
-    AoaHidException.Check(Native.NodeOpen(device, spec, in nodeOptions, TimeoutMs, out node));
+    AoaHidException.Check(Native.NodeOpen(device, spec, in placement, in timeouts, out node));
     // Android registers the HID without telling the host; a report sent at once may be lost.
     Thread.Sleep(1000);
     foreach (var down in new uint[] { 1, 0 })
@@ -75,7 +79,7 @@ finally
     if (spec != 0)
         Native.SpecRelease(spec);
     if (node != 0)
-        Native.NodeClose(node, TimeoutMs, TimeoutMs);
+        Native.NodeClose(node, in timeouts);
     if (device != 0)
         Native.DeviceClose(device, TimeoutMs, TimeoutMs);
     if (context != 0)

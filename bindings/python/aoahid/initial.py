@@ -16,7 +16,7 @@ from . import native as n
 
 __all__ = [
     "integer_field", "context_options", "device_options", "accessory_options", "channel_options",
-    "node_options", "keyboard_options", "mouse_options", "toggle_options", "gamepad_options",
+    "node_placement", "commit_timeouts", "keyboard_options", "mouse_options", "toggle_options", "gamepad_options",
     "touchscreen_options", "touchpad_options", "pen_options", "digitizer_options", "raw_options",
 ]
 
@@ -65,8 +65,13 @@ def channel_options(**overrides):
         "read_mode": n.AOAHID_CHANNEL_READ_REQUEST}, overrides)
 
 
-def node_options(**overrides):
-    return _build(n.NodeOptions, {}, overrides)
+def node_placement(**overrides):
+    return _build(n.NodePlacement, {}, overrides)
+
+
+def commit_timeouts(**overrides):
+    return _build(n.CommitTimeouts, {"control_timeout_ms": n.AOAHID_CONTROL_TIMEOUT_MS,
+                                     "drain_timeout_ms": n.AOAHID_DRAIN_TIMEOUT_MS}, overrides)
 
 
 def raw_options(**overrides):

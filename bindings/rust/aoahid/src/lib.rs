@@ -384,7 +384,7 @@ impl Context {
         let info = discovery.info(index).ok_or(Error(sys::AOAHID_ERR_PARAM))?;
         let mut raw = core::ptr::null_mut();
         result(unsafe { sys::aoahid_device_open(self.as_ptr(), info, options, &mut raw) })?;
-        NonNull::new(raw).map(|raw| Device { raw, context: PhantomData }).ok_or(Error(sys::AOAHID_ERR_INTERNAL))
+        NonNull::new(raw).map(|raw| Device { raw, context: PhantomData, registrations: core::cell::Cell::new(0) }).ok_or(Error(sys::AOAHID_ERR_INTERNAL))
     }
 
     /// Discovers and opens the one device present with the options of
@@ -432,6 +432,15 @@ impl Drop for Discovery<'_> {
 pub struct Device<'c> {
     raw: NonNull<sys::aoahid_device>,
     context: PhantomData<&'c Context>,
+    // The last registration number given out: each Node opened here is a HID device of its own.
+    registrations: core::cell::Cell<u32>,
+}
+
+fn commit_timeouts() -> sys::aoahid_commit_timeouts {
+    let mut timeouts = sys::aoahid_commit_timeouts::default();
+    timeouts.control_timeout_ms = sys::AOAHID_CONTROL_TIMEOUT_MS;
+    timeouts.drain_timeout_ms = sys::AOAHID_DRAIN_TIMEOUT_MS;
+    timeouts
 }
 
 /// A Node that closes itself on drop. It dereferences to the typed Node reference.
@@ -451,9 +460,8 @@ impl<R> Deref for Node<'_, R> {
 
 impl<R> Drop for Node<'_, R> {
     fn drop(&mut self) {
-        unsafe {
-            sys::aoahid_node_close(self.raw.as_ptr(), sys::AOAHID_CONTROL_TIMEOUT_MS, sys::AOAHID_DRAIN_TIMEOUT_MS)
-        };
+        let timeouts = commit_timeouts();
+        unsafe { sys::aoahid_node_close(self.raw.as_ptr(), &timeouts) };
     }
 }
 
@@ -485,9 +493,12 @@ impl Device<'_> {
 
     fn open_spec<R>(&self, spec: *mut sys::aoahid_spec, settle: Duration,
                     typed: impl FnOnce(*mut sys::aoahid_node) -> Option<R>) -> Result<Node<'_, R>, Error> {
-        let options = sys::aoahid_node_options::default();
+        self.registrations.set(self.registrations.get() + 1);
+        let mut placement = sys::aoahid_node_placement::default();
+        placement.registration = self.registrations.get();
+        let timeouts = commit_timeouts();
         let mut raw = core::ptr::null_mut();
-        result(unsafe { sys::aoahid_node_open(self.as_ptr(), spec, &options, sys::AOAHID_CONTROL_TIMEOUT_MS, &mut raw) })?;
+        result(unsafe { sys::aoahid_node_open(self.as_ptr(), spec, &placement, &timeouts, &mut raw) })?;
         let raw = NonNull::new(raw).ok_or(Error(sys::AOAHID_ERR_INTERNAL))?;
         let Some(node) = typed(raw.as_ptr()) else { return Err(Error(sys::AOAHID_ERR_INTERNAL)) };
         std::thread::sleep(settle);

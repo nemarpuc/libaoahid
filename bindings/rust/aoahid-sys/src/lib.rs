@@ -206,16 +206,36 @@ pub struct aoahid_channel_options {
     pub read_mode: aoahid_channel_read_mode,
 }
 
-/// A Node has one report in flight at a time, taken from the Device's shared pool.
+/// Where a Node goes (aoahid_node_open).
 #[repr(C)]
-pub struct aoahid_node_options {
+pub struct aoahid_node_placement {
     pub struct_size: u32,
     pub reserved: u32,
-    pub has_reserved_slots: u32,
-    pub reserved_slots: u32,
+    pub registration: u32,
+    pub reserve_slot: u32,
 }
 
-impl Default for aoahid_node_options {
+impl Default for aoahid_node_placement {
+    /// Zero with `struct_size` set, as the C `*_init` does.
+    fn default() -> Self {
+        // SAFETY: every field is an integer, a pointer, an optional function pointer or an array
+        // of them, and all-zero bytes are valid for each.
+        let mut value: Self = unsafe { core::mem::zeroed() };
+        value.struct_size = core::mem::size_of::<Self>() as u32;
+        value
+    }
+}
+
+/// How long a change of registrations may wait.
+#[repr(C)]
+pub struct aoahid_commit_timeouts {
+    pub struct_size: u32,
+    pub reserved: u32,
+    pub control_timeout_ms: u32,
+    pub drain_timeout_ms: u32,
+}
+
+impl Default for aoahid_commit_timeouts {
     /// Zero with `struct_size` set, as the C `*_init` does.
     fn default() -> Self {
         // SAFETY: every field is an integer, a pointer, an optional function pointer or an array
@@ -582,6 +602,12 @@ extern "C" {
     pub fn aoahid_device_open(context: *mut aoahid_context, selected: *const aoahid_device_info, options: *const aoahid_device_options, out_device: *mut *mut aoahid_device) -> aoahid_result;
     /// Closes a Device with its Nodes and Channels.
     pub fn aoahid_device_close(device: *mut aoahid_device, control_timeout_ms: u32, drain_timeout_ms: u32) -> aoahid_result;
+    /// Starts gathering changes.
+    pub fn aoahid_device_batch_begin(device: *mut aoahid_device) -> aoahid_result;
+    /// Applies the staged changes: each changed registration once, in the order of its first change.
+    pub fn aoahid_device_batch_end(device: *mut aoahid_device, timeouts: *const aoahid_commit_timeouts) -> aoahid_result;
+    /// Registers again every registration whose members differ from what the phone has, as after a failed open, close or batch.
+    pub fn aoahid_device_commit(device: *mut aoahid_device, timeouts: *const aoahid_commit_timeouts) -> aoahid_result;
     /// Reads the error a transfer or event left on the Device.
     pub fn aoahid_device_latched_error(device: *mut aoahid_device) -> aoahid_result;
     /// Opens a Bulk IN/OUT interface of a Device as a stream.
@@ -618,11 +644,11 @@ extern "C" {
     pub fn aoahid_spec_descriptor(spec: *const aoahid_spec, bytes: *const *const u8, length: *mut usize) -> aoahid_result;
     /// What a Spec sends.
     pub fn aoahid_spec_manifest(spec: *const aoahid_spec, manifest: *mut aoahid_capability_manifest) -> aoahid_result;
-    /// Registers a Spec on a Device as one AOA HID.
-    pub fn aoahid_node_open(device: *mut aoahid_device, spec: *mut aoahid_spec, options: *const aoahid_node_options, control_timeout_ms: u32, out_node: *mut *mut aoahid_node) -> aoahid_result;
-    /// Unregisters a Node.
-    pub fn aoahid_node_close(node: *mut aoahid_node, control_timeout_ms: u32, drain_timeout_ms: u32) -> aoahid_result;
-    /// The AOA HID ID of a Node.
+    /// Opens a Node of spec at placement.
+    pub fn aoahid_node_open(device: *mut aoahid_device, spec: *mut aoahid_spec, placement: *const aoahid_node_placement, timeouts: *const aoahid_commit_timeouts, out_node: *mut *mut aoahid_node) -> aoahid_result;
+    /// Closes a Node.
+    pub fn aoahid_node_close(node: *mut aoahid_node, timeouts: *const aoahid_commit_timeouts) -> aoahid_result;
+    /// The library's number for a Node: from 1, unique on its Device, never reused while the Device is open.
     pub fn aoahid_node_id(node: *const aoahid_node) -> u16;
     /// What a Node sends.
     pub fn aoahid_node_manifest(node: *const aoahid_node, manifest: *mut aoahid_capability_manifest) -> aoahid_result;
