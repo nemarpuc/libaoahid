@@ -41,11 +41,11 @@ struct Globals {
 };
 
 std::int64_t item_value(const std::uint8_t* data, const std::size_t size) noexcept {
-    std::int64_t value = 0;
+    std::uint64_t value = 0U;
     for (std::size_t index = 0U; index < size; ++index) {
-        value |= static_cast<std::int64_t>(data[index]) << (8U * index);
+        value |= static_cast<std::uint64_t>(data[index]) << (8U * index);
     }
-    return value;
+    return static_cast<std::int64_t>(value);
 }
 
 void collect_report_ids(const aoahid_spec* spec, std::bitset<256>* ids, std::size_t* count,
@@ -86,7 +86,7 @@ bool ends_with_clean_globals(const std::vector<std::uint8_t>& descriptor) noexce
     std::vector<Globals> pushed;
     std::size_t at = 0U;
     while (at < descriptor.size()) {
-        const std::uint8_t prefix = descriptor[at];
+        const unsigned prefix = descriptor[at];
         if (prefix == kLongItem) {
             // A long item is a size, a tag and that many bytes.
             if (at + 2U >= descriptor.size()) {
@@ -96,8 +96,8 @@ bool ends_with_clean_globals(const std::vector<std::uint8_t>& descriptor) noexce
             continue;
         }
         const std::size_t size = (prefix & 0x03U) == 3U ? 4U : (prefix & 0x03U);
-        const std::uint8_t type = static_cast<std::uint8_t>((prefix >> 2U) & 0x03U);
-        const std::uint8_t tag = static_cast<std::uint8_t>(prefix >> 4U);
+        const auto type = static_cast<std::uint8_t>((prefix >> 2U) & 0x03U);
+        const auto tag = static_cast<std::uint8_t>(prefix >> 4U);
         if (at + 1U + size > descriptor.size()) {
             return false;
         }
