@@ -45,8 +45,7 @@ void mark_clean(aoahid_device* device, Registration* registration) noexcept {
 
 aoahid_result unregister_one(aoahid_device* device, const std::uint16_t hid_id,
                              const std::uint32_t control_timeout_ms) noexcept {
-    const aoahid_result unregister =
-        device->transport->unregister_hid(hid_id, control_timeout_ms);
+    const aoahid_result unregister = device->transport->unregister_hid(hid_id, control_timeout_ms);
     if (unregister == AOAHID_OK || unregister == AOAHID_ERR_NO_DEVICE) {
         return AOAHID_OK;
     }
@@ -74,8 +73,7 @@ void mark_stale(aoahid_device* device, Registration* registration) {
     }
 }
 
-aoahid_result check_registration(const aoahid_device* device,
-                                 const Registration* registration) {
+aoahid_result check_registration(const aoahid_device* device, const Registration* registration) {
     if (registration->members.empty()) {
         return AOAHID_OK;
     }
@@ -161,7 +159,8 @@ aoahid_result apply_registration(aoahid_device* device, Registration* registrati
     if (registration->applied_hid_id != 0U) {
         const std::uint16_t applied = registration->applied_hid_id;
         forget_applied(registration);
-        const aoahid_result unregister = unregister_one(device, applied, timeouts.control_timeout_ms);
+        const aoahid_result unregister =
+            unregister_one(device, applied, timeouts.control_timeout_ms);
         if (unregister != AOAHID_OK) {
             // The phone may still have it: the next apply sends request 55 again first.
             registration->owed_hid_id = applied;
@@ -198,10 +197,10 @@ aoahid_result apply_registration(aoahid_device* device, Registration* registrati
         // The new HID device has never seen a battery level.
         member->battery_dirty = member->battery.has_value;
     }
-    aoa::detail::log_event(device->context, AOAHID_LOG_INFO, "node_register", device, first,
-                           aoa::detail::LogEventStatus{AOAHID_OK, 0, 54, 0U,
-                                                       static_cast<std::uint32_t>(
-                                                           joined.bytes.size())});
+    aoa::detail::log_event(
+        device->context, AOAHID_LOG_INFO, "node_register", device, first,
+        aoa::detail::LogEventStatus{AOAHID_OK, 0, 54, 0U,
+                                    static_cast<std::uint32_t>(joined.bytes.size())});
     mark_clean(device, registration);
     return AOAHID_OK;
 }

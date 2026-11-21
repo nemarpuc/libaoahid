@@ -130,14 +130,15 @@ void test_structured_logging_excludes_payload() {
     AOAHID_CHECK(aoahid_spec_create_raw(&raw_options, &spec) == AOAHID_OK);
     const std::uint32_t node_options = 0U;
     aoahid_node* node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), &node) == AOAHID_OK);
     static constexpr std::array<std::uint8_t, 7U> sensitive_report{1U,  'S', 'E', 'C',
                                                                    'R', 'E', 'T'};
     AOAHID_CHECK(aoahid_raw_submit(node, sensitive_report.data(), sensitive_report.size(),
                                    kSendTimeoutMs) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(node, 20U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, kDrainTimeoutMs)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, kDrainTimeoutMs)) ==
+                 AOAHID_OK);
     aoahid_spec_release(spec);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kDrainTimeoutMs) == AOAHID_OK);
@@ -173,7 +174,9 @@ void test_physical_identity_hid_id_domains() {
     // A failed registration retires its ID in only the first physical domain.
     aoahid_fake_libusb_queue_control_result(LIBUSB_ERROR_PIPE);
     aoahid_node* rejected = nullptr;
-    AOAHID_CHECK(aoahid_node_open(first_device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &rejected) == AOAHID_ERR_STALL);
+    AOAHID_CHECK(aoahid_node_open(first_device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U),
+                                  &rejected) == AOAHID_ERR_STALL);
     AOAHID_CHECK(rejected == nullptr);
     const aoahid_error_detail* registration_error = aoahid_last_error();
     AOAHID_CHECK(registration_error->code == AOAHID_ERR_STALL);
@@ -186,9 +189,13 @@ void test_physical_identity_hid_id_domains() {
 
     aoahid_node* first_node = nullptr;
     aoahid_node* second_node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(first_device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &first_node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(first_device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U),
+                                  &first_node) == AOAHID_OK);
     AOAHID_CHECK(aoahid_last_error()->code == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_open(second_device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &second_node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(second_device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U),
+                                  &second_node) == AOAHID_OK);
     // Node numbers count on each Device; the AOA HID IDs count in the physical domain.
     AOAHID_CHECK(aoahid_node_id(first_node) == 1U);
     AOAHID_CHECK(aoahid_node_id(second_node) == 1U);
@@ -196,18 +203,23 @@ void test_physical_identity_hid_id_domains() {
     AOAHID_CHECK(registrations.size() == 3U);
     AOAHID_CHECK(registrations[1].value == 2U && registrations[2].value == 1U);
 
-    AOAHID_CHECK(aoahid_node_close(first_node, commit_timeouts_of(kControlTimeoutMs, kDrainTimeoutMs)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(first_node, commit_timeouts_of(kControlTimeoutMs,
+                                                                  kDrainTimeoutMs)) == AOAHID_OK);
     AOAHID_CHECK(aoahid_device_close(first_device, kControlTimeoutMs, kDrainTimeoutMs) ==
                  AOAHID_OK);
     first_device = open_device(context, first);
     first_node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(first_device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &first_node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(first_device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U),
+                                  &first_node) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_id(first_node) == 1U);
     const auto reopened = transport_sim::controls_for(54U);
     AOAHID_CHECK(reopened.size() == 4U && reopened[3].value == 3U);
 
-    AOAHID_CHECK(aoahid_node_close(first_node, commit_timeouts_of(kControlTimeoutMs, kDrainTimeoutMs)) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(second_node, commit_timeouts_of(kControlTimeoutMs, kDrainTimeoutMs)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(first_node, commit_timeouts_of(kControlTimeoutMs,
+                                                                  kDrainTimeoutMs)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(second_node, commit_timeouts_of(kControlTimeoutMs,
+                                                                   kDrainTimeoutMs)) == AOAHID_OK);
     aoahid_spec_release(spec);
     AOAHID_CHECK(aoahid_device_close(first_device, kControlTimeoutMs, kDrainTimeoutMs) ==
                  AOAHID_OK);

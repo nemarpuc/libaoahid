@@ -51,11 +51,12 @@ void test_public_touchpad_button_only_close() {
 
     const std::uint32_t node_options = 0U;
     aoahid_node* node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), &node) == AOAHID_OK);
     AOAHID_CHECK(aoahid_touchpad_button(node, 1U, 1U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(node, 100U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, drain_timeout_ms)) ==
+                 AOAHID_OK);
 
     const auto payloads = control_payloads_for(57U);
     AOAHID_CHECK(payloads.size() == 2U);
@@ -117,11 +118,13 @@ void test_public_controller_close_neutralizes_dpad() {
                              [](const auto* field) { return field != nullptr; }));
     const std::uint32_t node_options = 0U;
     aoahid_node* raw_node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(device, raw_spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &raw_node) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, raw_spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U),
+                                  &raw_node) == AOAHID_OK);
     AOAHID_CHECK(aoahid_gamepad_dpad(raw_node, 1U, 0U, 0U, 0U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(raw_node, 100U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(raw_node, commit_timeouts_of(kControlTimeoutMs, drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(raw_node, commit_timeouts_of(kControlTimeoutMs,
+                                                                drain_timeout_ms)) == AOAHID_OK);
     auto payloads = control_payloads_for(57U);
     AOAHID_CHECK(payloads.size() == 2U);
     if (payloads.size() == 2U && std::all_of(raw_dpad.begin(), raw_dpad.end(),
@@ -144,11 +147,13 @@ void test_public_controller_close_neutralizes_dpad() {
     const auto* hat = profile_field(hat_spec, aoa::hid::FieldSemantic::hat);
     AOAHID_CHECK(hat != nullptr);
     aoahid_node* hat_node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(device, hat_spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &hat_node) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, hat_spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U),
+                                  &hat_node) == AOAHID_OK);
     AOAHID_CHECK(aoahid_gamepad_dpad(hat_node, 1U, 0U, 0U, 0U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(hat_node, 100U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(hat_node, commit_timeouts_of(kControlTimeoutMs, drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(hat_node, commit_timeouts_of(kControlTimeoutMs,
+                                                                drain_timeout_ms)) == AOAHID_OK);
     payloads = control_payloads_for(57U);
     AOAHID_CHECK(payloads.size() == 4U);
     if (payloads.size() == 4U && hat != nullptr) {

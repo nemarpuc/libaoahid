@@ -230,8 +230,8 @@ typedef struct aoahid_error_detail {
     int32_t aoa_request;      /* the AOA request involved (51 to 57) */
     uint16_t node_id;         /* the library's number of the Node involved (aoahid_node_id) */
     uint16_t report_id;
-    uint16_t hid_id;          /* the AOA HID ID involved (the wValue of requests 54 to 57) */
-    uint16_t reserved16;      /* zero */
+    uint16_t hid_id;     /* the AOA HID ID involved (the wValue of requests 54 to 57) */
+    uint16_t reserved16; /* zero */
     uint32_t offset;
     uint32_t length;
 } aoahid_error_detail;
@@ -1069,8 +1069,8 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_device_batch_begin(aoahid_device* de
  * Returns: AOAHID_OK; AOAHID_ERR_PARAM for an invalid Device, a null timeouts or a wrong
  * struct_size; AOAHID_ERR_UNSET_FIELD for a zero timeout; AOAHID_ERR_BUSY outside a batch; the
  * results of aoahid_device_commit. */
-AOAHID_API aoahid_result AOAHID_CALL aoahid_device_batch_end(aoahid_device* device,
-                                                             const aoahid_commit_timeouts* timeouts);
+AOAHID_API aoahid_result AOAHID_CALL
+aoahid_device_batch_end(aoahid_device* device, const aoahid_commit_timeouts* timeouts);
 
 /* aoahid_device_commit
  * Registers again every registration whose members differ from what the phone has, as after a

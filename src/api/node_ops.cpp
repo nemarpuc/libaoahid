@@ -296,7 +296,14 @@ aoahid_result close_live_node_until(aoahid_node* node,
             keep_first(AOAHID_ERR_INTERNAL);
         }
         if (!device->in_batch) {
-            keep_first(aoa::detail::apply_registration(device, registration, timeouts));
+            try {
+                keep_first(aoa::detail::apply_registration(device, registration, timeouts));
+            } catch (...) {
+                // An allocation failed while composing: the Node is gone either way, and the
+                // registration stays stale for the next commit.
+                registration->stale = true;
+                keep_first(AOAHID_ERR_INTERNAL);
+            }
             aoa::detail::forget_empty_registrations(device);
         }
     }

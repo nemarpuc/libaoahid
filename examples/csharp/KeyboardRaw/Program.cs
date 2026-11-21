@@ -14,6 +14,9 @@ const ushort KeyA = 0x04; // HID Keyboard page usage
 const uint TimeoutMs = 500;
 
 nint context = 0, discovery = 0, device = 0, spec = 0, node = 0;
+var timeouts = CommitTimeouts.Init();
+timeouts.ControlTimeoutMs = TimeoutMs;
+timeouts.DrainTimeoutMs = TimeoutMs;
 try
 {
     var contextOptions = ContextOptions.Init();
@@ -42,9 +45,6 @@ try
 
     var placement = NodePlacement.Init(); // no reserved transfer slot
     placement.Registration = 1; // its own HID device
-    var timeouts = CommitTimeouts.Init();
-    timeouts.ControlTimeoutMs = TimeoutMs;
-    timeouts.DrainTimeoutMs = TimeoutMs;
 
     AoaHidException.Check(Native.ContextCreate(in contextOptions, out context));
     AoaHidException.Check(Native.Discover(context, TimeoutMs, out discovery));

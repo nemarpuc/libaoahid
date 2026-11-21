@@ -153,8 +153,8 @@ inline void spec_release(aoahid_spec* spec) noexcept { aoahid_spec_release(spec)
 [[nodiscard]] inline aoahid_result device_batch_begin(aoahid_device* device) noexcept {
     return aoahid_device_batch_begin(device);
 }
-[[nodiscard]] inline aoahid_result device_batch_end(aoahid_device* device,
-                                                    const aoahid_commit_timeouts* timeouts) noexcept {
+[[nodiscard]] inline aoahid_result
+device_batch_end(aoahid_device* device, const aoahid_commit_timeouts* timeouts) noexcept {
     return aoahid_device_batch_end(device, timeouts);
 }
 [[nodiscard]] inline aoahid_result device_commit(aoahid_device* device,

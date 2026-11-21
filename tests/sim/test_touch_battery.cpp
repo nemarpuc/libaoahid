@@ -85,7 +85,9 @@ void test_public_touch_scan_time_lifecycle() {
         AOAHID_CHECK(extract_report_value(payloads.back(), *scan_time) == 0U);
     }
 
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, session_drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(
+        aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, session_drain_timeout_ms)) ==
+        AOAHID_OK);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
                  AOAHID_OK);
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, session_drain_timeout_ms) ==
@@ -148,9 +150,12 @@ void test_public_touch_scan_time_rejected_first_attempt_stays_zero() {
     const std::uint32_t node_options = 0U;
     aoahid_node* raw_node = nullptr;
     aoahid_node* touch_node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(device, raw_spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &raw_node) ==
-                 AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_open(device, touch_spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &touch_node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, raw_spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U),
+                                  &raw_node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, touch_spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U),
+                                  &touch_node) == AOAHID_OK);
     const aoa::detail::TouchContact contact{1U, 100, 200, 0, 0, 0, 0};
     AOAHID_CHECK(aoahid_touchscreen_contact(touch_node, contact.contact_id, 1U, contact.x,
                                             contact.y, nullptr) == AOAHID_OK);
@@ -183,8 +188,10 @@ void test_public_touch_scan_time_rejected_first_attempt_stays_zero() {
         AOAHID_CHECK(extract_report_value(payloads.back(), *scan_time) == 0U);
     }
 
-    AOAHID_CHECK(aoahid_node_close(touch_node, commit_timeouts_of(kControlTimeoutMs, drain_timeout_ms)) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(raw_node, commit_timeouts_of(kControlTimeoutMs, drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(touch_node, commit_timeouts_of(kControlTimeoutMs,
+                                                                  drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(raw_node, commit_timeouts_of(kControlTimeoutMs,
+                                                                drain_timeout_ms)) == AOAHID_OK);
     aoahid_spec_release(touch_spec);
     aoahid_spec_release(raw_spec);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, drain_timeout_ms) == AOAHID_OK);
@@ -219,8 +226,8 @@ void test_battery_reports() {
     AOAHID_CHECK(aoahid_spec_create_keyboard(&keyboard, &spec) == AOAHID_OK);
     const std::uint32_t node_options = 0U;
     aoahid_node* node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), &node) == AOAHID_OK);
     aoahid_spec_release(spec);
 
     using Reports = std::vector<std::vector<std::uint8_t>>;
@@ -301,7 +308,8 @@ void test_battery_reports() {
 
     // Close releases the held key and drops the unsent battery value.
     AOAHID_CHECK(aoahid_battery_update(node, 74) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, drain_timeout_ms)) ==
+                 AOAHID_OK);
     sent = fresh();
     AOAHID_CHECK(sent.size() == 1U && is_key_report(sent[0]) &&
                  std::all_of(sent[0].begin() + 1, sent[0].end(),
@@ -360,8 +368,8 @@ void test_battery_reports_internal_thread() {
     AOAHID_CHECK(aoahid_spec_create_keyboard(&keyboard, &spec) == AOAHID_OK);
     const std::uint32_t node_options = 0U;
     aoahid_node* node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), &node) == AOAHID_OK);
     aoahid_spec_release(spec);
 
     for (std::int32_t level = 100; level > 80; --level) {
@@ -379,7 +387,8 @@ void test_battery_reports_internal_thread() {
         AOAHID_CHECK(sent[round * 3U + 1U] ==
                      (std::vector<std::uint8_t>{2U, static_cast<std::uint8_t>(100U - round)}));
     }
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, drain_timeout_ms)) ==
+                 AOAHID_OK);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, drain_timeout_ms) == AOAHID_OK);
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, drain_timeout_ms) == AOAHID_OK);
     aoahid_fake_libusb_reset();

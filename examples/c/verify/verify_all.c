@@ -283,17 +283,20 @@ int main(void) {
         const aoahid_node_placement touch_placement = verify_placement(1U);
         const aoahid_node_placement keyboard_placement = verify_placement(2U);
         const aoahid_node_placement mouse_placement = verify_placement(3U);
-        result = aoahid_node_open(device, touch_spec, &touch_placement, &node_timeouts, &touch_node);
+        result =
+            aoahid_node_open(device, touch_spec, &touch_placement, &node_timeouts, &touch_node);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("touchscreen node open", result);
             goto cleanup;
         }
-        result = aoahid_node_open(device, keyboard_spec, &keyboard_placement, &node_timeouts, &keyboard_node);
+        result = aoahid_node_open(device, keyboard_spec, &keyboard_placement, &node_timeouts,
+                                  &keyboard_node);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("keyboard node open", result);
             goto cleanup;
         }
-        result = aoahid_node_open(device, mouse_spec, &mouse_placement, &node_timeouts, &mouse_node);
+        result =
+            aoahid_node_open(device, mouse_spec, &mouse_placement, &node_timeouts, &mouse_node);
         if (result != AOAHID_OK) {
             exit_code = verify_fail("mouse node open", result);
             goto cleanup;

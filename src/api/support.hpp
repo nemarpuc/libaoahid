@@ -128,7 +128,8 @@ aoahid_result check_reservation(const aoahid_device* device,
 
 // The limits of the Device that a descriptor of this size and these requirements must meet. A
 // joined descriptor is checked with it as a single Spec's is.
-aoahid_result check_descriptor_fits_device(const aoahid_device* device, std::size_t descriptor_bytes,
+aoahid_result check_descriptor_fits_device(const aoahid_device* device,
+                                           std::size_t descriptor_bytes,
                                            const aoa::hid::DescriptorRequirements& needs) noexcept;
 
 aoahid_result check_spec_fits_device(const aoahid_device* device, const aoahid_spec* spec) noexcept;
@@ -175,8 +176,7 @@ void mark_stale(aoahid_device* device, Registration* registration);
 
 // The checks of a registration that need no I/O: its Specs may share a HID ID, and the joined
 // descriptor fits the Device's policies. Sets the error detail on a refusal.
-aoahid_result check_registration(const aoahid_device* device,
-                                 const Registration* registration);
+aoahid_result check_registration(const aoahid_device* device, const Registration* registration);
 
 // Makes the phone's HID ID match the registration's members (the steps are in the file's header).
 // A refusal or a failed step leaves it stale; the error detail names the step.

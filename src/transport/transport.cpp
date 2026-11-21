@@ -663,8 +663,7 @@ aoahid_result Device::acquire(const std::uint16_t hid_id, const ReservationToken
 
     const Impl::StateGuard guard(*impl_);
     auto* own_reservation = static_cast<Impl::Reservation*>(reservation.value);
-    if (own_reservation != nullptr &&
-        own_reservation->owner != impl_) {
+    if (own_reservation != nullptr && own_reservation->owner != impl_) {
         record_error(AOAHID_ERR_PARAM, 0, accessory_send_hid_event, hid_id, 0U,
                      static_cast<std::uint32_t>(report_length));
         return AOAHID_ERR_PARAM;

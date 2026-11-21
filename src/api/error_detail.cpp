@@ -67,9 +67,7 @@ void set_error(const aoahid_result result, const char* field, const char* reason
         offset,        length};
 }
 
-void set_error_node(const std::uint16_t node_id) noexcept {
-    g_error.node_id = node_id;
-}
+void set_error_node(const std::uint16_t node_id) noexcept { g_error.node_id = node_id; }
 
 void clear_error() noexcept {
     g_error = aoahid_error_detail{AOAHID_OK, nullptr, "No error.", 0, 0, 0, 0, 0, 0, 0, 0};

@@ -219,7 +219,8 @@ int main() {
     // Node destruction takes that mutex as a callback-exit barrier.
     for (std::size_t iteration = 0U; iteration < 128U; ++iteration) {
         aoahid_node* node = nullptr;
-        if (!require_ok(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &node),
+        if (!require_ok(aoahid_node_open(device, spec, separate_placement(node_options),
+                                         commit_timeouts_of(kControlTimeoutMs, 20U), &node),
                         "node_open")) {
             return 1;
         }
@@ -230,8 +231,9 @@ int main() {
         if (!require_ok(aoahid_mouse_move(node, 17, -9), "mouse_move") ||
             !require_ok(aoahid_mouse_scroll(node, 1, -1), "mouse_scroll") ||
             !require_ok(aoahid_node_submit(node, kSendTimeoutMs), "node_submit") ||
-            !require_ok(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, kDrainTimeoutMs)),
-                        "node_close")) {
+            !require_ok(
+                aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, kDrainTimeoutMs)),
+                "node_close")) {
             return 1;
         }
     }
@@ -319,7 +321,8 @@ int main() {
         return 1;
     }
     aoahid_node* delayed_node = nullptr;
-    if (!require_ok(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &delayed_node),
+    if (!require_ok(aoahid_node_open(device, spec, separate_placement(node_options),
+                                     commit_timeouts_of(kControlTimeoutMs, 20U), &delayed_node),
                     "fallback_node_open")) {
         return 1;
     }

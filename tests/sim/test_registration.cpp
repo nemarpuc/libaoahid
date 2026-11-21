@@ -37,9 +37,7 @@ aoahid_node_placement placement(const std::uint32_t registration) {
                                  registration, 0U};
 }
 
-const aoahid_commit_timeouts* waits() {
-    return commit_timeouts_of(sim::kControlTimeoutMs, 20U);
-}
+const aoahid_commit_timeouts* waits() { return commit_timeouts_of(sim::kControlTimeoutMs, 20U); }
 
 bool field_is(const char* expected) {
     const aoahid_error_detail* detail = aoahid_last_error();
@@ -67,8 +65,7 @@ struct Fixture {
                       aoahid_result* result = nullptr) {
         const aoahid_node_placement where = placement(registration);
         aoahid_node* node = nullptr;
-        const aoahid_result opened =
-            aoahid_node_open(session.device, spec, &where, waits(), &node);
+        const aoahid_result opened = aoahid_node_open(session.device, spec, &where, waits(), &node);
         if (result != nullptr) {
             *result = opened;
         } else {
@@ -226,8 +223,8 @@ void test_device_close_unregisters_each_registration_once() {
     static_cast<void>(fixture.open(mouse, 7U));
     static_cast<void>(fixture.open(other, 8U));
     const std::size_t before = count(kUnregister);
-    AOAHID_CHECK(aoahid_device_close(fixture.session.device, sim::kControlTimeoutMs,
-                                     20U) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_device_close(fixture.session.device, sim::kControlTimeoutMs, 20U) ==
+                 AOAHID_OK);
     fixture.session.device = nullptr;
     // Two HID devices were on the phone, so two requests, however many Nodes they held.
     AOAHID_CHECK(count(kUnregister) == before + 2U);

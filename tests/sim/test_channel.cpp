@@ -106,8 +106,8 @@ void test_channel_shares_the_device_handle_internal_thread() {
     AOAHID_CHECK(aoahid_spec_create_keyboard(&keyboard, &spec) == AOAHID_OK);
     const std::uint32_t node_options = 0U;
     aoahid_node* node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), &node) == AOAHID_OK);
     aoahid_spec_release(spec);
     AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 1U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_node_submit_blocking(node, 1000U) == AOAHID_OK);
@@ -120,7 +120,8 @@ void test_channel_shares_the_device_handle_internal_thread() {
                  AOAHID_ERR_NO_DEVICE);
     AOAHID_CHECK(aoahid_channel_close(channel, kThreadDrainTimeoutMs) == AOAHID_OK);
     AOAHID_CHECK(aoahid_channel_close(nullptr, kDrainTimeoutMs) == AOAHID_ERR_PARAM);
-    static_cast<void>(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, kThreadDrainTimeoutMs)));
+    static_cast<void>(
+        aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, kThreadDrainTimeoutMs)));
     static_cast<void>(aoahid_device_close(device, kControlTimeoutMs, kThreadDrainTimeoutMs));
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, kThreadDrainTimeoutMs) ==
                  AOAHID_OK);
@@ -288,8 +289,8 @@ void test_hid_adb_and_accessory_bulk_run_together() {
     AOAHID_CHECK(aoahid_spec_create_keyboard(&keyboard, &spec) == AOAHID_OK);
     const std::uint32_t node_options = 0U;
     aoahid_node* node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), &node) == AOAHID_OK);
     aoahid_spec_release(spec);
 
     aoahid_channel_options accessory_options = adb_channel_options();
@@ -346,7 +347,8 @@ void test_hid_adb_and_accessory_bulk_run_together() {
     AOAHID_CHECK(aoahid_fake_libusb_bulk_out_count() == 2U);
 
     AOAHID_CHECK(aoahid_channel_close(app, kThreadDrainTimeoutMs) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, kThreadDrainTimeoutMs)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs,
+                                                            kThreadDrainTimeoutMs)) == AOAHID_OK);
     // The Device close also consumes the still-open ADB Channel.
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, kThreadDrainTimeoutMs) ==
                  AOAHID_OK);

@@ -70,7 +70,9 @@ void test_public_error_contract_and_raw_padding() {
     AOAHID_CHECK(overflow_error->length == report.size());
     AOAHID_CHECK(aoahid_device_latched_error(device) == AOAHID_ERR_OVERFLOW);
     AOAHID_CHECK(aoahid_last_error()->transport_status == LIBUSB_TRANSFER_OVERFLOW);
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, session_drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(
+        aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, session_drain_timeout_ms)) ==
+        AOAHID_OK);
     AOAHID_CHECK(aoahid_last_error()->code == AOAHID_OK);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
                  AOAHID_OK);
@@ -117,7 +119,9 @@ void test_first_report_stall_is_returned_without_retry() {
     AOAHID_CHECK(aoahid_node_submit(node, kSendTimeoutMs) == AOAHID_OK);
     AOAHID_CHECK(controls_for(57U).size() == 3U);
 
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, session_drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(
+        aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, session_drain_timeout_ms)) ==
+        AOAHID_OK);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
                  AOAHID_OK);
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, session_drain_timeout_ms) ==
@@ -149,10 +153,12 @@ void test_submit_blocking_waits_for_a_free_slot_without_spinning() {
     const std::uint32_t node_options = 0U;
     aoahid_node* holder = nullptr;
     aoahid_node* waiter = nullptr;
-    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &holder) ==
-                 AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &waiter) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U),
+                                  &holder) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U),
+                                  &waiter) == AOAHID_OK);
     aoahid_spec_release(spec);
 
     // The holder's report takes the only slot and stays in flight.
@@ -224,7 +230,9 @@ void test_submit_rejection_retains_state_and_close_releases() {
     }
 
     AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 0U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, session_drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(
+        aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, session_drain_timeout_ms)) ==
+        AOAHID_OK);
     payloads = control_payloads_for(57U);
     AOAHID_CHECK(payloads.size() == 2U);
     if (payloads.size() == 2U) {
@@ -264,7 +272,9 @@ void test_accepted_submit_defers_opportunistic_poll_error() {
     }
     AOAHID_CHECK(aoahid_context_poll(context, 0U) == AOAHID_OK);
     AOAHID_CHECK(aoahid_keyboard_key(node, 0x04U, 0U) == AOAHID_OK);
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, session_drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(
+        aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, session_drain_timeout_ms)) ==
+        AOAHID_OK);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, session_drain_timeout_ms) ==
                  AOAHID_OK);
     AOAHID_CHECK(aoahid_context_destroy(context, kControlTimeoutMs, session_drain_timeout_ms) ==

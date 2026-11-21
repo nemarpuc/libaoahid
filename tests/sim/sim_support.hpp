@@ -96,9 +96,7 @@ inline aoahid_channel_options adb_stream_options() {
 }
 
 // The reserve_slot of the Nodes the sim helpers open: none.
-inline std::uint32_t node_options() {
-    return 0U;
-}
+inline std::uint32_t node_options() { return 0U; }
 
 // Report ID 1 with one 1-bit button: a 2-byte report.
 inline constexpr std::array<std::uint8_t, 21U> kRawDescriptor{
@@ -152,7 +150,8 @@ struct Session {
         if (spec == nullptr)
             return true;
         const std::uint32_t options = node_options();
-        return aoahid_node_open(device, spec, separate_placement(options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) == AOAHID_OK;
+        return aoahid_node_open(device, spec, separate_placement(options),
+                                commit_timeouts_of(kControlTimeoutMs, 20U), &node) == AOAHID_OK;
     }
 
     // Closes what open() made; the Context's destroy consumes any Device and Node left.

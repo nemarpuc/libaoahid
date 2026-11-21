@@ -52,8 +52,8 @@ void test_tuning_values_required_and_zero_reservation() {
     const std::uint32_t node_options = 0U;
     aoahid_node* node = nullptr;
     // A zero wait is refused before anything is sent, and nothing is consumed.
-    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(0U, 20U), &node) ==
-                     AOAHID_ERR_UNSET_FIELD &&
+    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(0U, 20U), &node) == AOAHID_ERR_UNSET_FIELD &&
                  node == nullptr);
     AOAHID_CHECK(aoahid_last_error()->field != nullptr &&
                  std::string_view(aoahid_last_error()->field) == "control_timeout_ms");
@@ -63,8 +63,9 @@ void test_tuning_values_required_and_zero_reservation() {
     constexpr std::uint32_t submit_timeout_ms = 1234U;
     // The wait this test used to give through the options.
     constexpr std::uint32_t drain_timeout_ms = 1000U;
-    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(open_control_timeout_ms, 20U), &node) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(open_control_timeout_ms, 20U),
+                                  &node) == AOAHID_OK);
     AOAHID_CHECK(node != nullptr && node->reserved_slots == 0U);
     for (const std::uint8_t request : {std::uint8_t{54U}, std::uint8_t{56U}}) {
         const auto records = controls_for(request);
@@ -80,9 +81,12 @@ void test_tuning_values_required_and_zero_reservation() {
     const auto reports = controls_for(57U);
     AOAHID_CHECK(!reports.empty() && reports.front().timeout == submit_timeout_ms);
 
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(0U, drain_timeout_ms)) == AOAHID_ERR_UNSET_FIELD);
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, 0U)) == AOAHID_ERR_UNSET_FIELD);
-    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, drain_timeout_ms)) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(0U, drain_timeout_ms)) ==
+                 AOAHID_ERR_UNSET_FIELD);
+    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, 0U)) ==
+                 AOAHID_ERR_UNSET_FIELD);
+    AOAHID_CHECK(aoahid_node_close(node, commit_timeouts_of(kControlTimeoutMs, drain_timeout_ms)) ==
+                 AOAHID_OK);
     aoahid_spec_release(spec);
     AOAHID_CHECK(aoahid_device_close(device, 0U, drain_timeout_ms) == AOAHID_ERR_UNSET_FIELD);
     AOAHID_CHECK(aoahid_device_close(device, kControlTimeoutMs, drain_timeout_ms) == AOAHID_OK);
@@ -132,7 +136,9 @@ void test_initializers_open_a_working_session() {
     const std::uint32_t node_options = 0U;
     std::array<aoahid_node*, 7U> nodes{};
     for (std::size_t index = 0U; index < specs.size(); ++index) {
-        AOAHID_CHECK(aoahid_node_open(device, specs[index], separate_placement(node_options), commit_timeouts_of(AOAHID_CONTROL_TIMEOUT_MS, 20U), &nodes[index]) == AOAHID_OK);
+        AOAHID_CHECK(aoahid_node_open(device, specs[index], separate_placement(node_options),
+                                      commit_timeouts_of(AOAHID_CONTROL_TIMEOUT_MS, 20U),
+                                      &nodes[index]) == AOAHID_OK);
         aoahid_spec_release(specs[index]);
     }
     AOAHID_CHECK(aoahid_keyboard_key(nodes[0], 0x04U, 1U) == AOAHID_OK);
@@ -302,8 +308,9 @@ void test_descriptor_requirements_are_caller_policies() {
             AOAHID_CHECK(device->linux_hid.report_data_bits == report_bits_policy);
             AOAHID_CHECK(device->linux_hid.report_size_bits == report_size_policy);
             aoahid_node* node = nullptr;
-            AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) ==
-                         AOAHID_ERR_OVERFLOW);
+            AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(node_options),
+                                          commit_timeouts_of(kControlTimeoutMs, 20U),
+                                          &node) == AOAHID_ERR_OVERFLOW);
             AOAHID_CHECK(node == nullptr);
             AOAHID_CHECK(aoahid_last_error()->field != nullptr);
             if (aoahid_last_error()->field != nullptr) {

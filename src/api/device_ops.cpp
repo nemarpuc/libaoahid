@@ -12,9 +12,9 @@
 #include <new>
 #include <thread>
 
+using aoa::detail::current_deferred_error;
 using aoa::detail::DeferredErrorInput;
 using aoa::detail::drain_node_for_close;
-using aoa::detail::current_deferred_error;
 using aoa::detail::finish_transport_result;
 using aoa::detail::make_deferred_error;
 using aoa::detail::park_in_graveyard;
@@ -34,8 +34,8 @@ void remember_close_error(aoahid_device* device, const aoa::detail::DeferredErro
 }
 
 void remember_current_close_error(aoahid_device* device, const aoahid_result result,
-                                  const char* field, const char* reason,
-                                  const aoahid_node* node, const std::int32_t fallback_request,
+                                  const char* field, const char* reason, const aoahid_node* node,
+                                  const std::int32_t fallback_request,
                                   const std::uint32_t fallback_offset,
                                   const std::uint32_t fallback_length) noexcept {
     if (result == AOAHID_OK || result == AOAHID_CLOSE_PENDING)
@@ -75,9 +75,10 @@ void remember_terminal_completion(aoahid_device* device, aoahid_node* node) noex
         return;
     }
     remember_close_error(
-        device, make_deferred_error(DeferredErrorInput{
-                    aoa::transport::ErrorInfo{result, native_status, 57, node->hid_id, 0U, length},
-                    "node.completion", completion_reason(result), completed_report_id, node->node_id}));
+        device,
+        make_deferred_error(DeferredErrorInput{
+            aoa::transport::ErrorInfo{result, native_status, 57, node->hid_id, 0U, length},
+            "node.completion", completion_reason(result), completed_report_id, node->node_id}));
 }
 
 // A Device graph may be freed only after its own transfers and every child

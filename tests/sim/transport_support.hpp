@@ -313,8 +313,8 @@ inline void open_public_raw_session(aoahid_context** context, aoahid_device** de
     aoahid_spec* spec = nullptr;
     AOAHID_CHECK(aoahid_spec_create_raw(&raw_options, &spec) == AOAHID_OK);
     const std::uint32_t node_options = 0U;
-    AOAHID_CHECK(aoahid_node_open(*device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), node) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(*device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), node) == AOAHID_OK);
     // The node's retained reference must keep the spec alive through a late
     // callback even after the caller drops its own reference.
     aoahid_spec_release(spec);
@@ -344,8 +344,8 @@ inline void open_public_keyboard_session(aoahid_context** context, aoahid_device
     aoahid_spec* spec = nullptr;
     AOAHID_CHECK(aoahid_spec_create_keyboard(&keyboard, &spec) == AOAHID_OK);
     const std::uint32_t node_options = 0U;
-    AOAHID_CHECK(aoahid_node_open(*device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), node) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(*device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), node) == AOAHID_OK);
     aoahid_spec_release(spec);
 }
 
@@ -406,8 +406,8 @@ inline void open_public_touch_session(aoahid_context** context, aoahid_device** 
     aoahid_spec* spec = nullptr;
     AOAHID_CHECK(aoahid_spec_create_touchscreen(&touch, &spec) == AOAHID_OK);
     const std::uint32_t node_options = 0U;
-    AOAHID_CHECK(aoahid_node_open(*device, spec, separate_placement(node_options), commit_timeouts_of(kControlTimeoutMs, 20U), node) ==
-                 AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(*device, spec, separate_placement(node_options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), node) == AOAHID_OK);
     aoahid_spec_release(spec);
 
     const aoa::detail::TouchContact first{1U, 100, 200, 0, 0, 0, 0};

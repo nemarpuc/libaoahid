@@ -17,10 +17,10 @@ struct Suite {
 };
 
 constexpr Suite kSuites[] = {
-    {"item_writer", test_item_writer},      {"profiles", test_profiles},
-    {"transport", test_transport},          {"identity", test_identity},
-    {"api_arguments", test_api_arguments},  {"spec_options", test_spec_options},
-    {"report_state", test_report_state},    {"transport_failures", test_transport_failures},
+    {"item_writer", test_item_writer},       {"profiles", test_profiles},
+    {"transport", test_transport},           {"identity", test_identity},
+    {"api_arguments", test_api_arguments},   {"spec_options", test_spec_options},
+    {"report_state", test_report_state},     {"transport_failures", test_transport_failures},
     {"raw_descriptor", test_raw_descriptor}, {"hid_layer", test_hid_layer},
     {"registration", test_registration}};
 } // namespace

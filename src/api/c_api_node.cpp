@@ -14,12 +14,12 @@
 using aoa::detail::apply_registration;
 using aoa::detail::check_commit_timeouts;
 using aoa::detail::check_registration;
-using aoa::detail::find_registration;
-using aoa::detail::forget_empty_registrations;
 using aoa::detail::check_reservation;
 using aoa::detail::check_spec_fits_device;
 using aoa::detail::close_live_node_until;
+using aoa::detail::find_registration;
 using aoa::detail::finish_transport_result;
+using aoa::detail::forget_empty_registrations;
 using aoa::detail::initialize_node_state;
 using aoa::detail::preflight_context;
 using aoa::detail::set_error;
@@ -161,21 +161,36 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
         throw;
     }
 
+    // apply_registration allocates while composing; a failure there is an error like any other,
+    // and must not leave the Node in the registration's members.
+    const auto apply = [&]() noexcept -> aoahid_result {
+        try {
+            return apply_registration(device, registration, *timeouts);
+        } catch (...) {
+            registration->stale = true;
+            set_error(AOAHID_ERR_INTERNAL, "node.open", "Memory allocation failed.");
+            return AOAHID_ERR_INTERNAL;
+        }
+    };
     if (device->in_batch) {
-        aoa::detail::mark_stale(device, registration);
+        try {
+            aoa::detail::mark_stale(device, registration);
+        } catch (...) {
+            registration->stale = true; // the capacity was reserved above; kept for commit
+        }
     } else {
-        const aoahid_result applied = apply_registration(device, registration, *timeouts);
+        const aoahid_result applied = apply();
         if (applied != AOAHID_OK) {
             // Keep the error of the step that failed while the registration is put back.
-            const aoa::detail::DeferredError failure =
-                aoa::detail::current_deferred_error(applied, "node.open", "A registration step failed.");
-            registration->members.erase(std::remove(registration->members.begin(),
-                                                    registration->members.end(), node.get()),
-                                        registration->members.end());
+            const aoa::detail::DeferredError failure = aoa::detail::current_deferred_error(
+                applied, "node.open", "A registration step failed.");
+            registration->members.erase(
+                std::remove(registration->members.begin(), registration->members.end(), node.get()),
+                registration->members.end());
             joined = false;
             if (!registration->members.empty() && registration->applied_hid_id != previous_hid_id) {
                 // The old HID device went away with the failed step: register the old Nodes again.
-                static_cast<void>(apply_registration(device, registration, *timeouts));
+                static_cast<void>(apply());
             } else {
                 registration->stale = was_stale;
                 if (!was_stale) {

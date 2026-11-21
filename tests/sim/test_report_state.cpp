@@ -23,7 +23,8 @@ bool field_is(const char* field) {
 aoahid_node* open_node(aoahid_device* device, aoahid_spec* spec) {
     const std::uint32_t options = sim::node_options();
     aoahid_node* node = nullptr;
-    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(options), commit_timeouts_of(kControlTimeoutMs, 20U), &node) == AOAHID_OK);
+    AOAHID_CHECK(aoahid_node_open(device, spec, separate_placement(options),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U), &node) == AOAHID_OK);
     aoahid_spec_release(spec);
     return node;
 }

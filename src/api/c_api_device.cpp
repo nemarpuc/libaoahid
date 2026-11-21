@@ -281,7 +281,8 @@ aoahid_result AOAHID_CALL aoahid_device_batch_begin(aoahid_device* device) try {
     aoa::detail::clear_error();
     if (device == nullptr || device->transport == nullptr ||
         device->closing.load(std::memory_order_acquire)) {
-        set_error(AOAHID_ERR_PARAM, "device.batch_begin", "A live, open Device handle is required.");
+        set_error(AOAHID_ERR_PARAM, "device.batch_begin",
+                  "A live, open Device handle is required.");
         return AOAHID_ERR_PARAM;
     }
     if (device->in_batch) {

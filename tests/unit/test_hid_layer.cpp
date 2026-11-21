@@ -80,8 +80,7 @@ void test_two_specs_are_concatenated_in_order() {
     expected.insert(expected.end(), mouse->descriptor.begin(), mouse->descriptor.end());
     AOAHID_CHECK(joined.bytes == expected);
     // The requirements are the largest of the members, not their sum.
-    AOAHID_CHECK(joined.requirements.maximum_usages >=
-                 keyboard->requirements.maximum_usages);
+    AOAHID_CHECK(joined.requirements.maximum_usages >= keyboard->requirements.maximum_usages);
     AOAHID_CHECK(joined.requirements.maximum_usages >= mouse->requirements.maximum_usages);
     release_all({keyboard, mouse});
 }
@@ -125,8 +124,8 @@ void test_two_batteries_are_refused() {
 
 void test_unclean_globals_before_another_member_are_refused() {
     // Usage Page, Usage, Collection, Unit Exponent 1, End Collection: leaves Unit Exponent set.
-    const std::vector<std::uint8_t> dirty{0x05U, 0x01U, 0x09U, 0x06U, 0xA1U, 0x01U,
-                                          0x55U, 0x01U, 0xC0U};
+    const std::vector<std::uint8_t> dirty{0x05U, 0x01U, 0x09U, 0x06U, 0xA1U,
+                                          0x01U, 0x55U, 0x01U, 0xC0U};
     AOAHID_CHECK(!aoa::detail::ends_with_clean_globals(dirty));
     const std::vector<std::uint8_t> reset{0x05U, 0x01U, 0x55U, 0x01U, 0x55U, 0x00U};
     AOAHID_CHECK(aoa::detail::ends_with_clean_globals(reset));

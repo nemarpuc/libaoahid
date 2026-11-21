@@ -45,9 +45,10 @@ aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node,
     if (deferred != AOAHID_OK)
         return deferred;
     if (node->hid_id == 0U) {
-        set_error(AOAHID_ERR_BUSY, "node.registration",
-                  "The Node's registration is not on the phone: it is staged in a batch or its last "
-                  "step failed. aoahid_device_batch_end or aoahid_device_commit applies it.");
+        set_error(
+            AOAHID_ERR_BUSY, "node.registration",
+            "The Node's registration is not on the phone: it is staged in a batch or its last "
+            "step failed. aoahid_device_batch_end or aoahid_device_commit applies it.");
         aoa::detail::set_error_node(node->node_id);
         return AOAHID_ERR_BUSY;
     }
@@ -206,9 +207,10 @@ aoahid_result AOAHID_CALL aoahid_raw_submit(aoahid_node* node, const std::uint8_
     if (deferred != AOAHID_OK)
         return deferred;
     if (node->hid_id == 0U) {
-        set_error(AOAHID_ERR_BUSY, "node.registration",
-                  "The Node's registration is not on the phone: it is staged in a batch or its last "
-                  "step failed. aoahid_device_batch_end or aoahid_device_commit applies it.");
+        set_error(
+            AOAHID_ERR_BUSY, "node.registration",
+            "The Node's registration is not on the phone: it is staged in a batch or its last "
+            "step failed. aoahid_device_batch_end or aoahid_device_commit applies it.");
         aoa::detail::set_error_node(node->node_id);
         return AOAHID_ERR_BUSY;
     }
