@@ -58,6 +58,7 @@ in [CHANGELOG.md](../CHANGELOG.md), summarized under
 | Accessory mode switch (`aoahid_accessory_start`, requests 51–53) | — | `test_accessory_start.cpp` (`transport`), `test_transport_failures.cpp` (`transport_failures`) |
 | Device open, Linux HID policy check & shared `Port` (`aoahid_device_open`) | — | `test_device_open.cpp`, `test_session_setup.cpp`, `test_transport_failures.cpp` |
 | Node registration, descriptor slicing & close (`aoahid_node_open`, `aoahid_node_close`, requests 54, 56, 55) | — | `test_session_setup.cpp`, `test_node_close.cpp`, `test_neutral_close.cpp`, `test_transport_failures.cpp` |
+| Shared registrations: joining rules, batch, commit, replacement order, rollback (`aoahid_device_batch_begin/_end`, `aoahid_device_commit`) | `test_hid_layer.cpp` (`hid_layer`) | `test_registration.cpp` (`registration`) |
 | Report submission, transfer pool & reservations (`aoahid_node_submit`, `aoahid_node_submit_blocking`, request 57) | — | `test_submit.cpp`, `test_hot_path.cpp`, `test_internal_thread.cpp`, `test_transport_failures.cpp` |
 | Bulk Channels (`aoahid_channel_open`, `read`, `write`, `close`; `STREAM` & `REQUEST` modes; ZLP) | — | `test_channel.cpp`, `test_internal_thread.cpp`, `test_transport_failures.cpp` |
 | Event modes, teardown & Context graveyard (`AOAHID_EVENT_CALLER_POLL`, `AOAHID_EVENT_INTERNAL_THREAD`, `aoahid_device_close`, `aoahid_context_destroy*`) | — | `test_transport_runtime.cpp`, `test_context_destroy.cpp`, `test_internal_thread.cpp` (`aoahid.sim-internal-thread`) |

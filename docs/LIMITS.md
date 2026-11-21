@@ -109,7 +109,7 @@ differ; check the same symbols in the kernel you target.
 | `hidinput_update_battery` (v5.9 to v6.17) | Ignores raw 0 and out-of-range values for every battery usage | `drivers/hid/hid-input.c` | A level of 0 is never published when the range starts at 0; start the range at 1. |
 | `hidinput_update_battery` (v6.18) | Ignores out-of-range values, and raw 0 only on the Digitizers page | `drivers/hid/hid-input.c` | Out-of-range values never produce an update, so there is no "unknown" to send. |
 | `hidinput_update_battery` (v5.11 to v6.18) | An unchanged level is forwarded at most once in 30 seconds (`battery_ratelimit_time`) | `drivers/hid/hid-input.c` | Not present in v5.10. |
-| `hidinput_setup_battery` (v5.9 to v6.18) | One battery per HID device (`if (dev->battery) return 0;`) | `drivers/hid/hid-input.c` | A Spec has at most one battery report. |
+| `hidinput_setup_battery` (v5.9 to v6.18) | One battery per HID device (`if (dev->battery) return 0;`) | `drivers/hid/hid-input.c` | A Spec has at most one battery report, and so does a registration (Nodes sharing one registration share one HID device). |
 | `hidinput_connect` | A HID device with no input usages gets no input device, and its power supply is unregistered | `drivers/hid/hid-input.c` | The battery report rides on an input profile; there is no battery-only profile. |
 
 The `linux_hid` fields of `aoahid_device_options` (`descriptor_bytes`,
@@ -118,7 +118,10 @@ The `linux_hid` fields of `aoahid_device_options` (`descriptor_bytes`,
 above they are 4096, 256, 12288, 4, 256 and 65528, the values
 `aoahid_device_options_init` fills in; check them against your target kernel. Each Spec records what it needs,
 using checked arithmetic without expanding Usage ranges, and `aoahid_node_open`
-returns `AOAHID_ERR_OVERFLOW` before registering if a policy is exceeded.
+returns `AOAHID_ERR_OVERFLOW` before registering if a policy is exceeded. For a
+registration of several Nodes the limits apply to the joined descriptor: its
+size is the sum of the descriptors, and each of the other requirements is the
+largest of the Nodes' (the Linux parser keeps them per report).
 
 ## Library limits {#library-limits}
 
@@ -154,9 +157,10 @@ libusb recommendations; see [API.md](API.md#tuning-values).
 `descriptor_fragment_bytes`, `transfer_pool_slots`, `maximum_report_bytes`, and
 the Channel's `out_transfers`, `transfer_bytes` and (stream mode)
 `in_transfers`; the initializers fill them in. The waits (`control_timeout_ms`,
-`send_timeout_ms`, `drain_timeout_ms`) are arguments of the calls that wait; see
+`send_timeout_ms`, `drain_timeout_ms`) are arguments of the calls that wait, the
+two of a registration change together in `aoahid_commit_timeouts`; see
 [API.md](API.md#timeouts).
-`aoahid_node_options` `0/0` is no reserved slot.
+`aoahid_node_placement.reserve_slot` 0 is no reserved slot.
 
 `maximum_report_bytes` and `descriptor_fragment_bytes` must fit
 `target_ep0_data_policy_bytes` and `host_control_buffer_policy_bytes`.

@@ -74,11 +74,16 @@ int main(void) {
     aoahid_context_options ctx_opts;
     aoahid_device_options dev_opts;
     aoahid_keyboard_options kb_opts;
-    aoahid_node_options node_opts;
+    aoahid_node_placement placement;
+    aoahid_commit_timeouts waits;
     aoahid_context_options_init(&ctx_opts);
     aoahid_device_options_init(&dev_opts);
     aoahid_keyboard_options_init(&kb_opts);
-    aoahid_node_options_init(&node_opts);
+    aoahid_node_placement_init(&placement);
+    placement.registration = 1; /* this Node is a HID device of its own */
+    aoahid_commit_timeouts_init(&waits);
+    waits.control_timeout_ms = AOAHID_CONTROL_TIMEOUT_MS;
+    waits.drain_timeout_ms = AOAHID_DRAIN_TIMEOUT_MS;
 
     aoahid_context* ctx = NULL;
     aoahid_discovery* disc = NULL;
@@ -111,7 +116,7 @@ int main(void) {
         failed("spec", r);
         goto done;
     }
-    if ((r = aoahid_node_open(dev, spec, &node_opts, AOAHID_CONTROL_TIMEOUT_MS, &kb)) != AOAHID_OK) {
+    if ((r = aoahid_node_open(dev, spec, &placement, &waits, &kb)) != AOAHID_OK) {
         failed("node", r);
         goto done;
     }
@@ -130,7 +135,7 @@ int main(void) {
 
 done:
     if (kb != NULL) {
-        r = aoahid_node_close(kb, AOAHID_CONTROL_TIMEOUT_MS, AOAHID_DRAIN_TIMEOUT_MS);
+        r = aoahid_node_close(kb, &waits);
         /* AOAHID_CLOSE_PENDING leaves the Node open; aoahid_device_close below closes it. */
         if (r != AOAHID_OK && r != AOAHID_CLOSE_PENDING) status = failed("node close", r);
     }

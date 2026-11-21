@@ -11,8 +11,8 @@ the wire protocol in [PROTOCOL.md](PROTOCOL.md), and every limit in
 | Handle | Definition | Holds |
 | --- | --- | --- |
 | `aoahid_context` | `src/api/internal.hpp` | The `Runtime` (libusb context), the event thread, `devices`, `graveyard`, the HID ID domains, and the deferred error latch. |
-| `aoahid_device` | `src/api/internal.hpp` | A `transport::Device` (transfer pool and one `Port` reference), its policy values, `nodes`, `channels`, and the pool-slot signal. |
-| `aoahid_node` | `src/api/internal.hpp` | A retained Spec, the `NodeState` variant, the HID ID, the pool reservation, and the completion fields the callback publishes. |
+| `aoahid_device` | `src/api/internal.hpp` | A `transport::Device` (transfer pool and one `Port` reference), its policy values, `nodes`, the `registrations` (each its members, the HID ID applied and one owed after a failed request 55), the batch flag, the next Node number, `channels`, and the pool-slot signal. |
+| `aoahid_node` | `src/api/internal.hpp` | A retained Spec, the `NodeState` variant, its Node number, its registration and a copy of the registration's applied HID ID (0 while none), the pool reservation, and the completion fields the callback publishes. |
 | `aoahid_channel` | `src/api/internal.hpp` | A `transport::Channel` (its own transfers and one `Port` reference). |
 | `aoahid_spec` | `src/api/internal.hpp` | An atomic reference count, the descriptor bytes, the `ReportLayout`, the `DescriptorRequirements`, and the copied options. |
 
@@ -209,7 +209,10 @@ that size. The count is capped at 65535 bytes, the 16-bit AOA length
   checks it against the layout.
 - `DescriptorRequirements` records what the descriptor needs of the target
   parser (usages, fields per report, report bits). `aoahid_node_open` compares
-  it with the Device's `linux_hid` (`aoahid_linux_hid_policy`) values.
+  it with the Device's `linux_hid` (`aoahid_linux_hid_policy`) values; for a
+  registration of several Nodes it compares the joined descriptor, whose
+  requirements are the largest of the members and whose size is their sum
+  (`join_descriptors`, `src/profiles/hid_layer.cpp`).
 
 `store_bits` (`src/profiles/state_support.hpp`) writes a value little-endian at its
 layout offset; values outside the logical range are rejected, except the null
@@ -303,9 +306,10 @@ instead of parking a Device that had already drained.
 ### Host state allocated before request 54
 
 **Decision:** In `aoahid_node_open` (`src/api/c_api_node.cpp`),
-`initialize_node_state`, `device->nodes.reserve`, `retain_spec` and
-`set_reservation` all run before `register_hid` sends request 54, so
-publishing the registered Node is a push that cannot allocate.
+`initialize_node_state`, the `reserve` calls on `device->nodes`, the
+registration's members and the stale list, `retain_spec` and `set_reservation`
+all run before `apply_registration` sends request 54, so publishing the
+registered Node is a push that cannot allocate.
 
 **Reason:** The code comment: "After Android accepts a registration,
 publishing the Node into this pre-reserved vector cannot allocate or orphan
@@ -316,7 +320,7 @@ it."
 
 ### One neutralizer function per profile
 
-**Decision:** `make_neutral` (`src/api/node_ops.cpp`) calls a separate
+**Decision:** `make_neutral` (`src/profiles/neutral.cpp`) calls a separate
 `AOAHID_NOINLINE` function for each `NodeState` alternative
 (`neutralize_keyboard`, `neutralize_mouse`, `neutralize_gamepad`,
 `neutralize_touch`, `neutralize_pen`).

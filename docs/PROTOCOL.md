@@ -144,7 +144,7 @@ retrieved 2026-08-27). Which kernel driver binds, and how Android classifies the
 device, depends on the descriptor and on that device's kernel and Android
 version. See [PROFILES.md](PROFILES.md) and [TARGET_MATRIX.md](TARGET_MATRIX.md).
 
-### Report IDs and one HID device per Node {#report-ids-and-one-hid-device-per-node}
+### Report IDs and one HID device per Node {#report-ids-and-hid-devices}
 
 - **Report IDs work.** A descriptor with Report IDs is parsed by the ordinary HID core. In
   `hid_get_report` (`drivers/hid/hid-core.c`, tag v6.12, retrieved 2026-11-16) the report number is
@@ -152,17 +152,28 @@ version. See [PROFILES.md](PROFILES.md) and [TARGET_MATRIX.md](TARGET_MATRIX.md)
   payload of request 57 starts with the Report ID, and an ID the descriptor does not declare is
   dropped with a debug message only. The Android common kernel commit above was not read for this
   function.
-- **One HID ID is one `hid_device`.** Every Node is registered under its own HID ID, so the kernel
-  makes one `hid_device` per Node, and each can be added or removed without touching the others.
-  `acc_hid_init` sets `hid->vendor = HID_ANY_ID` and `hid->product = HID_ANY_ID` and sets no name,
-  `uniq` or `phys` (commit `0e3db17d01c94263b629b089c51c7d0988308232`, retrieved 2026-11-16).
-- **Several Specs in one HID device are not offered.** `hid_generic_probe`
-  (`drivers/hid/hid-generic.c`) sets `HID_QUIRK_INPUT_PER_APP`, and `hidinput_connect`
-  (`drivers/hid/hid-input.c`) then uses `hidinput_match_application` when the descriptor has more
-  than one Application Collection, which gives one input device per Application Collection (Android
-  common kernel commit `35556bed836f8dc07ac55f69c8d17dce3e7f0e25`, retrieved 2026-11-16). A joined
-  descriptor therefore yields separate input devices, as separate HID IDs do. This holds where
-  `hid-generic` binds; `hid-multitouch` was not read, and none of it has been run on a phone.
+- **One HID ID is one `hid_device`, and its descriptor cannot grow.** The kernel makes one
+  `hid_device` for each registered HID ID. A request 56 fragment is accepted only at the offset where
+  the previous one ended and inside the length announced by request 54, and the `hid_device` is
+  created when the last byte arrives (HID flow, steps 1 and 2). Nothing adds to a registered
+  descriptor, so libaoahid changes what a HID device holds by unregistering it (55) and registering
+  the new descriptor under a new ID (54, 56). A Node in a registration of its own is a HID device of
+  its own, added or removed without touching the others; Nodes that share a registration share one
+  (docs/API.md, "Shared registrations"). `acc_hid_init` sets `hid->vendor = HID_ANY_ID` and
+  `hid->product = HID_ANY_ID` and sets no name, `uniq` or `phys` (commit
+  `0e3db17d01c94263b629b089c51c7d0988308232`, retrieved 2026-11-16).
+- **A joined descriptor becomes one input device for each Application Collection, as far as read.**
+  `hid_generic_probe` (`drivers/hid/hid-generic.c`) sets `HID_QUIRK_INPUT_PER_APP` (Android common
+  kernel commit `35556bed836f8dc07ac55f69c8d17dce3e7f0e25`, retrieved 2026-11-16). In
+  `hidinput_connect` (`drivers/hid/hid-input.c`, tag v6.12, retrieved 2026-11-21) a report is
+  attached to an existing input device by `hidinput_match_application` when `hid->maxapplication > 1`
+  and the quirk is set. That function matches on the report's application, so Report IDs of the same
+  application share one input device. It also keeps System Control and Consumer Control reports with
+  an earlier Keyboard application, so a keyboard and a media-key Node of one registration reach
+  Android as one input device. `hidinput_allocate` appends a suffix to the input device's name
+  (`Keyboard`, `Keypad`, `Mouse`, `Stylus`, `Pen`, `Touchscreen`, `Touchpad`) only when the quirk is
+  set and `maxapplication > 1`. This was read for `hid-generic`; `hid-multitouch` was not, and none of
+  it has been run on a phone.
 - **Android classifies the `evdev` device, not the HID device.** In `EventHub::openDeviceLocked`
   the class comes from the key, relative and absolute bits: `KEYBOARD` from keys below `BTN_MISC` or
   from `BTN_WHEEL` up, `CURSOR` from `BTN_MOUSE` with `REL_X` and `REL_Y`, `TOUCH_MT` from
@@ -171,8 +182,10 @@ version. See [PROFILES.md](PROFILES.md) and [TARGET_MATRIX.md](TARGET_MATRIX.md)
 - **Every Node looks the same to the identifier.** `generateDescriptor` hashes vendor, product,
   `uniqueId` and `nonce`, and uses the name and location only when vendor and product are both 0.
   `assignDescriptorLocked` raises `nonce` until no connected device has the same descriptor (same
-  commit). Because every Node has the same vendor and product, the descriptor of an input device
-  depends on the order in which the devices are present. A joined descriptor does not change that.
+  commit). Because every HID device has the same vendor and product, the descriptor of an input device
+  depends on the order in which the devices are present. Joining Nodes into one registration does not
+  change that, and a replaced registration is a new HID device that Android may identify
+  differently from the old one.
 
 A descriptor with several Report IDs in one device is still possible with
 `aoahid_spec_create_raw`.
@@ -212,9 +225,9 @@ A descriptor with several Report IDs in one device is still possible with
 | Find AOA-capable devices | `aoahid_discover` | 51 to every accessible USB device. Lists only those with a nonzero version, with the version in `protocol_version`. The caller decides whether version 2 is required. |
 | Switch to accessory mode (optional) | `aoahid_accessory_start` | 51, then 52 for each non-null string (manufacturer and model required), then 53. Returns when 53 completes. It does not wait for re-enumeration and never retries. A device already in accessory mode receives nothing. |
 | Open the device | `aoahid_device_open` | None. Opens the device in its current mode and allocates the transfer pool. |
-| Register a HID device | `aoahid_node_open` | 54, then 56 in fragments of `descriptor_fragment_bytes`. On failure after 54, sends a best-effort 55. |
+| Register a HID device | `aoahid_node_open`, `aoahid_device_batch_end`, `aoahid_device_commit` | For each registration that changes: 55 for the HID ID it had, then 54 and 56 in fragments of `descriptor_fragment_bytes` with the joined descriptor under a new ID. On failure after 54, sends a best-effort 55. |
 | Send input | `aoahid_node_submit`, `aoahid_node_submit_blocking`, `aoahid_raw_submit` | 57, asynchronous. |
-| Unregister | `aoahid_node_close`, `aoahid_device_close`, context destroy | Neutral reports as needed, then 55. |
+| Unregister | `aoahid_node_close`, `aoahid_device_close`, context destroy | Neutral reports as needed, then 55 (for a registration that keeps other Nodes, followed by 54 and 56 as above; once for each registration at Device close). |
 | Bulk data (e.g. ADB) | `aoahid_channel_open/read/write` | No AOA request. Bulk transfers on an interface chosen by class/subclass/protocol. |
 
 The request implementations are in `src/transport/discovery.cpp` (51 probe),

@@ -5,6 +5,30 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+**Not hardware-verified.** The new registration behavior was tested only against the fake libusb backend; no phone was used. The ABI changes incompatibly (the library is below 1.0.0).
+
+### Added
+
+- Shared registrations: Nodes opened with the same `aoahid_node_placement.registration` are one AOA HID device on the phone, their descriptors joined in open order. Every change of the set replaces the HID device (neutral reports, request 55, then 54 and 56 under a new HID ID). The rules, in `docs/API.md` "Shared registrations": Report IDs in every Spec and none twice, at most one battery, clean globals before another Spec, the joined descriptor within the Device's limits.
+- `aoahid_device_batch_begin`, `aoahid_device_batch_end` and `aoahid_device_commit`: stage several Node opens and closes and apply each changed registration once; commit re-registers after a failure.
+- `aoahid_node_placement` and `aoahid_commit_timeouts` with their `_init` functions (and the C++ `aoahid::node_placement()` and `commit_timeouts()`).
+- `aoahid_error_detail.hid_id`: the AOA HID ID an error concerns.
+- Tests `hid_layer` (the joining rules) and `registration` (request order, batch, rollback, teardown).
+
+### Changed
+
+- `aoahid_node_open(device, spec, placement, timeouts, out_node)` and `aoahid_node_close(node, timeouts)` take a placement and an `aoahid_commit_timeouts` (both waits) instead of an options structure and two integers. `aoahid_device_close` and the Context calls keep the two integers.
+- `aoahid_node_id` returns the Node's number on its Device, from 1 and never reused while the Device is open; it is no longer the AOA HID ID. `aoahid_error_detail.node_id` is that number and `hid_id` the AOA HID ID.
+- A transfer-pool reservation belongs to the Node (`reserve_slot`), not to a HID ID.
+- A failed request 55 is remembered: it is sent again before the next change of that registration and at Device teardown, so a Device close after a failed Node close sends it once more.
+- Device close sends one request 55 for each registration, not for each Node.
+- Bindings and examples (C, C++, Python, C#, Rust) follow the new signatures; `aoahid.Session`, `AoaSession` and the Rust `Device` give each Node a registration of its own, and Python has `Device.batch()`.
+- `docs/PROTOCOL.md`: the descriptor of a registered HID cannot grow (request 56 offsets), and what `hid-input.c` (v6.12) does with a joined descriptor.
+
+### Removed
+
+- `aoahid_node_options`, `aoahid_node_options_init` and `aoahid::node_options`.
+
 ## [0.2.2] - 2026-11-17
 
 **Not hardware-verified.** The C library, its ABI and its behavior are those of 0.2.1; this release changes the language bindings, tests, documentation and examples. The owning objects (`Session`, `AoaSession`, `Context`/`Device`/`Node`) were run only against the fake libusb transport; no phone was used.

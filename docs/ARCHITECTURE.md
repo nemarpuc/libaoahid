@@ -32,10 +32,12 @@ is the internal boundary: the layers above it see only plain host-side values.
 | Discovery | `aoahid_discover` | A snapshot of devices that answered AOA request 51 with a nonzero version. Independent lifetime. |
 | Device | `aoahid_device_open` | One opened USB device in its current mode, a fixed transfer pool, and optionally one claimed interface. |
 | Spec | `aoahid_spec_create_*` | An immutable, reference-counted profile description and its generated HID report descriptor. Not tied to a Context. |
-| Node | `aoahid_node_open(device, spec, ...)` | One AOA HID ID registered on the Device for one Spec, plus that Node's report state. Retains its Spec. |
+| Node | `aoahid_node_open(device, spec, placement, timeouts, ...)` | One Spec's report state, a member of the registration named by the placement. Retains its Spec. |
 | Channel | `aoahid_channel_open` | A bulk IN/OUT interface on the same USB handle as the Device (used, for example, for ADB). |
 
-Relationships: Context → Device → { Node…, Channel… }. Closing a Device closes
+Relationships: Context → Device → { Registration → Node…, Channel… }. A registration
+is not a handle: it is the Nodes the caller gave one registration number, and it
+owns the one AOA HID ID the phone has for them (see below). Closing a Device closes
 every Node and Channel still open on it; destroying a Context tears down every
 child graph.
 
@@ -49,8 +51,23 @@ WinUSB). Interface claims are counted per interface.
 AOA HID IDs are chosen by the host. The library allocates them from a
 monotonic counter starting at 1, kept per physical identity (USB bus plus port
 path) within a Context, so IDs are not reused while the Context lives, even if
-the device re-enumerates. Exhausting the 16-bit space returns
-`AOAHID_ERR_OVERFLOW`. `aoahid_node_id` returns the ID of a Node.
+the device re-enumerates or a registration is replaced. Exhausting the 16-bit
+space returns `AOAHID_ERR_OVERFLOW`. A HID ID belongs to a registration, not to a
+Node: `aoahid_node_id` returns the library's number of a Node, and the HID ID
+appears in `aoahid_error_detail.hid_id` and the log.
+
+### Registrations
+
+A Device holds registrations; each has the Nodes (in open order) that share one
+AOA HID ID. AOA has no request to extend a registered descriptor
+([PROTOCOL.md](PROTOCOL.md#hid-flow)), so any change of the set is applied by
+replacing the HID device: the Nodes' neutral reports (one shared drain
+deadline), request 55 for the old ID, then 54 and 56 with the joined
+descriptor under a new ID. Registrations are applied one at a time; a failure
+leaves the registration stale, and `aoahid_device_commit` applies it again. The
+rules for joining descriptors are pure code in `src/profiles/hid_layer.cpp`; the
+requests are in `src/api/registration_ops.cpp`. A batch only defers the
+applying, so a set of Nodes costs one registration instead of one per Node.
 
 ## Event modes and threading
 
@@ -133,21 +150,26 @@ submission stores only the HID ID (wValue) and the report length (wLength).
 No allocation happens on the send path.
 
 The pool is shared by every Node on the Device. A Node can reserve one slot
-(`aoahid_node_options.has_reserved_slots` / `reserved_slots`, zero or one) so
+(`aoahid_node_placement.reserve_slot`, zero or one) so
 other Nodes cannot starve it; reservations must always leave at least one
 shared slot. When no usable slot is free, submission returns `AOAHID_ERR_BUSY`.
 
 ### Registration and close
 
-`aoahid_node_open` synchronously sends request 54 (register) and the
-descriptor in request 56 fragments of `descriptor_fragment_bytes`. If
-registration fails after the device may have accepted request 54, a
-best-effort request 55 is sent so no half-registered ID is left behind.
+`aoahid_node_open` adds the Node to its registration and applies it: request 54
+(register) and the descriptor in request 56 fragments of
+`descriptor_fragment_bytes`, preceded by request 55 when the registration already
+had a HID device. If registering fails after the device may have accepted request
+54, a best-effort request 55 is sent so no half-registered ID is left behind, and
+the registration is put back as it was. A request 55 that fails is remembered
+and sent first the next time the registration is applied, or at Device teardown.
 
-`aoahid_node_close` waits up to its `drain_timeout_ms` argument (zero is
-`AOAHID_ERR_UNSET_FIELD`) for in-flight work, finishes any touch frame, sends the neutral
-reports the profile requires (every key and button up, contacts lifted, axes at
-rest), and then sends request 55. A failed step does not stop the next one. If
+`aoahid_node_close` waits up to the `drain_timeout_ms` of its
+`aoahid_commit_timeouts` (zero is `AOAHID_ERR_UNSET_FIELD`) for in-flight work,
+finishes any touch frame, sends the neutral reports the profile requires (every
+key and button up, contacts lifted, axes at rest), and then applies the
+registration without the Node: request 55 for the last Node, else a
+replacement. A failed step does not stop the next one. If
 a report is still in flight at the deadline, the Node close returns
 `AOAHID_CLOSE_PENDING` and the Node stays the caller's; a Device close instead
 moves the consumed graph to the Context graveyard, which reaps it once the
@@ -233,7 +255,7 @@ and the atomic flag (`1c6b080`).
 
 **Decision:** `aoahid_device_open` allocates `transfer_pool_slots` libusb
 transfers with buffers of `8 + maximum_report_bytes` bytes, and a Node may
-reserve one slot at `aoahid_node_open` so other Nodes cannot take every slot.
+reserve one slot in its `aoahid_node_placement` so other Nodes cannot take every slot.
 Free slots are kept in a `std::vector<Slot*>` used as a stack
 (`free_stack` in `src/transport/transport.cpp`). With every slot taken,
 `aoahid_node_submit_blocking` waits on a Device-level condition variable that

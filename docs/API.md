@@ -49,7 +49,7 @@ Python `ctypes` structure created without arguments, set only `struct_size`.
 | `aoahid_device_options_init` | 4096-byte descriptor fragments, AOA wire limit, EP0 and host control limits; 4 transfer slots; reports up to 1024 bytes; the Linux HID limits of [LIMITS.md](LIMITS.md) (4096, 256, 4, 256, 12288, 65528); `AOAHID_INTERFACE_CLAIM_NONE` with `interface_number = -1`; `validate_reports = 0`. |
 | `aoahid_accessory_options_init` | Manufacturer and model `"libaoahid"`; no other string. Set your own when you ship an app that filters accessories. |
 | `aoahid_channel_options_init` | The ADB interface `0xFF/0x42/0x01`, `AOAHID_CHANNEL_READ_REQUEST`, 2 OUT transfers of up to 1 MiB, zero-length termination on. |
-| `aoahid_node_options_init` | No reserved slot. |
+| `aoahid_node_placement_init`, `aoahid_commit_timeouts_init` | `struct_size` only: the registration number (required) and the two waits are the caller's. |
 | `aoahid_keyboard_options_init` | Usages `0x04` (Keyboard a) to `0xDD` (Keypad Hexadecimal), plus the modifiers. |
 | `aoahid_mouse_options_init` | 5 buttons; X and Y -32767..32767 in 16 bits; wheel and pan -127..127 in 8 bits. |
 | `aoahid_toggle_options_init` | Consumer Control (`0x0C/0x01`, field page `0x0C`). The four parallel arrays (`allowed_usages`, `usage_semantics`, `expected_linux_event_types`, `expected_linux_codes`) and `allowed_usage_count` are yours to set. |
@@ -74,12 +74,18 @@ that work with the same phones; the library never uses them by itself.
 | `aoahid_discovery` | A point-in-time device list and every string/pointer returned by `aoahid_discovery_get`. | Independent of the Context once created. |
 | `aoahid_device` | One USB handle, a fixed transfer pool, its Nodes and Channels. | Closed by `aoahid_device_close`, which also closes its children. |
 | `aoahid_spec` | An immutable descriptor and report layout. Reference-counted (`aoahid_spec_retain` / `aoahid_spec_release`); usable on any number of Devices and Contexts. | Until the last reference is released. |
-| `aoahid_node` | Mutable profile state and one AOA HID registration. Retains its Spec. | Until `aoahid_node_close` returns anything but `AOAHID_CLOSE_PENDING`, or its Device closes. |
+| `aoahid_node` | Mutable profile state, a member of one registration. Retains its Spec. | Until `aoahid_node_close` returns anything but `AOAHID_CLOSE_PENDING`, or its Device closes. |
 | `aoahid_channel` | One claimed Bulk interface on the Device's USB handle, its own transfer pool, and read-ahead state. | Until `aoahid_channel_close` returns anything but `AOAHID_CLOSE_PENDING`, or its Device closes. |
+
+A *registration* is the set of Nodes the caller gave one registration number: the
+phone sees them as one AOA HID device ([Shared registrations](#shared-registrations)).
+A Node number (`aoahid_node_id`) names a Node on its Device: from 1, unique, never
+reused while the Device is open. It is not the AOA HID ID.
 
 AOA HID IDs are allocated per Context and per physical port (bus plus port
 path), starting at 1, and are never reused within that Context, also when the
-device enumerates again on the same port. `aoahid_node_id` returns the ID.
+device enumerates again on the same port or a registration is replaced.
+`aoahid_error_detail.hid_id` reports the one an error concerns.
 
 `aoahid_spec_descriptor` and `aoahid_spec_manifest` pointers stay valid while
 the Spec reference is held. `aoahid_node_manifest` pointers stay valid until the
@@ -125,7 +131,7 @@ allows; calls the caller must serialize are still the caller's responsibility.
 | Context | `aoahid_context_create`, `aoahid_context_poll`, `aoahid_context_destroy`, `aoahid_context_destroy_blocking` |
 | Discovery | `aoahid_discover`, `aoahid_discovery_count`, `aoahid_discovery_get`, `aoahid_discovery_destroy` |
 | Accessory mode | `aoahid_accessory_start` |
-| Device | `aoahid_device_open`, `aoahid_device_close`, `aoahid_device_latched_error` |
+| Device | `aoahid_device_open`, `aoahid_device_close`, `aoahid_device_batch_begin`, `aoahid_device_batch_end`, `aoahid_device_commit`, `aoahid_device_latched_error` |
 | Channel | `aoahid_channel_open`, `aoahid_channel_close`, `aoahid_channel_write`, `aoahid_channel_read` |
 | Spec factories | `aoahid_spec_create_keyboard`, `_mouse`, `_toggle`, `_gamepad`, `_touchscreen`, `_touchpad`, `_pen`, `_digitizer`, `_raw` |
 | Spec access | `aoahid_spec_retain`, `aoahid_spec_release`, `aoahid_spec_descriptor`, `aoahid_spec_manifest` |
@@ -153,10 +159,15 @@ also defines `AOAHID_VERSION_MAJOR`, `_MINOR`, and `_PATCH`.
    HID support opens normally and then fails at `aoahid_node_open` with
    `AOAHID_ERR_STALL`.
 4. Create Specs with the profile factories (no I/O; may run on any thread).
-5. `aoahid_node_open` for each Spec. It allocates Node state and any reserved
-   pool slot, then synchronously sends request 54 (register) and the
-   descriptor in request-56 fragments. A failure unwinds everything it
-   allocated.
+5. `aoahid_node_open` for each Spec, with an `aoahid_node_placement` (the
+   registration number and an optional reserved pool slot) and the two waits.
+   It allocates Node state and the slot, then synchronously sends request 54
+   (register) and the descriptor in request-56 fragments, after request 55 for
+   the HID device the registration had if it had Nodes already. A failure
+   unwinds everything it allocated and puts the registration back as it was.
+   Opening several Nodes of one registration at once costs a registration each
+   time unless they are opened inside a batch
+   ([Shared registrations](#shared-registrations)).
 
    **Wait briefly before the first input.** Android's `f_accessory.c` only
    schedules the HID's registration (`acc_hid_work`) when the last
@@ -266,10 +277,15 @@ returns immediately.
 
 | Argument | Calls | Scope |
 |---|---|---|
-| `control_timeout_ms` | `aoahid_discover`, `aoahid_accessory_start`, `aoahid_node_open`, `aoahid_node_close`, `aoahid_device_close`, `aoahid_context_destroy`, `aoahid_context_destroy_blocking` | Each synchronous AOA control request (51 to 56). |
+| `control_timeout_ms` | `aoahid_discover`, `aoahid_accessory_start`, `aoahid_device_close`, `aoahid_context_destroy`, `aoahid_context_destroy_blocking`, and the `aoahid_commit_timeouts` of `aoahid_node_open`, `aoahid_node_close`, `aoahid_device_batch_end`, `aoahid_device_commit` | Each synchronous AOA control request (51 to 56). |
 | `send_timeout_ms` | `aoahid_node_submit`, `aoahid_raw_submit` | The deadline of the queued asynchronous request-57 transfer; a failure is returned by a later call. A timed-out touch report leaves the contacts it lifted occupied; close and reopen that Node. Keep it well above normal EP0 latency. |
-| `drain_timeout_ms` | `aoahid_node_close`, `aoahid_device_close`, `aoahid_context_destroy*`, `aoahid_channel_open`, `aoahid_channel_close` | How long a close (or the wait for in-flight reports before a Channel opens) waits for in-flight reports and for the neutral reports it sends. |
+| `drain_timeout_ms` | `aoahid_device_close`, `aoahid_context_destroy*`, `aoahid_channel_open`, `aoahid_channel_close`, and the `aoahid_commit_timeouts` of the Node and batch calls | How long a close, or a change of a registration, waits for in-flight reports and for the neutral reports it sends, together (the wait for in-flight reports before a Channel opens). |
 | `timeout_ms` | `aoahid_node_submit_blocking`, `aoahid_channel_read`, `aoahid_channel_write`, `aoahid_context_poll`, `aoahid_context_destroy_blocking` | The whole call. `aoahid_node_submit_blocking` also bounds each report it sends: that report's deadline is what is left of `timeout_ms`; so does the neutral-report wait of a close with `drain_timeout_ms`. |
+
+`aoahid_node_open`, `aoahid_node_close`, `aoahid_device_batch_end` and
+`aoahid_device_commit` take both waits as one `aoahid_commit_timeouts`; a zero in
+either is `AOAHID_ERR_UNSET_FIELD`. `aoahid_device_close` and the Context calls
+keep the two integers, as they replace no registration.
 
 A Device teardown that cannot finish inside `aoahid_device_close` (a transfer
 callback has not run yet) is finished by the Context with the
@@ -290,11 +306,48 @@ or libusb requirements.
 | `aoahid_channel_options.out_transfers` | OUT transfers; a full pool makes a write wait. |
 | `aoahid_channel_options.transfer_bytes` | Bytes per Bulk transfer, rounded up to `wMaxPacketSize`; the largest IN request in request mode. |
 
-Zero keeps its plain meaning in `aoahid_node_options`: `has_reserved_slots = 0`
-and `reserved_slots = 0` is no reservation (the Node shares the Device pool).
-To reserve a slot for a Node, set `has_reserved_slots = 1` and
-`reserved_slots = 1` (a Node has one report in flight, so 0 or 1 is allowed),
-leaving at least one shared slot on the Device.
+Zero keeps its plain meaning in `aoahid_node_placement.reserve_slot`: 0 is no
+reservation (the Node shares the Device pool). To reserve a slot for a Node set
+it to 1 (a Node has one report in flight, so 0 or 1 is allowed), leaving at
+least one shared slot on the Device. The reservation belongs to the Node, not to
+its registration, and stays when the registration is replaced.
+
+## Shared registrations {#shared-registrations}
+
+One registration number, one AOA HID device: the phone has a single
+`hid_device` for the Nodes that share a number, built from their descriptors
+joined in the order the Nodes were opened ([PROTOCOL.md](PROTOCOL.md#hid-flow)).
+AOA cannot add a report descriptor to a registered HID, so every change of the
+set replaces the HID device: the Nodes involved send their neutral reports within
+`drain_timeout_ms`, request 55 removes the old HID ID, and requests 54 and 56
+register the joined descriptor under a new one. Applications that attach and
+detach their devices one by one should therefore keep each Node in a registration
+of its own, which is the one-HID-device-per-Node behaviour of earlier versions.
+
+Nodes may share a registration only when:
+
+- every Spec declares Report IDs (the Report IDs a profile's battery report uses
+  included), and no Report ID is used twice in the registration
+  (`AOAHID_ERR_PARAM`, field `node.report_id`);
+- at most one of them has a battery report (field `node.battery`);
+- every Spec but the last leaves Unit, Unit Exponent, Physical Minimum and
+  Maximum at zero and no pushed global state, as the profile factories do
+  (`AOAHID_ERR_UNSUPPORTED`, field `spec.descriptor.globals`: only a Raw Spec can break it);
+- the joined descriptor fits the Device's limits (`AOAHID_ERR_OVERFLOW`).
+
+These are the rules of libmimusb's `compose_hid_groups`, plus the battery and
+globals rules that come from joining descriptors.
+
+`aoahid_device_batch_begin` makes `aoahid_node_open` and `aoahid_node_close`
+only stage their change: the checks run at once, nothing is sent, and a staged
+Node is returned with no HID device yet (its submits return `AOAHID_ERR_BUSY`,
+field `node.registration`). `aoahid_device_batch_end` applies every changed
+registration once, in the order of its first change, and returns the first
+error. `aoahid_device_commit` applies the same changes outside a batch; use it
+after an error. It registers again every registration that differs from what
+the phone has. A registration that fails to apply keeps its Nodes; the phone may
+meanwhile have no HID device for it, and the Nodes' submits return
+`AOAHID_ERR_BUSY` until a commit succeeds.
 
 ## Bulk Channels {#bulk-channels}
 
@@ -484,7 +537,7 @@ the header adds no type aliases. It adds two things:
 - one function per initializer that returns the initialized structure by
   value: `aoahid::context_options`, `aoahid::device_options`,
   `aoahid::accessory_options`, `aoahid::channel_options`,
-  `aoahid::node_options`, one per profile (`aoahid::keyboard_options` to
+  `aoahid::node_placement`, `aoahid::commit_timeouts`, one per profile (`aoahid::keyboard_options` to
   `aoahid::raw_options`), and `aoahid::capability_manifest`;
 - `aoahid::SpecPtr` and `aoahid::DiscoveryPtr`, `std::unique_ptr` types that
   release a Spec reference or destroy a discovery snapshot. Context, Device,
@@ -531,7 +584,8 @@ Every close and destroy call follows one rule:
 Where `AOAHID_CLOSE_PENDING` can come from:
 
 - `aoahid_node_close`: a report of the Node is still in flight at the drain
-  deadline.
+  deadline. After an error that consumed the Node the phone may still have its
+  HID device; `aoahid_device_commit` (or closing the Device) removes it.
 - `aoahid_channel_close`: a cancelled Bulk transfer has not completed.
 - `aoahid_context_destroy`: a Device teardown is still waiting for a callback.
 - `aoahid_context_destroy_blocking`: as `aoahid_context_destroy`, when its own
@@ -548,7 +602,7 @@ be passed to the API again.
 `aoahid_last_error()` returns the calling thread's diagnostic record without
 changing it. Every other function replaces the record: success resets it to
 `AOAHID_OK`; a failure fills `code`, `field`, `reason`, and, where they apply,
-`transport_status` (the libusb status), `aoa_request`, `node_id` (the AOA HID ID of the Node involved), `report_id`, `offset`, and `length`.
+`transport_status` (the libusb status), `aoa_request`, `node_id` (the library's number of the Node involved), `hid_id` (the AOA HID ID involved), `report_id`, `offset`, and `length`.
 The strings stay valid until the thread's next call into the library.
 Functions that return a value rather than a result (`aoahid_discovery_count`,
 `aoahid_discovery_get`, `aoahid_node_id`, `aoahid_version`) use 0 or null as
@@ -852,13 +906,63 @@ aoahid_result aoahid_device_close(aoahid_device* device, uint32_t control_timeou
 - `control_timeout_ms`: the deadline of each AOA control request, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
 - `drain_timeout_ms`: how long to wait for transfers in flight, in milliseconds (see Blocking); zero is `AOAHID_ERR_UNSET_FIELD`.
 
-**Ownership:** Closes every Node (as `aoahid_node_close` does) and Channel of the Device, then the Device. It never returns `AOAHID_CLOSE_PENDING`: when a transfer is still in flight at the drain deadline, the Context finishes the teardown and reports its errors from `aoahid_context_poll` or `aoahid_context_destroy`.
+**Ownership:** Closes every Node (as `aoahid_node_close` does, but one request 55 for each registration) and Channel of the Device, then the Device. It never returns `AOAHID_CLOSE_PENDING`: when a transfer is still in flight at the drain deadline, the Context finishes the teardown and reports its errors from `aoahid_context_poll` or `aoahid_context_destroy`.
 
 **Blocking:** drain_timeout_ms for all reports together, control_timeout_ms for each request 55.
 
 **Threads:** Context domain; not from the log sink.
 
 **Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null Device or one already closed; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; otherwise the first error of the teardown.
+
+#### aoahid_device_batch_begin
+
+```c
+aoahid_result aoahid_device_batch_begin(aoahid_device* device);
+```
+
+- `device`: the Device.
+
+**Ownership:** Nothing.
+
+**Blocking:** None; nothing is sent.
+
+**Threads:** Context domain.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for an invalid Device; `AOAHID_ERR_BUSY` inside a batch. Until `aoahid_device_batch_end`, `aoahid_node_open` and `aoahid_node_close` check everything they can without I/O and stage the change; a Node opened in the batch, or in a registration the batch changes, refuses reports with `AOAHID_ERR_BUSY`.
+
+#### aoahid_device_batch_end
+
+```c
+aoahid_result aoahid_device_batch_end(aoahid_device* device, const aoahid_commit_timeouts* timeouts);
+```
+
+- `device`: the Device.
+- `timeouts`: the waits of each registration change; both are required.
+
+**Ownership:** Nothing.
+
+**Blocking:** As `aoahid_device_commit`: each changed registration once, in the order of its first change.
+
+**Threads:** Context domain; not from the log sink.
+
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for an invalid Device, a null timeouts or a wrong struct_size; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; `AOAHID_ERR_BUSY` outside a batch; the results of `aoahid_device_commit`.
+
+#### aoahid_device_commit
+
+```c
+aoahid_result aoahid_device_commit(aoahid_device* device, const aoahid_commit_timeouts* timeouts);
+```
+
+- `device`: the Device.
+- `timeouts`: the waits of each registration change; both are required.
+
+**Ownership:** Nothing.
+
+**Blocking:** Registers again every registration whose members differ from what the phone has, as after a failed open, close or batch; inside a batch it applies the batch and ends it. For each such registration: its Nodes' neutral reports within `drain_timeout_ms`, request 55 for the old HID ID, 54 and 56 for a new one. A step that fails does not stop the next registration.
+
+**Threads:** Context domain; not from the log sink.
+
+**Returns:** `AOAHID_OK`, also when nothing differs; `AOAHID_ERR_PARAM` for an invalid Device, a null timeouts or a wrong struct_size; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; `AOAHID_ERR_TIMEOUT`; otherwise the first transport error.
 
 #### aoahid_device_latched_error
 
@@ -1190,40 +1294,39 @@ aoahid_result aoahid_spec_manifest(const aoahid_spec* spec, aoahid_capability_ma
 #### aoahid_node_open
 
 ```c
-aoahid_result aoahid_node_open(aoahid_device* device, aoahid_spec* spec, const aoahid_node_options* options, uint32_t control_timeout_ms, aoahid_node** out_node);
+aoahid_result aoahid_node_open(aoahid_device* device, aoahid_spec* spec, const aoahid_node_placement* placement, const aoahid_commit_timeouts* timeouts, aoahid_node** out_node);
 ```
 
 - `device`: the Device.
 - `spec`: the Spec.
-- `options`: the options; start from `aoahid_node_options_init`.
-- `control_timeout_ms`: the deadline of each AOA control request, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
+- `placement`: where the Node goes: a nonzero `registration` number and `reserve_slot` 0 or 1; start from `aoahid_node_placement_init`.
+- `timeouts`: the waits of the registration change; both are required; start from `aoahid_commit_timeouts_init`.
 - `out_node`: receives the new Node; set to null first and left null when the call fails.
 
-**Ownership:** The Node keeps a reference to spec until it closes.
+**Ownership:** Copies placement; retains spec until the Node closes.
 
-**Blocking:** Sends request 54 (register) and the descriptor in request 56 fragments, each waiting up to control_timeout_ms. Android registers the HID after the last fragment, without telling the host: a report sent at once may STALL or be lost, so wait a little before the first one ([Open sequence](#open-sequence)).
+**Blocking:** A registration with no other Node: request 54 and the descriptor in request 56 fragments, each waiting up to `control_timeout_ms`. One that has Nodes already: their neutral reports within `drain_timeout_ms`, request 55 for its HID ID, then 54 and 56 with the joined descriptor under a new HID ID. Inside a batch nothing is sent and the Node is only staged. Android registers the HID after the last fragment, without telling the host: a report sent at once may STALL or be lost, so wait a little before the first one ([Open sequence](#open-sequence)).
 
-**Threads:** Context domain.
+**Threads:** Context domain; not from the log sink.
 
-**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null argument, a wrong struct_size or a reservation that leaves no shared slot; `AOAHID_ERR_UNSET_FIELD` for a zero timeout or a reservation that is not 0/0 or 1/0..1; `AOAHID_ERR_OVERFLOW` when the Spec exceeds a policy of the Device or no AOA HID ID is left; a transport error from the requests (`AOAHID_ERR_STALL`: the device has no AOA 2.0 HID).
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null argument, a wrong struct_size, a closing Device, a reservation that leaves no shared slot, or Nodes sharing a registration against the [rules](#shared-registrations); `AOAHID_ERR_UNSET_FIELD` for a zero registration or timeout, a nonzero reserved, or a `reserve_slot` other than 0 or 1; `AOAHID_ERR_UNSUPPORTED` for a Spec that cannot be followed by another in a registration; `AOAHID_ERR_OVERFLOW` when the Spec, or the joined descriptor, exceeds a policy of the Device, or no AOA HID ID or Node number is left; `AOAHID_ERR_TIMEOUT` when a report of another Node of the registration was still in flight at the drain deadline; a transport error from the requests (`AOAHID_ERR_STALL`: the device has no AOA 2.0 HID). On any error there is no Node, and the registration is put back as it was.
 
 #### aoahid_node_close
 
 ```c
-aoahid_result aoahid_node_close(aoahid_node* node, uint32_t control_timeout_ms, uint32_t drain_timeout_ms);
+aoahid_result aoahid_node_close(aoahid_node* node, const aoahid_commit_timeouts* timeouts);
 ```
 
 - `node`: the Node.
-- `control_timeout_ms`: the deadline of each AOA control request, in milliseconds; zero is `AOAHID_ERR_UNSET_FIELD`.
-- `drain_timeout_ms`: how long to wait for transfers in flight, in milliseconds (see Blocking); zero is `AOAHID_ERR_UNSET_FIELD`.
+- `timeouts`: the waits of the registration change; both are required.
 
 **Ownership:** Follows the [close rule](#close-and-destroy): `AOAHID_CLOSE_PENDING` while a report of the Node is still in flight at the drain deadline.
 
-**Blocking:** Finishes a touch frame that has started, sends the neutral report (keys and buttons up, contacts lifted, axes at rest) within drain_timeout_ms, then request 55 (unregister) within control_timeout_ms. A failed step does not stop the next one.
+**Blocking:** Finishes a touch frame that has started and sends the neutral report (keys and buttons up, contacts lifted, axes at rest) within `drain_timeout_ms`. Then the last Node of a registration sends request 55; with other Nodes left, their neutral reports, request 55, and 54 and 56 with the remaining descriptors joined under a new HID ID. Inside a batch the removal is only staged. A failed step does not stop the next one.
 
 **Threads:** Context domain; not from the log sink.
 
-**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null or closed Node; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; `AOAHID_CLOSE_PENDING`; otherwise the first error on the way out, such as a report that failed earlier or a refused request 55.
+**Returns:** `AOAHID_OK`; `AOAHID_ERR_PARAM` for a null or closed Node, a closing Device or a wrong struct_size; `AOAHID_ERR_UNSET_FIELD` for a zero timeout; `AOAHID_CLOSE_PENDING`; otherwise the first error on the way out, such as a report that failed earlier or a refused request 55. Every result but the first three consumed the Node; after an error the phone may still see it until `aoahid_device_commit` succeeds.
 
 #### aoahid_node_id
 
@@ -1239,7 +1342,7 @@ uint16_t aoahid_node_id(const aoahid_node* node);
 
 **Threads:** Context domain.
 
-**Returns:** The Node's AOA HID ID (nonzero) with `AOAHID_OK` recorded, or 0 with `AOAHID_ERR_PARAM` recorded for a null or closed Node.
+**Returns:** The Node's number (nonzero) with `AOAHID_OK` recorded, or 0 with `AOAHID_ERR_PARAM` recorded for a null or closed Node. It is from 1, unique on its Device and never reused while the Device is open; it is not the AOA HID ID, which `aoahid_error_detail.hid_id` reports.
 
 #### aoahid_node_manifest
 
