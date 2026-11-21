@@ -11,7 +11,7 @@ All notable changes to libaoahid are recorded here. This project follows
 
 - Shared registrations: Nodes opened with the same `aoahid_node_placement.registration` are one AOA HID device on the phone, their descriptors joined in open order. Every change of the set replaces the HID device (neutral reports, request 55, then 54 and 56 under a new HID ID). The rules, in `docs/API.md` "Shared registrations": Report IDs in every Spec and none twice, at most one battery, clean globals before another Spec, the joined descriptor within the Device's limits.
 - `aoahid_device_batch_begin`, `aoahid_device_batch_end` and `aoahid_device_commit`: stage several Node opens and closes and apply each changed registration once; commit re-registers after a failure.
-- `aoahid_node_placement` and `aoahid_commit_timeouts` with their `_init` functions (and the C++ `aoahid::node_placement()` and `commit_timeouts()`).
+- `aoahid_node_placement` and `aoahid_commit_timeouts` with their `_init` functions (and the C++ wrappers `aoahid::node_placement` and `aoahid::commit_timeouts`).
 - `aoahid_error_detail.hid_id`: the AOA HID ID an error concerns.
 - Tests `hid_layer` (the joining rules) and `registration` (request order, batch, rollback, teardown).
 
@@ -27,7 +27,7 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ### Removed
 
-- `aoahid_node_options`, `aoahid_node_options_init` and `aoahid::node_options`.
+- `aoahid_node_options`, `aoahid_node_options_init` and the C++ wrapper `aoahid::node_options`.
 
 ## [0.2.2] - 2026-11-17
 

@@ -72,10 +72,13 @@ void operator delete[](void* storage, const std::nothrow_t&) noexcept { std::fre
 
 namespace {
 
-using sim::kControlTimeoutMs;
 using sim::kDrainTimeoutMs;
-using sim::kSendTimeoutMs;
 using sim::kThreadDrainTimeoutMs;
+
+// These are failure deadlines: the fake completes every request at once, so a long one costs
+// nothing, and a short one only fails on a slow or busy runner.
+constexpr std::uint32_t kControlTimeoutMs = 500U;
+constexpr std::uint32_t kSendTimeoutMs = 500U;
 
 // Where the current run stands, printed when a step fails unexpectedly.
 long g_run_allocation = 0;
@@ -192,17 +195,17 @@ void run_session(const aoahid_event_mode mode, const long allocation) {
     const std::uint32_t node_options = sim::node_options();
     aoahid_node* keyboard = nullptr;
     if (!step(aoahid_node_open(device, made.keyboard, separate_placement(node_options),
-                               commit_timeouts_of(kControlTimeoutMs, 20U), &keyboard),
+                               commit_timeouts_of(kControlTimeoutMs, kDrainTimeoutMs), &keyboard),
               "keyboard node_open"))
         return finish();
     aoahid_node* raw = nullptr;
     if (!step(aoahid_node_open(device, made.raw, separate_placement(node_options),
-                               commit_timeouts_of(kControlTimeoutMs, 20U), &raw),
+                               commit_timeouts_of(kControlTimeoutMs, kDrainTimeoutMs), &raw),
               "raw node_open"))
         return finish();
     aoahid_node* mouse = nullptr;
     if (!step(aoahid_node_open(device, made.mouse, separate_placement(node_options),
-                               commit_timeouts_of(kControlTimeoutMs, 20U), &mouse),
+                               commit_timeouts_of(kControlTimeoutMs, kDrainTimeoutMs), &mouse),
               "mouse node_open"))
         return finish();
 
