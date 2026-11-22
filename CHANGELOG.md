@@ -5,6 +5,15 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+### Changed
+
+- `aoahid_spec_create_raw` no longer judges the descriptor. It reads item boundaries (short and long items) and
+  works out the wire length of each Input report, and refuses only what it cannot represent: an item that runs past
+  the end, a Report ID outside 1-255 or after unnumbered data, an arithmetic overflow, a table that does not match
+  the Input reports, Output or Feature items. Usages, Logical and Physical extents, Units, Collections, Delimiters,
+  reserved tags and flag bits, field widths and spans are the phone's HID parser's to judge. A descriptor with no
+  Input report takes an empty accepted-report table. Generated profiles are validated as before.
+
 ## [0.2.3] - 2026-11-21
 
 **Not hardware-verified.** The new registration behavior was tested only against the fake libusb backend; no phone was used. The ABI changes incompatibly (the library is below 1.0.0).

@@ -34,9 +34,9 @@ static aoahid_result aoahid_spec_create_raw_impl(const aoahid_raw_options* optio
     // count-derived allocation before using the caller's count so an invalid
     // raw table cannot turn a deterministic validation error into allocation
     // pressure or std::length_error.
-    if (options->reports == nullptr || options->report_count == 0U) {
+    if (options->reports == nullptr && options->report_count != 0U) {
         set_error(AOAHID_ERR_UNSET_FIELD, "raw.reports",
-                  "Raw descriptors require an explicit accepted-report table.");
+                  "The accepted-report table is null but its count is not zero.");
         return AOAHID_ERR_UNSET_FIELD;
     }
     if (options->report_count > 256U) {
@@ -60,7 +60,9 @@ static aoahid_result aoahid_spec_create_raw_impl(const aoahid_raw_options* optio
     spec->requirements = requirements;
     spec->descriptor.assign(options->descriptor, options->descriptor + options->descriptor_length);
     aoa::detail::RawConfig config{};
-    config.reports.assign(options->reports, options->reports + options->report_count);
+    if (options->report_count != 0U) {
+        config.reports.assign(options->reports, options->reports + options->report_count);
+    }
     config.trailing_valid_masks = std::move(trailing_valid_masks);
     for (const aoahid_raw_report& report : config.reports) {
         spec->report_capabilities.push_back(

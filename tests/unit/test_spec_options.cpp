@@ -840,7 +840,7 @@ void test_raw_options() {
             {[](O* o) { o->requires_feature_response = 1U; }, AOAHID_ERR_UNSUPPORTED,
              "raw.acknowledgements"},
             {[](O* o) { o->reports = nullptr; }, AOAHID_ERR_UNSET_FIELD, "raw.reports"},
-            {[](O* o) { o->report_count = 0U; }, AOAHID_ERR_UNSET_FIELD, "raw.reports"},
+            {[](O* o) { o->report_count = 0U; }, AOAHID_ERR_PARAM, "raw.reports"},
             {[](O* o) { o->report_count = 257U; }, AOAHID_ERR_OVERFLOW, "raw.reports"},
             {[](O* o) { o->reports = &wrong_length; }, AOAHID_ERR_PARAM, nullptr},
             {[](O* o) { o->descriptor = nullptr; }, AOAHID_ERR_UNSET_FIELD, "raw.descriptor"},

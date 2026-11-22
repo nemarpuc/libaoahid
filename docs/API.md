@@ -559,7 +559,7 @@ the header adds no type aliases. It adds two things:
   result; see [PROFILES.md](PROFILES.md#hardware-status) for what has been
   tested;
 - `profile_kind`;
-- `reports` / `report_count`: every Input Report ID and its exact wire length;
+- `reports` / `report_count`: every Input Report ID and its exact wire length (empty when the descriptor has no Input report);
 - `descriptor_length`.
 
 A generated descriptor may contain a Constant Feature item such as Contact
@@ -1220,7 +1220,7 @@ aoahid_result aoahid_spec_create_raw(const aoahid_raw_options* options, aoahid_s
 
 **Threads:** Any thread.
 
-**Returns:** As every factory, `AOAHID_OK` through `AOAHID_ERR_OVERFLOW`; `AOAHID_ERR_PARAM` also for a descriptor that does not parse or does not match the report table; `AOAHID_ERR_UNSUPPORTED` without the acknowledgement, with requires_output or requires_feature_response set, or for a long item or a construct the parser does not handle.
+**Returns:** As every factory, `AOAHID_OK` through `AOAHID_ERR_OVERFLOW`; `AOAHID_ERR_PARAM` also for a descriptor with an item that runs past its end, a Report ID the table cannot name, or one that does not match the report table; `AOAHID_ERR_UNSUPPORTED` without the acknowledgement, with requires_output or requires_feature_response set, or for an Output or Feature item. Nothing else about the descriptor is judged.
 
 #### aoahid_spec_retain
 

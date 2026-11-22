@@ -21,9 +21,9 @@ and [HID Usage Tables 1.7](https://usb.org/sites/default/files/hut1_7.pdf).
 | Report length | No 4-byte limit on the whole report | §8.4 | Report size is limited only by the transport and target policies below. |
 | Signed items | A field is signed when either extent is negative, unsigned otherwise | §§5.8, 6.2.2.7 | Minimum items are written as the shortest signed value. A Maximum is written as the shortest unsigned value when both extents are non-negative (65535 with minimum 0 is `26 FF FF`), and as the shortest signed value otherwise. |
 | Unit Exponent | 4-bit signed, -8..7 | §6.2.2.7 | Emitted as a low nibble. |
-| Global tags | 0-11 defined, 12-15 reserved | §6.2.2.7 | Raw validation rejects reserved tags. |
-| Extended Usages | A 4-byte Usage carries its own page; an extended Usage Minimum needs an extended Maximum | §6.2.2.8 | Raw validation rejects mixed pairs. |
-| Units | A non-None Unit needs Logical and Physical extents and a Unit Exponent | HUT §3.3 | Raw validation tracks these through Push/Pop. |
+| Global tags | 0-11 defined, 12-15 reserved | §6.2.2.7 | A raw descriptor is not checked; the item is passed over by the library. |
+| Extended Usages | A 4-byte Usage carries its own page; an extended Usage Minimum needs an extended Maximum | §6.2.2.8 | Generated profiles never mix them; a raw descriptor is not checked. |
+| Units | A non-None Unit needs Logical and Physical extents and a Unit Exponent | HUT §3.3 | Generated profiles follow the rule; a raw descriptor is not checked. |
 | Null State | Needs at least one encodable value outside the logical range | §6.2.2.5 | A Hat field whose range fills its width is rejected. |
 
 ### Field span
@@ -98,7 +98,7 @@ differ; check the same symbols in the kernel you target.
 | `HID_GLOBAL_STACK_SIZE` | 4 | `include/linux/hid.h`, `hid_parser_global` | A fifth nested Push is rejected. |
 | Report Size | at most 256 bits per declaration | `hid_parser_global` | Checked when declared, even if later overwritten. |
 | Report data | at most 65,528 bits per report (`(HID_MAX_BUFFER_SIZE - 1) << 3`) | `hid_add_field` | Excludes the Report ID byte. |
-| Long items | Rejected (any prefix with tag 15) | `fetch_item`, `hid_open_report` | Raw validation checks the tag nibble, not only `0xFE`. |
+| Long items | Rejected by the parser | `fetch_item`, `hid_open_report` | A raw descriptor may hold one: the library steps over it (prefix `0xFE`, then its size) and the target gives its answer when the device is registered. |
 | Usage ranges | The current page is added only when the Maximum item is 1 or 2 bytes | `hid_parser_local`, `hid_add_usage` | The library counts Usage demand exactly as this code does. |
 | Standalone Usage Maximum | Expands from 0 because Local state starts zeroed | `hid_parser_local` | Accepted by this kernel; HID 1.11 does not define it. |
 | Input fields wider than 32 bits | Warned about and truncated to 32 | `hid_field_extract` | Generated fields are at most 32 bits. |
@@ -141,7 +141,7 @@ These are choices made by this library, not HID, Linux, or Android limits.
 | Mouse deltas | Signed 64-bit pending total per axis; overflow is an error. |
 | Toggle semantics | Selector, OOC toggle, OOC maintained, MC, OSC, RTC only. |
 | Raw report table | At most 256 entries; exact ID and wire length (a `uint32_t`). |
-| Raw descriptors | Short items only; reserved Main, Local, and item-type values rejected; a 4-byte Usage Maximum of `0xFFFFFFFF` rejected; every Collection has a Usage; every non-Constant Input has Usage Page, Usage, Logical Minimum/Maximum, Report Size, and Report Count; Delimiter sets close before their Main item. |
+| Raw descriptors | Only what the library needs to know the wire length of each Input report: every item is whole inside the descriptor (a short item or a long one), Report IDs are 1-255 and come before the first data item, Report Size times Report Count and the sums do not overflow, the accepted-report table matches the Input reports (it may be empty when there are none), and there are no Output or Feature items (AOA carries neither). Nothing else is checked: Usages, Logical and Physical extents, Units, Collections, Delimiters, reserved tags and flag bits, field widths and spans are the target parser's to judge. |
 | AOA descriptor | At most 65535 bytes (16-bit AOA length field), further limited by `aoa_descriptor_wire_policy_bytes` and `linux_hid.descriptor_bytes`. |
 | Accessory strings | At most 256 bytes each, including the NUL. |
 | Object counts | No fixed maximum for Contexts, Devices, Nodes, or Specs; allocation can still fail. |

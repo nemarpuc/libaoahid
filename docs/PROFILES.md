@@ -452,9 +452,9 @@ table of accepted Input reports (`aoahid_raw_report`: a `report_id`
 `acknowledges_no_android_support = 1` and `requires_output =
 requires_feature_response = 0` (else `AOAHID_ERR_UNSUPPORTED`).
 
-The descriptor is parsed and checked (short items only, no reserved items,
-required Global/Local state present, field spans per HID 1.11 §8.4, see
-[LIMITS.md](LIMITS.md#library-limits)). `aoahid_raw_submit(node, report,
+The descriptor is read for what the library needs (the wire length of each report, see
+[LIMITS.md](LIMITS.md#library-limits)); whether the phone's HID parser accepts it is
+the phone's answer, given when the device is registered. `aoahid_raw_submit(node, report,
 length, send_timeout_ms)` checks the report against the accepted ID and length (and that
 trailing padding bits are zero), copies it, and queues it. No state, neutral
 report, or transition is generated; `aoahid_node_submit` does not apply to Raw

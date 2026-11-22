@@ -1213,9 +1213,10 @@ aoahid_spec_create_digitizer(const aoahid_digitizer_options* options, aoahid_spe
 /* aoahid_spec_create_raw
  * Makes a Spec from the caller's own HID report descriptor.
  * Returns: As every factory, AOAHID_OK through AOAHID_ERR_OVERFLOW; AOAHID_ERR_PARAM also for a
- * descriptor that does not parse or does not match the report table; AOAHID_ERR_UNSUPPORTED
- * without the acknowledgement, with requires_output or requires_feature_response set, or for a
- * long item or a construct the parser does not handle. */
+ * descriptor with an item that runs past its end, a Report ID the table cannot name, or one that
+ * does not match the report table; AOAHID_ERR_UNSUPPORTED without the acknowledgement, with
+ * requires_output or requires_feature_response set, or for an Output or Feature item. Nothing
+ * else about the descriptor is judged. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_spec_create_raw(const aoahid_raw_options* options,
                                                             aoahid_spec** out_spec);
 
