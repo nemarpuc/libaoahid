@@ -16,9 +16,10 @@
 namespace aoa::hid {
 
 namespace {
-// HID 1.11 section 6.2.2.2 short-item types, then each type's tags (sections
-// 6.2.2.4, 6.2.2.7, and 6.2.2.8).
-constexpr std::uint8_t kLongItemPrefix = 0xFEU; // section 6.2.2.3
+// HID 1.11 section 6.2.2.3: the prefix of a long item.
+constexpr std::uint8_t kLongItemPrefix = 0xFEU;
+
+// Section 6.2.2.2 short-item types, then each type's tags (sections 6.2.2.4, 6.2.2.7, and 6.2.2.8).
 constexpr std::uint8_t kTypeMain = 0U;
 constexpr std::uint8_t kTypeGlobal = 1U;
 constexpr std::uint8_t kTypeLocal = 2U;
@@ -29,13 +30,6 @@ constexpr std::uint8_t kMainCollection = 10U;
 constexpr std::uint8_t kMainFeature = 11U;
 constexpr std::uint8_t kMainEndCollection = 12U;
 
-constexpr std::uint8_t kGlobalUsagePage = 0U;
-constexpr std::uint8_t kGlobalLogicalMinimum = 1U;
-constexpr std::uint8_t kGlobalLogicalMaximum = 2U;
-constexpr std::uint8_t kGlobalPhysicalMinimum = 3U;
-constexpr std::uint8_t kGlobalPhysicalMaximum = 4U;
-constexpr std::uint8_t kGlobalUnitExponent = 5U;
-constexpr std::uint8_t kGlobalUnit = 6U;
 constexpr std::uint8_t kGlobalReportSize = 7U;
 constexpr std::uint8_t kGlobalReportId = 8U;
 constexpr std::uint8_t kGlobalReportCount = 9U;
@@ -45,15 +39,11 @@ constexpr std::uint8_t kGlobalPop = 11U;
 constexpr std::uint8_t kLocalUsage = 0U;
 constexpr std::uint8_t kLocalUsageMinimum = 1U;
 constexpr std::uint8_t kLocalUsageMaximum = 2U;
-constexpr std::uint8_t kLocalReserved = 6U;
 constexpr std::uint8_t kLocalDelimiter = 10U;
 
-// Section 6.2.2.6 Collection type, and section 6.2.2.5 Input item bits.
+// Section 6.2.2.6 Collection type.
 constexpr std::uint32_t kCollectionApplication = 1U;
-constexpr std::uint32_t kInputConstant = 0x001U;
-constexpr std::uint32_t kInputVariable = 0x002U;
-constexpr std::uint32_t kInputBufferedBytes = 0x100U;
-constexpr std::uint32_t kInputDefinedBits = 0x17FU;
+
 ValidationIssue issue(const aoahid_result result, const char* field, const char* reason,
                       const std::size_t offset = 0U) noexcept {
     return ValidationIssue{result, field, reason, offset};
