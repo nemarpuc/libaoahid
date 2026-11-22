@@ -5,6 +5,10 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-22
+
+**Not hardware-verified.** Raw descriptors are no longer judged by the library, so the phone's kernel now answers for them; this was tested against the fake libusb backend only, with no phone.
+
 ### Changed
 
 - `aoahid_spec_create_raw` no longer judges the descriptor. It reads item boundaries (short and long items) and
