@@ -23,6 +23,12 @@ https://github.com/user-attachments/assets/f6a93ffe-34ea-438b-a09f-d6c55a1f5e23
 An introduction to how the library works and why it was built is
 [on DEV](https://dev.to/nemarpuc/libaoahid-a-c-abi-library-for-sending-hid-input-to-android-over-usb-1h6f).
 
+Related: [`libadbhid`](https://github.com/nemarpuc/libadbhid) sends the same
+profiles through `adb` (USB or wireless debugging), where the phone can also send
+reports back. [`libmimusb`](https://github.com/nemarpuc/libmimusb) presents USB
+devices to any computer through a microcontroller board. All three are built on an
+immutable `Spec` opened as a `Node`, and are separate APIs.
+
 ## What it is not
 
 - **Not two-way.** Sends Input reports only; nothing comes back from the phone (no keyboard LEDs, rumble, or Feature reports; [PROTOCOL.md](docs/PROTOCOL.md#input-only)).
