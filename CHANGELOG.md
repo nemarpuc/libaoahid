@@ -5,6 +5,11 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-27
+
+**Not hardware-verified.** The fixes were tested against the fake libusb backend only, with no phone. The ABI and the
+API are those of 0.2.4.
+
 ### Fixed
 
 - `aoahid_node_open` succeeded on a device that was already gone, returning a Node whose reports failed with `AOAHID_ERR_BUSY` and advice to commit, which did nothing. It now returns `AOAHID_ERR_NO_DEVICE`, and so does a send on a Node that was staged when the device left.
