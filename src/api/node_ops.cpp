@@ -78,6 +78,18 @@ const char* completion_reason(const aoahid_result result) noexcept {
     }
 }
 
+aoahid_result unregistered_node_error(const aoahid_node* node) noexcept {
+    const bool gone = !node->device->transport->present();
+    const aoahid_result result = gone ? AOAHID_ERR_NO_DEVICE : AOAHID_ERR_BUSY;
+    set_error(
+        result, "node.registration",
+        gone ? "The device is gone."
+             : "The Node's registration is not on the phone: it is staged in a batch or its "
+               "last step failed. aoahid_device_batch_end or aoahid_device_commit applies it.");
+    aoa::detail::set_error_node(node->node_id);
+    return result;
+}
+
 aoahid_result consume_completion(aoahid_node* node, const char* field) noexcept {
     const aoahid_result result =
         node->completion_result.exchange(AOAHID_OK, std::memory_order_acq_rel);

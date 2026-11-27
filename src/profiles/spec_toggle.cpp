@@ -30,9 +30,9 @@ bool emit_usage_controls(DescriptorBuilder& builder, const aoahid_toggle_options
 
 aoahid_result create_usage_control_spec(const aoahid_toggle_options* options,
                                         aoahid_spec** out_spec) {
-    if (options == nullptr || !aoa::detail::valid_struct(
-                                  options, options == nullptr ? 0U : options->struct_size,
-                                  static_cast<std::uint32_t>(sizeof(*options)), "toggle_options")) {
+    if (!aoa::detail::valid_struct(options, options == nullptr ? 0U : options->struct_size,
+                                   static_cast<std::uint32_t>(sizeof(*options)),
+                                   "toggle_options")) {
         return AOAHID_ERR_PARAM;
     }
     if (options->reserved != 0U || options->reserved16 != 0U ||

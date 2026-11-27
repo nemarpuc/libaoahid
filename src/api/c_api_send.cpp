@@ -21,6 +21,7 @@ using aoa::detail::preflight_context;
 using aoa::detail::report_id;
 using aoa::detail::set_error;
 using aoa::detail::timeout_is_set;
+using aoa::detail::unregistered_node_error;
 
 extern "C" {
 
@@ -44,14 +45,8 @@ aoahid_result AOAHID_CALL aoahid_node_submit(aoahid_node* node,
     const aoahid_result deferred = preflight_context(node->device->context);
     if (deferred != AOAHID_OK)
         return deferred;
-    if (node->hid_id == 0U) {
-        set_error(
-            AOAHID_ERR_BUSY, "node.registration",
-            "The Node's registration is not on the phone: it is staged in a batch or its last "
-            "step failed. aoahid_device_batch_end or aoahid_device_commit applies it.");
-        aoa::detail::set_error_node(node->node_id);
-        return AOAHID_ERR_BUSY;
-    }
+    if (node->hid_id == 0U)
+        return unregistered_node_error(node);
     if (node->transfer_inflight.exchange(true, std::memory_order_acq_rel)) {
         set_error(AOAHID_ERR_BUSY, "node.submit", "The node already has one report in flight.");
         return AOAHID_ERR_BUSY;
@@ -206,14 +201,8 @@ aoahid_result AOAHID_CALL aoahid_raw_submit(aoahid_node* node, const std::uint8_
     const aoahid_result deferred = preflight_context(node->device->context);
     if (deferred != AOAHID_OK)
         return deferred;
-    if (node->hid_id == 0U) {
-        set_error(
-            AOAHID_ERR_BUSY, "node.registration",
-            "The Node's registration is not on the phone: it is staged in a batch or its last "
-            "step failed. aoahid_device_batch_end or aoahid_device_commit applies it.");
-        aoa::detail::set_error_node(node->node_id);
-        return AOAHID_ERR_BUSY;
-    }
+    if (node->hid_id == 0U)
+        return unregistered_node_error(node);
     if (node->transfer_inflight.exchange(true, std::memory_order_acq_rel)) {
         set_error(AOAHID_ERR_BUSY, "raw.submit", "The raw node already has one report in flight.");
         return AOAHID_ERR_BUSY;

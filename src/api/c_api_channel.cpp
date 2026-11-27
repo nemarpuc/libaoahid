@@ -48,8 +48,7 @@ aoahid_result AOAHID_CALL aoahid_channel_open(aoahid_device* device,
     const aoahid_result deferred = preflight_context(device->context);
     if (deferred != AOAHID_OK)
         return deferred;
-    if (options == nullptr ||
-        !aoa::detail::valid_struct(options, options->struct_size,
+    if (!aoa::detail::valid_struct(options, options == nullptr ? 0U : options->struct_size,
                                    static_cast<std::uint32_t>(sizeof(*options)),
                                    "channel_options")) {
         return AOAHID_ERR_PARAM;

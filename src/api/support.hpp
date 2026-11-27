@@ -140,6 +140,10 @@ std::uint16_t report_id(const aoahid_node* node) noexcept;
 
 const char* completion_reason(aoahid_result result) noexcept;
 
+// Records and returns why a Node with no HID device on the phone cannot send: it is staged or its
+// last step failed (BUSY), or the device is gone (NO_DEVICE).
+aoahid_result unregistered_node_error(const aoahid_node* node) noexcept;
+
 aoahid_result consume_completion(aoahid_node* node, const char* field) noexcept;
 
 aoahid_result initialize_node_state(aoahid_node* node);

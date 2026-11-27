@@ -145,8 +145,7 @@ aoahid_result AOAHID_CALL aoahid_accessory_start(aoahid_context* context,
         return selected->port_path_length > kMaximumLibusbPortDepth ? AOAHID_ERR_OVERFLOW
                                                                     : AOAHID_ERR_PARAM;
     }
-    if (options == nullptr ||
-        !aoa::detail::valid_struct(options, options->struct_size,
+    if (!aoa::detail::valid_struct(options, options == nullptr ? 0U : options->struct_size,
                                    static_cast<std::uint32_t>(sizeof(*options)),
                                    "accessory_options")) {
         return AOAHID_ERR_PARAM;

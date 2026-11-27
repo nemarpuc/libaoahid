@@ -338,6 +338,15 @@ void test_gone_phone_freezes_state(const Nodes& nodes, const sim::Session& sessi
     AOAHID_CHECK(aoahid_pen_update(nodes.pen, &sample) == AOAHID_ERR_NO_DEVICE);
     AOAHID_CHECK(aoahid_device_latched_error(session.device) == AOAHID_ERR_NO_DEVICE &&
                  field_is("device.latched_error"));
+    aoahid_keyboard_options options;
+    aoahid_keyboard_options_init(&options);
+    aoahid_spec* spec = make(options, aoahid_spec_create_keyboard);
+    aoahid_node* node = nullptr;
+    AOAHID_CHECK(aoahid_node_open(session.device, spec, separate_placement(sim::node_options()),
+                                  commit_timeouts_of(kControlTimeoutMs, 20U),
+                                  &node) == AOAHID_ERR_NO_DEVICE &&
+                 node == nullptr);
+    aoahid_spec_release(spec);
 }
 
 void test_report_state_suite() {

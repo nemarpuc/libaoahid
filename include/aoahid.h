@@ -1269,9 +1269,9 @@ AOAHID_API aoahid_result AOAHID_CALL aoahid_spec_manifest(const aoahid_spec* spe
  * followed by another in a registration (docs/API.md "Shared registrations"); AOAHID_ERR_OVERFLOW
  * when the Spec, or the joined descriptor, exceeds a policy of the Device, or no AOA HID ID or
  * Node number is left; AOAHID_ERR_TIMEOUT when a report of another Node of the registration was
- * still in flight at the drain deadline; a transport error from the requests (AOAHID_ERR_STALL:
- * the device has no AOA 2.0 HID). On any error there is no Node, and the registration is put back
- * as it was. */
+ * still in flight at the drain deadline; AOAHID_ERR_NO_DEVICE once the device is gone; a
+ * transport error from the requests (AOAHID_ERR_STALL: the device has no AOA 2.0 HID). On any
+ * error there is no Node, and the registration is put back as it was. */
 AOAHID_API aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* spec,
                                                       const aoahid_node_placement* placement,
                                                       const aoahid_commit_timeouts* timeouts,

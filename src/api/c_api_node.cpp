@@ -53,8 +53,11 @@ aoahid_result AOAHID_CALL aoahid_node_open(aoahid_device* device, aoahid_spec* s
     const aoahid_result deferred = preflight_context(device->context);
     if (deferred != AOAHID_OK)
         return deferred;
-    if (placement == nullptr ||
-        !aoa::detail::valid_struct(placement, placement->struct_size,
+    if (!device->transport->present()) {
+        set_error(AOAHID_ERR_NO_DEVICE, "node.open", "The device is gone.");
+        return AOAHID_ERR_NO_DEVICE;
+    }
+    if (!aoa::detail::valid_struct(placement, placement == nullptr ? 0U : placement->struct_size,
                                    static_cast<std::uint32_t>(sizeof(*placement)),
                                    "node_placement")) {
         return AOAHID_ERR_PARAM;

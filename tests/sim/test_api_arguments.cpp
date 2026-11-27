@@ -29,7 +29,8 @@ void test_context_arguments() {
     AOAHID_CHECK(aoahid_context_create(&options, nullptr) == AOAHID_ERR_PARAM &&
                  field_is("out_context"));
     aoahid_context* context = reinterpret_cast<aoahid_context*>(&options);
-    AOAHID_CHECK(aoahid_context_create(nullptr, &context) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_context_create(nullptr, &context) == AOAHID_ERR_PARAM &&
+                 field_is("context_options"));
     AOAHID_CHECK(context == nullptr);
     options.struct_size = 1U;
     AOAHID_CHECK(aoahid_context_create(&options, &context) == AOAHID_ERR_PARAM &&
@@ -210,7 +211,8 @@ void test_device_selection_arguments() {
     AOAHID_CHECK(aoahid_device_open(context, nullptr, &device_config, &device) == AOAHID_ERR_PARAM);
     AOAHID_CHECK(aoahid_device_open(context, &phone.info, &device_config, nullptr) ==
                  AOAHID_ERR_PARAM);
-    AOAHID_CHECK(aoahid_device_open(context, &phone.info, nullptr, &device) == AOAHID_ERR_PARAM);
+    AOAHID_CHECK(aoahid_device_open(context, &phone.info, nullptr, &device) == AOAHID_ERR_PARAM &&
+                 field_is("device_options"));
     AOAHID_CHECK(aoahid_accessory_start(context, &phone.info, &accessory, 0U) ==
                  AOAHID_ERR_UNSET_FIELD);
     AOAHID_CHECK(aoahid_accessory_start(nullptr, &phone.info, &accessory, kControlTimeoutMs) ==
@@ -406,6 +408,9 @@ void test_node_arguments() {
                                   commit_timeouts_of(kControlTimeoutMs, 20U),
                                   &node) == AOAHID_ERR_UNSET_FIELD &&
                  field_is("node.reserve_slot"));
+    AOAHID_CHECK(aoahid_node_open(session.device, keyboard, separate_placement(options), nullptr,
+                                  &node) == AOAHID_ERR_PARAM &&
+                 field_is("commit_timeouts"));
     aoahid_commit_timeouts wrong_timeouts = *commit_timeouts_of(kControlTimeoutMs, 20U);
     wrong_timeouts.struct_size = 4U;
     AOAHID_CHECK(aoahid_node_open(session.device, keyboard, separate_placement(options),

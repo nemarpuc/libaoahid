@@ -253,8 +253,7 @@ aoahid_result preflight_context(aoahid_context* context) noexcept {
 }
 
 aoahid_result validate_context_options(const aoahid_context_options* options) noexcept {
-    if (options == nullptr ||
-        !aoa::detail::valid_struct(options, options->struct_size,
+    if (!aoa::detail::valid_struct(options, options == nullptr ? 0U : options->struct_size,
                                    static_cast<std::uint32_t>(sizeof(*options)),
                                    "context_options")) {
         return AOAHID_ERR_PARAM;
@@ -274,9 +273,9 @@ aoahid_result validate_context_options(const aoahid_context_options* options) no
 
 aoahid_result prepare_device_options(const aoahid_device_options* options,
                                      aoahid_device_options* effective) noexcept {
-    if (options == nullptr || !aoa::detail::valid_struct(
-                                  options, options->struct_size,
-                                  static_cast<std::uint32_t>(sizeof(*options)), "device_options")) {
+    if (!aoa::detail::valid_struct(options, options == nullptr ? 0U : options->struct_size,
+                                   static_cast<std::uint32_t>(sizeof(*options)),
+                                   "device_options")) {
         return AOAHID_ERR_PARAM;
     }
     *effective = *options;
@@ -445,8 +444,7 @@ aoahid_result allocate_hid_id(aoahid_device* device, std::uint16_t* hid_id) noex
 }
 
 aoahid_result check_commit_timeouts(const aoahid_commit_timeouts* timeouts) noexcept {
-    if (timeouts == nullptr ||
-        !valid_struct(timeouts, timeouts->struct_size,
+    if (!valid_struct(timeouts, timeouts == nullptr ? 0U : timeouts->struct_size,
                       static_cast<std::uint32_t>(sizeof(*timeouts)), "commit_timeouts")) {
         return AOAHID_ERR_PARAM;
     }

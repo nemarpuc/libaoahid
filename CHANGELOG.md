@@ -5,6 +5,11 @@ All notable changes to libaoahid are recorded here. This project follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `aoahid_node_open` succeeded on a device that was already gone, returning a Node whose reports failed with `AOAHID_ERR_BUSY` and advice to commit, which did nothing. It now returns `AOAHID_ERR_NO_DEVICE`, and so does a send on a Node that was staged when the device left.
+- A null options, placement or timeouts structure returned `AOAHID_ERR_PARAM` without recording it, so `aoahid_last_error` still described success. It now names the structure.
+
 ## [0.2.4] - 2026-11-22
 
 **Not hardware-verified.** Raw descriptors are no longer judged by the library, so the phone's kernel now answers for them; this was tested against the fake libusb backend only, with no phone.
