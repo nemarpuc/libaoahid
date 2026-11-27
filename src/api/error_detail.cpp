@@ -211,20 +211,6 @@ void log_event(const aoahid_context* context, const aoahid_log_level level, cons
 
 bool valid_boolean(const std::uint32_t value) noexcept { return value == 0U || value == 1U; }
 
-bool valid_struct(const void* value, const std::uint32_t actual_size,
-                  const std::uint32_t expected_size, const char* field) noexcept {
-    if (value == nullptr) {
-        set_error(AOAHID_ERR_PARAM, field, "The required structure pointer is null.");
-        return false;
-    }
-    if (actual_size != expected_size) {
-        set_error(AOAHID_ERR_PARAM, field,
-                  "struct_size must equal the size of the ABI structure used by this release.");
-        return false;
-    }
-    return true;
-}
-
 } // namespace aoa::detail
 
 extern "C" {
