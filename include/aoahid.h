@@ -97,7 +97,7 @@ typedef struct aoahid_channel aoahid_channel;
  * Every enumeration is an int32_t typedef with anonymous constants, so structure layout does not
  * depend on how a compiler sizes an enum. */
 
-/* A result libmimusb also has keeps the same number there. 5 is not used. */
+/* A result libmimusb or libadbhid also has keeps the same number there. 5 is not used. */
 typedef int32_t aoahid_result;
 enum {
     AOAHID_OK = 0,
